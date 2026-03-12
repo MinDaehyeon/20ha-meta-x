@@ -1258,7 +1258,7 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
     <div>
       {!isAdminView && <AIAdvice logs={logs} profile={profile}/>}
       <LearningCalendar logs={logs}/>
-      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:10,marginBottom:16}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:16}}>
         {[
           {label:"오늘 EI 점수",desc:"최근 학습이 뇌에 얼마나 효과적으로 각인되었는지를 나타내는 종합 점수",kpi:"S(93~) A(81~) B(66~) C(51~) D(~50)\n\n세 가지 역량(전략 수행·풀이 효율·메타인지)을\n종합해 산출하는 학습 각인도 지수입니다.\n점수가 높을수록 오래 기억에 남는 학습을 했다는 의미예요.",value:latest?.engramIndex??"—",color:latest?EI_COLOR(latest.engramIndex):T.navy,sub:delta!==null?`${delta>=0?"▲":"▼"} ${Math.abs(delta)} 어제보다`:null,subColor:delta>=0?T.success:T.danger},
           {label:"목표 달성률",desc:"설정한 목표 점수 대비 현재 도달 정도",kpi:"100%이면 목표 달성, 100% 초과면 목표를 넘어선 상태입니다.\n\n프로필에서 목표 EI를 조정할 수 있어요.",value:latest?((latest.engramIndex/targetEI)*100).toFixed(0):"—",unit:"%",color:T.orange},
@@ -1287,7 +1287,7 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
           </ComposedChart>
         </ResponsiveContainer>
       </Card>
-      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12,marginBottom:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:12,marginBottom:12}}>
         <Card>
           <SectionTitle sub="C-C: 정확한 자기예측 · C-I: 과신 오류 · I-C: 과소평가 · I-I: 정직한 오답 인식" tooltip="Co-In(Confidence-Incorrect) 메타인지 필터입니다.\n\nC-C: 맞을 것 같았고 실제로 맞음 → 이상적\nC-I: 맞을 것 같았으나 틀림 → 과신 경보(30% 초과 시 Red Flag)\nI-C: 틀릴 것 같았으나 맞음 → 과소평가\nI-I: 틀릴 것 같았고 실제로 틀림 → 정직한 인식\n\nC-C 비율이 높을수록 메타인지 정확도 우수">🧠 내 예측 vs 실제 결과</SectionTitle>
           <ResponsiveContainer width="100%" height={200}>
@@ -1726,7 +1726,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                   </div>
                 ))}
               </Card>
-              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12,marginBottom:12}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:12,marginBottom:12}}>
                 <Card>
                   <SectionTitle sub="과목별 평균 EI">📚 과목별 EI</SectionTitle>
                   {Object.entries(bySubject).map(([subj,ei])=>(
@@ -2153,7 +2153,7 @@ export default function App() {
   const pendingCount = allProfiles.filter(p => p.role==="student" && p.approval_status==="pending").length;
 
   return (
-    <div style={{ minHeight:"100vh", background:T.bg, fontFamily:"'Noto Sans KR',sans-serif", color:T.text }}>
+    <div style={{ minHeight:"100vh", background:T.bg, fontFamily:"'Noto Sans KR',sans-serif", color:T.text, overflowX:"hidden" }}>
       {/* Header */}
       <div style={{ position:"sticky", top:0, zIndex:100, borderBottom:`1px solid ${T.border}`,
         background:T.surface, boxShadow:"0 1px 6px rgba(25,29,84,0.06)" }}>
