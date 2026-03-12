@@ -127,9 +127,9 @@ const SectionTitle = ({children,sub,tooltip}) => {
         </div>
       )}
       {show&&tooltip&&(
-        <div style={{position:"fixed",left:Math.min(pos.x, window.innerWidth-316),top:pos.y,zIndex:9999,pointerEvents:"none",
+        <div style={{position:"fixed",...(pos.x+316>window.innerWidth?{right:8,left:"auto"}:{left:pos.x}),top:pos.y,zIndex:9999,pointerEvents:"none",
           background:T.navy,color:T.white,borderRadius:10,padding:"12px 16px",fontSize:12,
-          maxWidth:300,lineHeight:1.8,boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>
+          width:300,lineHeight:1.8,boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>
           {tooltip.split(/\\n|\n/).map((line,i)=>
             line===""
               ? <div key={i} style={{height:6}}/>
@@ -149,7 +149,7 @@ const ChartTip = ({active,payload,label}) => {
   return (
     <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 12px",fontSize:11,boxShadow:"0 2px 8px rgba(25,29,84,0.10)"}}>
       <div style={{color:T.muted,marginBottom:4,fontWeight:600,fontSize:10}}>{label}</div>
-      {payload.map((p,i)=>{const v=p.value;const displayName=p.name==="value"?label:p.name;const isErrCode=/^[QM][1-3]$/.test(displayName);const isCount=isErrCode||displayName&&(displayName.includes("회")||displayName.includes("건")||displayName.includes("오답")||displayName.includes("횟수")||displayName==="기본"||displayName==="중급"||displayName==="심화");const disp=typeof v==="number"?(Number.isInteger(v)||isCount?Math.round(v):v.toFixed(1)):v;if(isErrCode)return<div key={i} style={{color:p.color||T.navy,fontWeight:700,fontSize:12,lineHeight:1.8}}>{displayName} {disp}</div>;return<div key={i} style={{color:p.color||T.navy,fontWeight:700,fontSize:11}}>{displayName}: {disp}{isCount?"회":""}</div>;})}
+      {payload.map((p,i)=>{const v=p.value;const displayName=p.name==="value"?label:p.name;const isErrCode=/^[QM][1-3]$/.test(displayName);const isSpeed=displayName==="기본"||displayName==="중급"||displayName==="심화";const isCount=isErrCode||displayName&&(displayName.includes("회")||displayName.includes("건")||displayName.includes("오답")||displayName.includes("횟수"));const disp=typeof v==="number"?(Number.isInteger(v)||isCount||isSpeed?Math.round(v):v.toFixed(1)):v;if(isErrCode)return<div key={i} style={{color:p.color||T.navy,fontWeight:700,fontSize:12,lineHeight:1.8}}>{displayName} {disp}</div>;return<div key={i} style={{color:p.color||T.navy,fontWeight:700,fontSize:11}}>{displayName}: {disp}{isSpeed?"초":isCount?"회":""}</div>;})}
     </div>
   );
 };
@@ -842,9 +842,8 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
                 <div key={key} style={{background:color+"0e",border:`1px solid ${color}30`,borderRadius:12,padding:"12px 14px"}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
                     <div><div style={{fontSize:14,fontWeight:800,color}}>{label}</div><div style={{fontSize:10,color:T.muted,marginTop:2,lineHeight:1.4}}>{desc}</div></div>
-                    <div style={{display:"flex",alignItems:"baseline",gap:2,whiteSpace:"nowrap",flexShrink:0,marginLeft:6}}>
-                      <span style={{fontSize:24,fontWeight:900,color,fontFamily:"'DM Mono',monospace"}}>{form.coinFilter[key]}</span>
-                      <span style={{fontSize:11,color,opacity:0.7}}>문항</span>
+                    <div style={{whiteSpace:"nowrap",flexShrink:0,marginLeft:6,lineHeight:1}}>
+                      <span style={{fontSize:24,fontWeight:900,color,fontFamily:"'DM Mono',monospace"}}>{form.coinFilter[key]}</span><span style={{fontSize:11,color,opacity:0.7}}>문항</span>
                     </div>
                   </div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
@@ -938,9 +937,9 @@ const KpiCard = ({label,desc,kpi,value,unit="",color,sub,subColor,isMobile}) => 
       <NavyNum value={value} unit={unit} size={isMobile?20:24} color={color}/>
       {sub&&<div style={{fontSize:11,color:subColor,marginTop:5,fontWeight:600}}>{sub}</div>}
       {show&&kpi&&(
-        <div style={{position:"fixed",left:Math.min(pos.x, window.innerWidth-276),top:pos.y,zIndex:9999,pointerEvents:"none",
+        <div style={{position:"fixed",...(pos.x+276>window.innerWidth?{right:8,left:"auto"}:{left:pos.x}),top:pos.y,zIndex:9999,pointerEvents:"none",
           background:T.navy,color:T.white,borderRadius:10,padding:"12px 16px",fontSize:12,
-          maxWidth:260,lineHeight:1.8,boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>
+          width:260,lineHeight:1.8,boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>
           {kpi.split("\n").map((line,i)=>
             line===""
               ? <div key={i} style={{height:6}}/>
@@ -986,10 +985,10 @@ const LearningCalendar = ({logs}) => {
           <div style={{fontSize:14,fontWeight:800,color:T.navy}}>📅 학습 달력</div>
           <div style={{fontSize:11,color:T.muted,marginTop:2}}>색칠된 날 = 학습 기록이 있는 날이에요</div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
           <button onClick={()=>{if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1);}}
-            style={{background:"none",border:`1px solid ${T.border}`,borderRadius:6,width:28,height:28,cursor:"pointer",fontSize:14,color:T.navy}}>‹</button>
-          <span style={{fontSize:13,fontWeight:700,color:T.navy,minWidth:52,textAlign:"center",whiteSpace:"nowrap"}}>{year}년 {MONTHS[month]}</span>
+            style={{background:"none",border:`1px solid ${T.border}`,borderRadius:6,width:28,height:28,cursor:"pointer",fontSize:14,color:T.navy,flexShrink:0}}>‹</button>
+          <span style={{fontSize:13,fontWeight:700,color:T.navy,whiteSpace:"nowrap",textAlign:"center"}}>{year}년 {MONTHS[month]}</span>
           <button onClick={()=>{if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1);}}
             style={{background:"none",border:`1px solid ${T.border}`,borderRadius:6,width:28,height:28,cursor:"pointer",fontSize:14,color:T.navy}}>›</button>
         </div>
