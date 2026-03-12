@@ -144,7 +144,7 @@ const ChartTip = ({active,payload,label}) => {
   return (
     <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 12px",fontSize:11,boxShadow:"0 2px 8px rgba(25,29,84,0.10)"}}>
       <div style={{color:T.muted,marginBottom:4,fontWeight:600,fontSize:10}}>{label}</div>
-      {payload.map((p,i)=>{const v=p.value;const isErrCode=/^[QM][1-3]$/.test(p.name);const isCount=isErrCode||p.name&&(p.name.includes("회")||p.name.includes("건")||p.name.includes("오답")||p.name.includes("횟수")||p.name==="기본"||p.name==="중급"||p.name==="심화");const disp=typeof v==="number"?(Number.isInteger(v)||isCount?Math.round(v):v.toFixed(1)):v;if(isErrCode)return<div key={i} style={{color:p.color||T.navy,fontWeight:700,fontSize:11,lineHeight:1.6}}>{p.name}<br/>{disp}</div>;return<div key={i} style={{color:p.color||T.navy,fontWeight:700,fontSize:11}}>{p.name}: {disp}{isCount?"회":""}</div>;})}
+      {payload.map((p,i)=>{const v=p.value;const displayName=p.name==="value"?label:p.name;const isErrCode=/^[QM][1-3]$/.test(displayName);const isCount=isErrCode||displayName&&(displayName.includes("회")||displayName.includes("건")||displayName.includes("오답")||displayName.includes("횟수")||displayName==="기본"||displayName==="중급"||displayName==="심화");const disp=typeof v==="number"?(Number.isInteger(v)||isCount?Math.round(v):v.toFixed(1)):v;if(isErrCode)return<div key={i} style={{color:p.color||T.navy,fontWeight:700,fontSize:12,lineHeight:1.8}}>{displayName} {disp}</div>;return<div key={i} style={{color:p.color||T.navy,fontWeight:700,fontSize:11}}>{displayName}: {disp}{isCount?"회":""}</div>;})}
     </div>
   );
 };
