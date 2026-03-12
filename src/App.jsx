@@ -120,14 +120,14 @@ const SectionTitle = ({children,sub,tooltip}) => {
       {tags.length>0&&(
         <div style={{display:"flex",flexWrap:"wrap",gap:"3px 8px",marginTop:4}}>
           {tags.map((t,i)=>(
-            <span key={i} style={{fontSize:10,color:T.muted,whiteSpace:"nowrap"}}>
+            <span key={i} style={{fontSize:10,color:T.muted,wordBreak:"keep-all",overflowWrap:"break-word"}}>
               {i>0&&<span style={{color:T.border,marginRight:4}}>·</span>}{t}
             </span>
           ))}
         </div>
       )}
       {show&&tooltip&&(
-        <div style={{position:"fixed",left:pos.x,top:pos.y,zIndex:9999,pointerEvents:"none",
+        <div style={{position:"fixed",left:Math.min(pos.x, window.innerWidth-316),top:pos.y,zIndex:9999,pointerEvents:"none",
           background:T.navy,color:T.white,borderRadius:10,padding:"12px 16px",fontSize:12,
           maxWidth:300,lineHeight:1.8,boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>
           {tooltip.split(/\\n|\n/).map((line,i)=>
@@ -938,7 +938,7 @@ const KpiCard = ({label,desc,kpi,value,unit="",color,sub,subColor,isMobile}) => 
       <NavyNum value={value} unit={unit} size={isMobile?20:24} color={color}/>
       {sub&&<div style={{fontSize:11,color:subColor,marginTop:5,fontWeight:600}}>{sub}</div>}
       {show&&kpi&&(
-        <div style={{position:"fixed",left:pos.x,top:pos.y,zIndex:9999,pointerEvents:"none",
+        <div style={{position:"fixed",left:Math.min(pos.x, window.innerWidth-276),top:pos.y,zIndex:9999,pointerEvents:"none",
           background:T.navy,color:T.white,borderRadius:10,padding:"12px 16px",fontSize:12,
           maxWidth:260,lineHeight:1.8,boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>
           {kpi.split("\n").map((line,i)=>
@@ -989,7 +989,7 @@ const LearningCalendar = ({logs}) => {
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <button onClick={()=>{if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1);}}
             style={{background:"none",border:`1px solid ${T.border}`,borderRadius:6,width:28,height:28,cursor:"pointer",fontSize:14,color:T.navy}}>‹</button>
-          <span style={{fontSize:13,fontWeight:700,color:T.navy,minWidth:52,textAlign:"center"}}>{year}년 {MONTHS[month]}</span>
+          <span style={{fontSize:13,fontWeight:700,color:T.navy,minWidth:52,textAlign:"center",whiteSpace:"nowrap"}}>{year}년 {MONTHS[month]}</span>
           <button onClick={()=>{if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1);}}
             style={{background:"none",border:`1px solid ${T.border}`,borderRadius:6,width:28,height:28,cursor:"pointer",fontSize:14,color:T.navy}}>›</button>
         </div>
