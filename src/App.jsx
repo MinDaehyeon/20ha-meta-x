@@ -26,7 +26,7 @@ const injectStyles = () => {
     select option { background-color: #ffffff !important; color: #1a1a2e !important; }
     input[type=range] { background: transparent; }
     input[type=range] { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 4px; outline: none; }
-    input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: #E8EAF6; }
+    input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: transparent; }
     input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--thumb-color, #191D54); cursor: pointer; margin-top: -7px; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
     input[type=range]::-moz-range-track { height: 4px; border-radius: 4px; background: #E8EAF6; }
     input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #191D54; cursor: pointer; border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
@@ -37,6 +37,11 @@ const injectStyles = () => {
   document.head.appendChild(el);
 };
 injectStyles();
+
+const sliderFill = (value, min, max, color) => {
+  const pct = ((value - min) / (max - min)) * 100;
+  return { width: "100%", color, background: `linear-gradient(to right, ${color} 0%, ${color} ${pct}%, #E8EAF6 ${pct}%, #E8EAF6 100%)` };
+};
 
 // ══════════════════════════════════════════════════════
 // CONSTANTS
@@ -678,7 +683,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
               </div>
             </div>
             <label style={css.label}>쉬는 시간: <strong style={{color:T.orange}}>{form.breakTime}분</strong> · 순수 풀이: <strong style={{color:T.navy}}>{netTime}분</strong></label>
-            <input type="range" min={0} max={60} value={form.breakTime} onChange={e=>setForm(f=>({...f,breakTime:Number(e.target.value)}))} style={{width:"100%",accentColor:T.orange}}/>
+            <input type="range" min={0} max={60} value={form.breakTime} onChange={e=>setForm(f=>({...f,breakTime:Number(e.target.value)}))} style={sliderFill(form.breakTime,0,60,T.orange)}/>
             {breakRatio>50&&<div style={{fontSize:12,color:T.danger,marginTop:4}}>⚠️ 쉬는 시간 50% 초과</div>}
 
             {/* 단계별 시간 분배 - 띠 위에서 드래그로 경계 조절 */}
@@ -775,7 +780,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
                     <span style={{fontSize:13,color:T.textMid}}>{item}</span>
                     <div style={{display:"flex",gap:8,alignItems:"center"}}><Pill color={c}>{g}</Pill><span style={{fontSize:14,fontWeight:800,color:T.navy,minWidth:28,textAlign:"right"}}>{form.quant[item]}</span></div>
                   </div>
-                  <input type="range" min={0} max={100} step={1} value={form.quant[item]} onChange={e=>setForm(f=>({...f,quant:{...f.quant,[item]:Number(e.target.value)}}))} style={{width:"100%",accentColor:c}}/>
+                  <input type="range" min={0} max={100} step={1} value={form.quant[item]} onChange={e=>setForm(f=>({...f,quant:{...f.quant,[item]:Number(e.target.value)}}))} style={sliderFill(form.quant[item],0,100,c)}/>
                 </div>
               );
             })}
@@ -1870,7 +1875,7 @@ const EISetupModal = ({profile, onSave}) => {
             </div>
           </div>
           <input type="range" min={50} max={100} step={1} value={target} onChange={e=>setTarget(Number(e.target.value))}
-            style={{width:"100%",accentColor:currentGrade.color}}/>
+            style={sliderFill(target,50,100,currentGrade.color)}/>
           <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"rgba(255,255,255,0.5)",marginTop:4}}>
             <span>50 (D)</span><span>65 (C)</span><span>80 (B)</span><span>92 (A)</span><span>100 (S)</span>
           </div>
@@ -1938,7 +1943,7 @@ const ProfileModal = ({profile, onClose, onSave}) => {
             </div>
             <div>
               <label style={css.label}>목표 EI <strong style={{color:T.navy}}>{target}</strong></label>
-              <input type="range" min={50} max={100} value={target} onChange={e=>setTarget(Number(e.target.value))} style={{width:"100%",accentColor:T.orange}}/>
+              <input type="range" min={50} max={100} value={target} onChange={e=>setTarget(Number(e.target.value))} style={sliderFill(target,50,100,T.orange)}/>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:T.muted,marginTop:2}}>
                 <span>50 (D)</span><span>66 (B)</span><span>81 (A)</span><span>93 (S)</span>
               </div>
