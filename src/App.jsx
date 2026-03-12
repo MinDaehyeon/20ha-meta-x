@@ -842,7 +842,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
                 <div key={key} style={{background:color+"0e",border:`1px solid ${color}30`,borderRadius:12,padding:"12px 14px"}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
                     <div><div style={{fontSize:14,fontWeight:800,color}}>{label}</div><div style={{fontSize:10,color:T.muted,marginTop:2,lineHeight:1.4}}>{desc}</div></div>
-                    <div style={{display:"flex",alignItems:"baseline",gap:2,whiteSpace:"nowrap"}}>
+                    <div style={{display:"flex",alignItems:"baseline",gap:2,whiteSpace:"nowrap",flexShrink:0,marginLeft:6}}>
                       <span style={{fontSize:24,fontWeight:900,color,fontFamily:"'DM Mono',monospace"}}>{form.coinFilter[key]}</span>
                       <span style={{fontSize:11,color,opacity:0.7}}>문항</span>
                     </div>
