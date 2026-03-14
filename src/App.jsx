@@ -73,7 +73,7 @@ const GRAPH = {
   speed:"#0891B2",
 };
 const EI_COLOR  = v => v>=85?GRAPH.ccColor:v>=70?T.navy:v>=55?GRAPH.icColor:GRAPH.ciColor;
-const gradeInfo = s => s>=93?{g:"S",c:"#F59E0B"}:s>=81?{g:"A",c:GRAPH.ccColor}:s>=66?{g:"B",c:T.navy}:s>=51?{g:"C",c:GRAPH.icColor}:{g:"D",c:GRAPH.ciColor};
+const gradeInfo = s => s>=93?{g:"S",c:"#16A34A"}:s>=81?{g:"A",c:"#2563EB"}:s>=66?{g:"B",c:"#111827"}:s>=51?{g:"C",c:"#F97316"}:{g:"D",c:"#DC2626"};
 const calcEI    = ({strategyScore:s,efficiencyIndex:e,metacognitionAccuracy:m}) => +(s*0.4+e*0.2+m*0.4).toFixed(1);
 
 // ══════════════════════════════════════════════════════
@@ -1825,9 +1825,9 @@ const EISetupModal = ({profile, onSave}) => {
   const [saving, setSaving] = useState(false);
   const isMobile = useMobile();
   const EI_GRADES = [
-    {min:93,max:100,grade:"S",color:"#F59E0B",desc:"최상위권 — 전략·효율·메타인지 모두 정점. 수능 만점권 수준의 학습 밀도."},
-    {min:81,max:92,grade:"A",color:"#16A34A",desc:"상위권 — 핵심 전략을 충실히 실천하며 자기 실력을 정확히 파악하는 단계."},
-    {min:66,max:80,grade:"B",color:"#191D54",desc:"중상위권 — 학습 루틴이 잡혀가고 있으나 메타인지나 효율에 개선 여지 있음."},
+    {min:93,max:100,grade:"S",color:"#16A34A",desc:"최상위권 — 전략·효율·메타인지 모두 정점. 수능 만점권 수준의 학습 밀도."},
+    {min:81,max:92,grade:"A",color:"#2563EB",desc:"상위권 — 핵심 전략을 충실히 실천하며 자기 실력을 정확히 파악하는 단계."},
+    {min:66,max:80,grade:"B",color:"#111827",desc:"중상위권 — 학습 루틴이 잡혀가고 있으나 메타인지나 효율에 개선 여지 있음."},
     {min:51,max:65,grade:"C",color:"#F97316",desc:"중위권 — 학습 시간은 채우고 있으나 전략 수행이 불안정하고 오답 패턴 반복."},
     {min:0, max:50,grade:"D",color:"#DC2626",desc:"하위권 — 학습 루틴·전략·메타인지 전반적 재정비 필요."},
   ];
