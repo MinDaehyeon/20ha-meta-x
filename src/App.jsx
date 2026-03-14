@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ScatterChart, Scatter, Cell,
@@ -1933,36 +1935,59 @@ const EISetupModal = ({profile, onSave}) => {
 // PROFILE MODAL
 // ══════════════════════════════════════════════════════
 const ProfileModal = ({profile, onClose, onSave}) => {
-  const [name, setName]         = useState(profile.name||"");
-  const [grade, setGrade]       = useState(profile.grade||"고1");
-  const [target, setTarget]     = useState(profile.target_ei||85);
+  const [name, setName]           = useState(profile.name||"");
+  const [grade, setGrade]         = useState(profile.grade||"고1");
+  const [target, setTarget]       = useState(profile.target_ei||85);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url||"");
   const [uploading, setUploading] = useState(false);
-  const [newPw, setNewPw]       = useState("");
-  const [newPwC, setNewPwC]     = useState("");
-  const [saving, setSaving]     = useState(false);
-  const [done, setDone]         = useState(false);
-  const [err, setErr]           = useState("");
-  const fileRef = useState(null);
+  const [newPw, setNewPw]         = useState("");
+  const [newPwC, setNewPwC]       = useState("");
+  const [saving, setSaving]       = useState(false);
+  const [done, setDone]           = useState(false);
+  const [err, setErr]             = useState("");
+  const [cropSrc, setCropSrc]     = useState(null);
+  const [crop, setCrop]           = useState();
+  const [completedCrop, setCompletedCrop] = useState(null);
+  const imgRef = useRef(null);
 
-  const handleAvatar = async (e) => {
+  const onFileSelect = (e) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if(!file) return;
-    if(file.size > 2*1024*1024){ setErr("이미지는 2MB 이하만 가능합니다."); return; }
-    const dims = await new Promise(res => {
-      const img = new Image();
-      img.onload = () => res({w:img.width,h:img.height});
-      img.src = URL.createObjectURL(file);
-    });
-    if(dims.w > 1000 || dims.h > 1000){ setErr("이미지 크기는 1000×1000px 이하만 가능합니다."); return; }
+    setErr("");
+    const reader = new FileReader();
+    reader.onload = () => setCropSrc(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const onImageLoad = (e) => {
+    const {width,height} = e.currentTarget;
+    const c = centerCrop(makeAspectCrop({unit:"%",width:80},1,width,height),width,height);
+    setCrop(c); setCompletedCrop(c);
+  };
+
+  const compressAndUpload = async () => {
+    if(!completedCrop || !imgRef.current) return;
     setUploading(true); setErr("");
-    const ext = file.name.split(".").pop();
-    const path = `${profile.id}.${ext}`;
-    const {error:upErr} = await supabase.storage.from("avatars").upload(path, file, {upsert:true});
+    const img = imgRef.current;
+    const scaleX = img.naturalWidth / img.width;
+    const scaleY = img.naturalHeight / img.height;
+    const canvas = document.createElement("canvas");
+    const size = Math.min(800, completedCrop.width * scaleX);
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img,
+      completedCrop.x*scaleX, completedCrop.y*scaleY,
+      completedCrop.width*scaleX, completedCrop.height*scaleY,
+      0, 0, size, size
+    );
+    const blob = await new Promise(res => canvas.toBlob(res, "image/jpeg", 0.82));
+    const path = `${profile.id}.jpg`;
+    const {error:upErr} = await supabase.storage.from("avatars").upload(path, blob, {upsert:true, contentType:"image/jpeg"});
     if(upErr){ setErr("업로드 실패: "+upErr.message); setUploading(false); return; }
     const {data:{publicUrl}} = supabase.storage.from("avatars").getPublicUrl(path);
     setAvatarUrl(publicUrl+"?t="+Date.now());
-    setUploading(false);
+    setCropSrc(null); setUploading(false);
   };
 
   const save = async () => {
@@ -1992,10 +2017,30 @@ const ProfileModal = ({profile, onClose, onSave}) => {
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,color:T.muted,cursor:"pointer",lineHeight:1}}>×</button>
         </div>
 
+        {/* 크롭 모달 */}
+        {cropSrc&&(
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:10000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}}>
+            <div style={{background:T.surface,borderRadius:16,padding:20,maxWidth:480,width:"100%"}}>
+              <div style={{fontSize:14,fontWeight:700,color:T.navy,marginBottom:12}}>사진 영역 선택</div>
+              <div style={{maxHeight:"60vh",overflowY:"auto",marginBottom:14}}>
+                <ReactCrop crop={crop} onChange={c=>setCrop(c)} onComplete={c=>setCompletedCrop(c)} aspect={1} circularCrop={false}>
+                  <img ref={imgRef} src={cropSrc} onLoad={onImageLoad} style={{maxWidth:"100%"}} alt="crop"/>
+                </ReactCrop>
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={()=>setCropSrc(null)} style={{...css.btnGhost,flex:1}}>취소</button>
+                <button onClick={compressAndUpload} disabled={uploading} style={{...css.btnPrimary,flex:2,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  {uploading?<><Spinner size={16} color="#fff"/>업로드 중...</>:"적용"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 프로필 사진 */}
         <div style={{textAlign:"center",marginBottom:20}}>
           <label style={{cursor:"pointer",display:"inline-block",position:"relative"}}>
-            <input type="file" accept="image/*" onChange={handleAvatar} style={{display:"none"}} ref={r=>fileRef[0]=r}/>
+            <input type="file" accept="image/*" onChange={onFileSelect} style={{display:"none"}}/>
             <div style={{width:80,height:80,borderRadius:24,background:avatarUrl?"transparent":T.grad,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:32,boxShadow:"0 4px 12px rgba(25,29,84,0.2)",overflow:"hidden",border:`2px solid ${T.border}`}}>
               {uploading
                 ? <Spinner size={28} color={T.white}/>
@@ -2006,7 +2051,7 @@ const ProfileModal = ({profile, onClose, onSave}) => {
             </div>
             <div style={{position:"absolute",bottom:0,right:0,width:24,height:24,background:T.orange,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>📷</div>
           </label>
-          <div style={{fontSize:11,color:T.muted,marginTop:8}}>사진 클릭하여 변경 (최대 2MB)</div>
+          <div style={{fontSize:11,color:T.muted,marginTop:8}}>사진 클릭하여 변경 · 자동 압축 저장</div>
           <div style={{fontSize:12,color:T.muted,marginTop:2}}>
             {profile.role==="admin"?"관리자 계정":"학생 계정"} · 가입 {profile.created_at?.slice(0,10)||""}
           </div>
