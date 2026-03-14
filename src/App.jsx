@@ -402,20 +402,6 @@ const handleSocial = async (provider) => {
           {loading.email?<><Spinner size={18} color="#fff"/>로그인 중...</>:"로그인 →"}
         </button>
 
-        {/* ── 데모 버튼 (상용화 시 삭제) ── */}
-        <div style={{marginTop:16,padding:"14px 16px",background:T.surfaceAlt,borderRadius:12,border:`1px dashed ${T.borderStrong}`}}>
-          <div style={{fontSize:11,color:T.muted,fontWeight:700,letterSpacing:"0.06em",marginBottom:10}}>🔧 데모 계정 (배포 시 삭제)</div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>fillDemo("student")} disabled={loading.email}
-              style={{flex:1,padding:"9px 0",borderRadius:8,border:`1px solid ${T.navy}`,background:T.white,color:T.navy,fontSize:12,fontWeight:700,cursor:"pointer"}}>
-              🎓 학생 체험
-            </button>
-            <button onClick={()=>fillDemo("admin")} disabled={loading.email}
-              style={{flex:1,padding:"9px 0",borderRadius:8,border:`1px solid ${T.orange}`,background:T.white,color:T.orange,fontSize:12,fontWeight:700,cursor:"pointer"}}>
-              📋 관리자 체험
-            </button>
-          </div>
-        </div>
 
         <div style={{textAlign:"center",marginTop:14,fontSize:13,color:T.muted}}>
           계정이 없으신가요? <span onClick={()=>{setMode("signup");setError("");}} style={{color:T.orange,fontWeight:700,cursor:"pointer"}}>이메일로 가입</span>
