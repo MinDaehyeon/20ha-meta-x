@@ -248,6 +248,7 @@ const AuthScreen = ({ onLogin }) => {
   const [suTarget, setSuTarget] = useState(85);
   const [signupDone, setSignupDone] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const isMobile = useMobile();
 
@@ -267,38 +268,48 @@ const AuthScreen = ({ onLogin }) => {
     onLogin(data.session);
   };
 
+  const handleSendOtp = async () => {
+    setError("");
+    if(!suEmail){ setError("이메일을 입력해주세요."); return; }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(suEmail)){ setError("유효하지 않은 이메일 형식입니다."); return; }
+    setLoad("sendOtp",true);
+    const {error:err} = await supabase.auth.signInWithOtp({ email:suEmail, options:{shouldCreateUser:true} });
+    setLoad("sendOtp",false);
+    if(err){ setError(translateSupabaseError(err.message)); return; }
+    setOtpSent(true); setOtpVerified(false); setOtpCode("");
+  };
+
+  const handleVerifyOtp = async () => {
+    if(otpCode.length !== 6){ setError("6자리 코드를 입력해주세요."); return; }
+    setLoad("otp",true); setError("");
+    const {error:err} = await supabase.auth.verifyOtp({ email:suEmail, token:otpCode, type:"email" });
+    setLoad("otp",false);
+    if(err){ setError("인증 코드가 올바르지 않습니다. 다시 확인해주세요."); return; }
+    setOtpSent(false); setOtpVerified(true);
+  };
+
   const handleSignup = async () => {
     setError("");
-    if(!suName||!suEmail||!suPw){ setError("모든 항목을 입력해 주세요."); return; }
+    if(!suName||!suPw){ setError("모든 항목을 입력해 주세요."); return; }
+    if(!otpVerified){ setError("이메일 인증을 먼저 완료해주세요."); return; }
     if(suName.trim()!==suName||suName.includes(" ")){ setError("이름에 공백을 포함할 수 없습니다."); return; }
     if(suName.trim().length<2){ setError("이름은 2자 이상 입력해주세요."); return; }
     const pwRegex=/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/;
     if(suPw!==suPwC){ setError("비밀번호가 일치하지 않습니다."); return; }
     if(!pwRegex.test(suPw)){ setError("비밀번호는 영문 대소문자, 특수문자를 포함한 8자 이상이어야 합니다."); return; }
     setLoad("signup",true);
-    const {data, error:err} = await supabase.auth.signUp({
-      email:suEmail, password:suPw,
-      options:{ data:{name:suName, grade:suGrade, target_ei:85, role:"student"} }
+    const {data,error:err} = await supabase.auth.updateUser({
+      password:suPw, data:{name:suName, grade:suGrade, target_ei:85, role:"student"}
     });
     if(!err && data?.user){
-      // profiles 직접 upsert (트리거 보완)
       await supabase.from("profiles").upsert({
         id:data.user.id, name:suName, grade:suGrade,
         target_ei:85, role:"student", approval_status:"pending"
       });
     }
+    await supabase.auth.signOut();
     setLoad("signup",false);
     if(err){ setError(translateSupabaseError(err.message)); return; }
-    setOtpSent(true);
-  };
-
-  const handleVerifyOtp = async () => {
-    if(otpCode.length !== 6){ setError("6자리 코드를 입력해주세요."); return; }
-    setLoad("otp",true); setError("");
-    const {error:err} = await supabase.auth.verifyOtp({ email:suEmail, token:otpCode, type:"signup" });
-    setLoad("otp",false);
-    if(err){ setError("인증 코드가 올바르지 않습니다. 다시 확인해주세요."); return; }
-    setOtpSent(false);
     setSignupDone(true);
   };
 
@@ -432,10 +443,13 @@ const handleSocial = async (provider) => {
           <div>
             <label style={css.label}>이메일</label>
             <div style={{display:"flex",gap:8}}>
-              <input value={suEmail} onChange={e=>{setSuEmail(e.target.value);setOtpSent(false);setOtpCode("");}} placeholder="example@email.com" disabled={otpSent} style={{...css.input,flex:1,opacity:otpSent?0.6:1}}/>
-              <button onClick={handleSignup} disabled={loading.signup||otpSent} style={{...css.btnPrimary,padding:"0 14px",fontSize:12,fontWeight:700,whiteSpace:"nowrap",flexShrink:0,opacity:otpSent?0.5:1}}>
-                {loading.signup?<Spinner size={14} color="#fff"/>:"인증메일 보내기"}
-              </button>
+              <input value={suEmail} onChange={e=>{setSuEmail(e.target.value);setOtpSent(false);setOtpVerified(false);setOtpCode("");}} placeholder="example@email.com" disabled={otpVerified} style={{...css.input,flex:1,opacity:otpVerified?0.6:1}}/>
+              {otpVerified
+                ? <span style={{flexShrink:0,color:"#16A34A",fontWeight:700,fontSize:13,padding:"0 8px"}}>✓ 인증완료</span>
+                : <button onClick={handleSendOtp} disabled={loading.sendOtp||otpSent} style={{...css.btnPrimary,padding:"0 14px",fontSize:12,fontWeight:700,whiteSpace:"nowrap",flexShrink:0,opacity:otpSent?0.5:1}}>
+                    {loading.sendOtp?<Spinner size={14} color="#fff"/>:otpSent?"재전송":"인증메일 보내기"}
+                  </button>
+              }
             </div>
           </div>
           {otpSent&&(
@@ -449,7 +463,7 @@ const handleSocial = async (provider) => {
                   {loading.otp?<Spinner size={14} color="#fff"/>:"확인"}
                 </button>
               </div>
-              <button onClick={async()=>{setOtpCode("");setError("");await supabase.auth.resend({type:"signup",email:suEmail});setError("코드를 재전송했습니다.");}}
+              <button onClick={async()=>{setOtpCode("");setError("");await handleSendOtp();}}
                 style={{background:"none",border:"none",color:"#6B7280",fontSize:11,cursor:"pointer",marginTop:6,padding:0}}>코드 재전송</button>
             </div>
           )}
@@ -460,8 +474,8 @@ const handleSocial = async (provider) => {
           ⚠️ 가입 후 <strong>관리자 승인</strong>이 완료되어야 로그인할 수 있습니다.
         </div>
         {error && <div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",fontSize:13,color:T.danger,marginBottom:12}}>{error}</div>}
-        <button onClick={handleVerifyOtp} disabled={loading.otp||!otpSent} style={{...css.btnOrange,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:!otpSent?0.4:1}}>
-          {loading.otp?<><Spinner size={18} color="#fff"/>확인 중...</>:"가입하기 →"}
+        <button onClick={handleSignup} disabled={loading.signup||!otpVerified} style={{...css.btnOrange,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:!otpVerified?0.4:1}}>
+          {loading.signup?<><Spinner size={18} color="#fff"/>가입 중...</>:"가입하기 →"}
         </button>
         <div style={{textAlign:"center",marginTop:14,fontSize:13,color:T.muted}}>
           이미 계정이 있으신가요? <span onClick={()=>{setMode("login");setError("");}} style={{color:T.navy,fontWeight:700,cursor:"pointer"}}>로그인</span>
