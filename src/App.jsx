@@ -1863,11 +1863,21 @@ const EISetupModal = ({profile, onSave}) => {
   const [saving, setSaving] = useState(false);
   const isMobile = useMobile();
   const EI_GRADES = [
-    {min:93,max:100,grade:"S",color:"#16A34A",desc:"최상위권 — 전략·효율·메타인지 모두 정점. 수능 만점권 수준의 학습 밀도."},
-    {min:81,max:92,grade:"A",color:"#2563EB",desc:"상위권 — 핵심 전략을 충실히 실천하며 자기 실력을 정확히 파악하는 단계."},
-    {min:66,max:80,grade:"B",color:"#111827",desc:"중상위권 — 학습 루틴이 잡혀가고 있으나 메타인지나 효율에 개선 여지 있음."},
-    {min:51,max:65,grade:"C",color:"#F97316",desc:"중위권 — 학습 시간은 채우고 있으나 전략 수행이 불안정하고 오답 패턴 반복."},
-    {min:0, max:50,grade:"D",color:"#DC2626",desc:"하위권 — 학습 루틴·전략·메타인지 전반적 재정비 필요."},
+    {min:93,max:100,grade:"S",color:"#16A34A",
+      desc:"전략 슬라이더 평균 90점↑, 정성 평가 거의 5점, Co-In 정확도 90% 이상",
+      sub:"매 회차 흐트러짐 없이 집중하고 자신의 실력을 정밀하게 인지하는 상태. 현실적으로 달성하기 매우 어려운 목표입니다."},
+    {min:81,max:92,grade:"A",color:"#2563EB",
+      desc:"전략 슬라이더 평균 80점대, 정성 평가 4점 이상, Co-In 정확도 80%↑",
+      sub:"핵심 루틴을 꾸준히 실천하고 자기 객관화가 잘 되어 있는 단계. 상위 10% 수준의 학습 밀도입니다."},
+    {min:66,max:80,grade:"B",color:"#111827",
+      desc:"전략 슬라이더 평균 70점대, 정성 평가 3~4점, Co-In 정확도 65~75%",
+      sub:"루틴은 어느 정도 잡혀있으나 메타인지 정확도가 아직 불안정한 상태. 대부분의 성실한 학생이 도달하는 구간입니다."},
+    {min:51,max:65,grade:"C",color:"#F97316",
+      desc:"전략 슬라이더 평균 60점대, 정성 평가 2~3점, Co-In 정확도 50~65%",
+      sub:"학습 시간은 채우지만 전략 실행이 형식적이거나 자기 객관화가 부족한 상태. 루틴 점검이 필요한 시점입니다."},
+    {min:0, max:50,grade:"D",color:"#DC2626",
+      desc:"전략 슬라이더 평균 50점 이하, 정성 평가 1~2점, Co-In 정확도 50% 미만",
+      sub:"루틴·전략·메타인지 전반 재정비가 필요한 단계. 현재 상태를 파악하는 것 자체가 출발점입니다."},
   ];
   const currentGrade = EI_GRADES.find(g=>target>=g.min)||EI_GRADES[4];
   const save = async()=>{
@@ -1895,8 +1905,12 @@ const EISetupModal = ({profile, onSave}) => {
               <div style={{minWidth:28,height:28,borderRadius:8,background:g.color,display:"flex",alignItems:"center",justifyContent:"center",
                 fontSize:13,fontWeight:900,color:"#fff",flexShrink:0}}>{g.grade}</div>
               <div>
-                <div style={{fontSize:12,fontWeight:700,color:g.color,marginBottom:2}}>{g.min}~{g.max}점</div>
-                <div style={{fontSize:12,color:T.textMid,lineHeight:1.5}}>{g.desc}</div>
+                <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:3}}>
+                  <span style={{fontSize:12,fontWeight:800,color:g.color}}>{g.min}~{g.max}점</span>
+                  <span style={{fontSize:11,color:T.muted}}>|</span>
+                  <span style={{fontSize:11,fontWeight:700,color:T.textMid}}>{g.desc}</span>
+                </div>
+                <div style={{fontSize:11,color:T.muted,lineHeight:1.6}}>{g.sub}</div>
               </div>
             </div>
           ))}
