@@ -1933,37 +1933,85 @@ const EISetupModal = ({profile, onSave}) => {
 // PROFILE MODAL
 // ══════════════════════════════════════════════════════
 const ProfileModal = ({profile, onClose, onSave}) => {
-  const [name, setName]     = useState(profile.name||"");
-  const [grade, setGrade]   = useState(profile.grade||"고1");
-  const [target, setTarget] = useState(profile.target_ei||85);
-  const [saving, setSaving] = useState(false);
-  const [done, setDone]     = useState(false);
+  const [name, setName]         = useState(profile.name||"");
+  const [grade, setGrade]       = useState(profile.grade||"고1");
+  const [target, setTarget]     = useState(profile.target_ei||85);
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url||"");
+  const [uploading, setUploading] = useState(false);
+  const [newPw, setNewPw]       = useState("");
+  const [newPwC, setNewPwC]     = useState("");
+  const [saving, setSaving]     = useState(false);
+  const [done, setDone]         = useState(false);
+  const [err, setErr]           = useState("");
+  const fileRef = useState(null);
+
+  const handleAvatar = async (e) => {
+    const file = e.target.files?.[0];
+    if(!file) return;
+    if(file.size > 2*1024*1024){ setErr("이미지는 2MB 이하만 가능합니다."); return; }
+    const dims = await new Promise(res => {
+      const img = new Image();
+      img.onload = () => res({w:img.width,h:img.height});
+      img.src = URL.createObjectURL(file);
+    });
+    if(dims.w > 1000 || dims.h > 1000){ setErr("이미지 크기는 1000×1000px 이하만 가능합니다."); return; }
+    setUploading(true); setErr("");
+    const ext = file.name.split(".").pop();
+    const path = `${profile.id}.${ext}`;
+    const {error:upErr} = await supabase.storage.from("avatars").upload(path, file, {upsert:true});
+    if(upErr){ setErr("업로드 실패: "+upErr.message); setUploading(false); return; }
+    const {data:{publicUrl}} = supabase.storage.from("avatars").getPublicUrl(path);
+    setAvatarUrl(publicUrl+"?t="+Date.now());
+    setUploading(false);
+  };
 
   const save = async () => {
+    setErr("");
+    if(newPw){
+      const pwRegex=/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/;
+      if(newPw!==newPwC){ setErr("비밀번호가 일치하지 않습니다."); return; }
+      if(!pwRegex.test(newPw)){ setErr("대소문자+특수문자 포함 8자 이상이어야 합니다."); return; }
+    }
     setSaving(true);
-    await supabase.from("profiles").update({name, grade, target_ei:target, updated_at:new Date().toISOString()}).eq("id", profile.id);
+    await supabase.from("profiles").update({name, grade, target_ei:target, avatar_url:avatarUrl, updated_at:new Date().toISOString()}).eq("id", profile.id);
+    if(newPw){
+      const {error:pwErr} = await supabase.auth.updateUser({password:newPw});
+      if(pwErr){ setSaving(false); setErr("비밀번호 변경 실패: "+pwErr.message); return; }
+    }
     setSaving(false);
     setDone(true);
-    setTimeout(()=>onSave({...profile,name,grade,target_ei:target}), 800);
+    setTimeout(()=>onSave({...profile,name,grade,target_ei:target,avatar_url:avatarUrl}), 800);
   };
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(25,29,84,0.45)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}
       onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <Card style={{width:"100%",maxWidth:400}}>
+      <Card style={{width:"100%",maxWidth:420,maxHeight:"90vh",overflowY:"auto"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
           <div style={{fontSize:17,fontWeight:800,color:T.navy}}>프로필 수정</div>
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,color:T.muted,cursor:"pointer",lineHeight:1}}>×</button>
         </div>
-        {/* 아바타 */}
+
+        {/* 프로필 사진 */}
         <div style={{textAlign:"center",marginBottom:20}}>
-          <div style={{width:64,height:64,borderRadius:20,background:T.grad,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:28,boxShadow:"0 4px 12px rgba(25,29,84,0.2)"}}>
-            {profile.role==="admin"?"👨‍💼":"🎓"}
-          </div>
-          <div style={{fontSize:12,color:T.muted,marginTop:8}}>
+          <label style={{cursor:"pointer",display:"inline-block",position:"relative"}}>
+            <input type="file" accept="image/*" onChange={handleAvatar} style={{display:"none"}} ref={r=>fileRef[0]=r}/>
+            <div style={{width:80,height:80,borderRadius:24,background:avatarUrl?"transparent":T.grad,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:32,boxShadow:"0 4px 12px rgba(25,29,84,0.2)",overflow:"hidden",border:`2px solid ${T.border}`}}>
+              {uploading
+                ? <Spinner size={28} color={T.white}/>
+                : avatarUrl
+                  ? <img src={avatarUrl} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  : <span>{profile.role==="admin"?"👨‍💼":"🎓"}</span>
+              }
+            </div>
+            <div style={{position:"absolute",bottom:0,right:0,width:24,height:24,background:T.orange,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>📷</div>
+          </label>
+          <div style={{fontSize:11,color:T.muted,marginTop:8}}>사진 클릭하여 변경 (최대 2MB)</div>
+          <div style={{fontSize:12,color:T.muted,marginTop:2}}>
             {profile.role==="admin"?"관리자 계정":"학생 계정"} · 가입 {profile.created_at?.slice(0,10)||""}
           </div>
         </div>
+
         <div style={{display:"grid",gap:14,marginBottom:16}}>
           <div>
             <label style={css.label}>이름</label>
@@ -1984,12 +2032,23 @@ const ProfileModal = ({profile, onClose, onSave}) => {
               </div>
             </div>
           </>}
+
+          {/* 비밀번호 변경 */}
+          <div style={{borderTop:`1px solid ${T.border}`,paddingTop:14}}>
+            <label style={{...css.label,marginBottom:10}}>비밀번호 변경 <span style={{fontWeight:400,color:T.muted}}>(변경 시에만 입력)</span></label>
+            <div style={{display:"grid",gap:10}}>
+              <input type="password" value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="새 비밀번호 (대소문자+특수문자 8자↑)" style={css.input}/>
+              <input type="password" value={newPwC} onChange={e=>setNewPwC(e.target.value)} placeholder="새 비밀번호 확인" style={css.input}/>
+            </div>
+          </div>
         </div>
+
+        {err&&<div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",fontSize:13,color:T.danger,marginBottom:12}}>{err}</div>}
         {done
           ? <div style={{background:"#F0FDF4",border:"1px solid #BBF7D0",borderRadius:10,padding:"12px 16px",textAlign:"center",color:T.success,fontWeight:700,fontSize:14}}>✅ 저장 완료!</div>
           : <div style={{display:"flex",gap:10}}>
               <button onClick={onClose} style={{...css.btnGhost,flex:1}}>취소</button>
-              <button onClick={save} disabled={saving} style={{...css.btnPrimary,flex:2,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              <button onClick={save} disabled={saving||uploading} style={{...css.btnPrimary,flex:2,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                 {saving?<><Spinner size={16} color="#fff"/>저장 중...</>:"저장"}
               </button>
             </div>}
@@ -2232,7 +2291,11 @@ export default function App() {
               onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
               <div style={{ width:30, height:30, borderRadius:10, background:T.grad,
                 display:"flex", alignItems:"center", justifyContent:"center",
-                fontSize:14, color:T.white, flexShrink:0 }}>{isAdmin ? "👨‍💼" : profile.name?.charAt(0)||"🎓"}</div>
+                fontSize:14, color:T.white, flexShrink:0, overflow:"hidden" }}>
+                {profile.avatar_url
+                  ? <img src={profile.avatar_url} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  : isAdmin ? "👨‍💼" : profile.name?.charAt(0)||"🎓"}
+              </div>
               {!isMobile && <span style={{ fontSize:13, color:T.navy, fontWeight:700 }}>{profile.name}</span>}
               {!isMobile && (isAdmin
                 ? <Pill color={T.orange}>관리자</Pill>
