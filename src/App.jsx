@@ -2051,7 +2051,7 @@ const ProfileModal = ({profile, onClose, onSave}) => {
             </div>
             <div style={{position:"absolute",bottom:0,right:0,width:24,height:24,background:T.orange,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>📷</div>
           </label>
-          <div style={{fontSize:11,color:T.muted,marginTop:8}}>사진 클릭하여 변경 · 자동 압축 저장</div>
+          <div style={{fontSize:11,color:T.muted,marginTop:8}}>사진 클릭하여 변경</div>
           <div style={{fontSize:12,color:T.muted,marginTop:2}}>
             {profile.role==="admin"?"관리자 계정":"학생 계정"} · 가입 {profile.created_at?.slice(0,10)||""}
           </div>
