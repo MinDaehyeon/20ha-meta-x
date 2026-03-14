@@ -273,7 +273,8 @@ const AuthScreen = ({ onLogin }) => {
     if(!suEmail){ setError("이메일을 입력해주세요."); return; }
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(suEmail)){ setError("유효하지 않은 이메일 형식입니다."); return; }
     setLoad("sendOtp",true);
-    const {error:err} = await supabase.auth.signInWithOtp({ email:suEmail, options:{shouldCreateUser:true} });
+    const tempPw = `Tmp${Date.now()}@x`;
+    const {error:err} = await supabase.auth.signUp({ email:suEmail, password:tempPw });
     setLoad("sendOtp",false);
     if(err){ setError(translateSupabaseError(err.message)); return; }
     setOtpSent(true); setOtpVerified(false); setOtpCode("");
@@ -282,7 +283,7 @@ const AuthScreen = ({ onLogin }) => {
   const handleVerifyOtp = async () => {
     if(otpCode.length !== 6){ setError("6자리 코드를 입력해주세요."); return; }
     setLoad("otp",true); setError("");
-    const {error:err} = await supabase.auth.verifyOtp({ email:suEmail, token:otpCode, type:"email" });
+    const {error:err} = await supabase.auth.verifyOtp({ email:suEmail, token:otpCode, type:"signup" });
     setLoad("otp",false);
     if(err){ setError("인증 코드가 올바르지 않습니다. 다시 확인해주세요."); return; }
     setOtpSent(false); setOtpVerified(true);
