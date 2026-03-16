@@ -2401,6 +2401,13 @@ export default function App() {
                 <span style={{fontSize:16,fontWeight:300}}>+</span> 학습 입력
               </button>
             )}
+            <button onClick={()=>window.open("/manual.html","_blank")}
+              title="도움말"
+              style={{ padding:"6px 10px", borderRadius:8, border:`1px solid ${T.border}`,
+                background:"transparent", color:T.muted, cursor:"pointer", fontSize:13, fontWeight:700,
+                display:"flex", alignItems:"center", gap:4, whiteSpace:"nowrap" }}>
+              {isMobile ? "?" : "❓ 도움말"}
+            </button>
             {!isMobile && <div style={{ height:24, width:1, background:T.border }}/>}
             <div onClick={()=>setShowProfileModal(true)}
               style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer", padding:"4px 8px", borderRadius:8,
