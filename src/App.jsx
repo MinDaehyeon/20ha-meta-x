@@ -287,22 +287,24 @@ const PasswordResetScreen = ({ onDone }) => {
             <div style={{fontSize:15,fontWeight:700,color:T.navy}}>비밀번호가 변경됐어요!</div>
             <div style={{fontSize:13,color:T.muted,marginTop:6}}>잠시 후 로그인 화면으로 이동합니다...</div>
           </div>
-        ) : (<>
-          <div style={{display:"grid",gap:12,marginBottom:12}}>
-            <div>
-              <label style={css.label}>새 비밀번호 <span style={{fontWeight:400,color:T.muted}}>(대소문자+특수문자 8자↑)</span></label>
-              <input type="password" value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="••••••••" style={css.input}/>
+        ) : (
+          <form onSubmit={e=>{e.preventDefault();handleReset();}} autoComplete="new-password">
+            <div style={{display:"grid",gap:12,marginBottom:12}}>
+              <div>
+                <label style={css.label}>새 비밀번호 <span style={{fontWeight:400,color:T.muted}}>(대소문자+특수문자 8자↑)</span></label>
+                <input name="new-password" type="password" value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="••••••••" autoComplete="new-password" style={css.input}/>
+              </div>
+              <div>
+                <label style={css.label}>새 비밀번호 확인</label>
+                <input name="new-password-confirm" type="password" value={newPwC} onChange={e=>setNewPwC(e.target.value)} placeholder="••••••••" autoComplete="new-password" style={css.input}/>
+              </div>
             </div>
-            <div>
-              <label style={css.label}>새 비밀번호 확인</label>
-              <input type="password" value={newPwC} onChange={e=>setNewPwC(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleReset()} placeholder="••••••••" style={css.input}/>
-            </div>
-          </div>
-          {err && <div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",fontSize:13,color:T.danger,marginBottom:12}}>{err}</div>}
-          <button onClick={handleReset} disabled={saving} style={{...css.btnPrimary,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-            {saving?<><Spinner size={18} color="#fff"/>변경 중...</>:"비밀번호 변경"}
-          </button>
-        </>)}
+            {err && <div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",fontSize:13,color:T.danger,marginBottom:12}}>{err}</div>}
+            <button type="submit" disabled={saving} style={{...css.btnPrimary,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              {saving?<><Spinner size={18} color="#fff"/>변경 중...</>:"비밀번호 변경"}
+            </button>
+          </form>
+        )}
       </Card>
     </div>
   );
@@ -491,44 +493,43 @@ const handleSocial = async (provider) => {
         {mode==="login"?"계정으로 로그인하세요.":mode==="forgot"?"가입 시 사용한 이메일을 입력해주세요.":"계정을 만들어 학습을 시작하세요."}
       </div>
 
-      {mode==="login" && (<>
-        {/* 소셜 로그인 - 비즈앱 인증 후 활성화 예정 */}
-
-        <div style={{display:"flex",alignItems:"center",gap:10,margin:"14px 0"}}>
-          <div style={{flex:1,height:1,background:T.border}}/>
-          <span style={{fontSize:12,color:T.muted,fontWeight:600}}>이메일로 로그인</span>
-          <div style={{flex:1,height:1,background:T.border}}/>
-        </div>
-
-        <div style={{marginBottom:12}}>
-          <label style={css.label}>이메일</label>
-          <input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="example@email.com" autoComplete="email" style={css.input}/>
-        </div>
-        <div style={{marginBottom:12}}>
-          <label style={css.label}>비밀번호</label>
-          <input type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="••••••••" autoComplete="current-password" style={css.input}/>
-        </div>
-        <div onClick={()=>setRememberMe(v=>!v)} style={{display:"flex",alignItems:"center",gap:8,marginBottom:14,cursor:"pointer"}}>
-          <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${rememberMe?T.navy:T.borderStrong}`,background:rememberMe?T.navy:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}}>
-            {rememberMe&&<span style={{color:T.white,fontSize:11,lineHeight:1,fontWeight:800}}>✓</span>}
+      {mode==="login" && (
+        <form onSubmit={e=>{e.preventDefault();handleLogin();}} autoComplete="on">
+          <div style={{display:"flex",alignItems:"center",gap:10,margin:"14px 0"}}>
+            <div style={{flex:1,height:1,background:T.border}}/>
+            <span style={{fontSize:12,color:T.muted,fontWeight:600}}>이메일로 로그인</span>
+            <div style={{flex:1,height:1,background:T.border}}/>
           </div>
-          <span style={{fontSize:13,color:T.textMid,userSelect:"none"}}>자동 로그인</span>
-        </div>
 
-        {error && <div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",fontSize:13,color:T.danger,marginBottom:12}}>{error}</div>}
+          <div style={{marginBottom:12}}>
+            <label style={css.label}>이메일</label>
+            <input name="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="example@email.com" autoComplete="email" style={css.input}/>
+          </div>
+          <div style={{marginBottom:12}}>
+            <label style={css.label}>비밀번호</label>
+            <input name="password" type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="••••••••" autoComplete="current-password" style={css.input}/>
+          </div>
+          <div onClick={()=>setRememberMe(v=>!v)} style={{display:"flex",alignItems:"center",gap:8,marginBottom:14,cursor:"pointer"}}>
+            <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${rememberMe?T.navy:T.borderStrong}`,background:rememberMe?T.navy:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}}>
+              {rememberMe&&<span style={{color:T.white,fontSize:11,lineHeight:1,fontWeight:800}}>✓</span>}
+            </div>
+            <span style={{fontSize:13,color:T.textMid,userSelect:"none"}}>자동 로그인</span>
+          </div>
 
-        <button onClick={()=>handleLogin()} disabled={loading.email} style={{...css.btnPrimary,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-          {loading.email?<><Spinner size={18} color="#fff"/>로그인 중...</>:"로그인 →"}
-        </button>
+          {error && <div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",fontSize:13,color:T.danger,marginBottom:12}}>{error}</div>}
 
+          <button type="submit" disabled={loading.email} style={{...css.btnPrimary,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            {loading.email?<><Spinner size={18} color="#fff"/>로그인 중...</>:"로그인 →"}
+          </button>
 
-        <div style={{textAlign:"center",marginTop:10,fontSize:12}}>
-          <span onClick={()=>{setMode("forgot");setError("");setFpSent(false);setFpEmail("");}} style={{color:T.muted,cursor:"pointer",textDecoration:"underline"}}>비밀번호를 잊으셨나요?</span>
-        </div>
-        <div style={{textAlign:"center",marginTop:10,fontSize:13,color:T.muted}}>
-          계정이 없으신가요? <span onClick={()=>{setMode("signup");setError("");}} style={{color:T.orange,fontWeight:700,cursor:"pointer"}}>이메일로 가입</span>
-        </div>
-      </>)}
+          <div style={{textAlign:"center",marginTop:10,fontSize:12}}>
+            <span onClick={()=>{setMode("forgot");setError("");setFpSent(false);setFpEmail("");}} style={{color:T.muted,cursor:"pointer",textDecoration:"underline"}}>비밀번호를 잊으셨나요?</span>
+          </div>
+          <div style={{textAlign:"center",marginTop:10,fontSize:13,color:T.muted}}>
+            계정이 없으신가요? <span onClick={()=>{setMode("signup");setError("");}} style={{color:T.orange,fontWeight:700,cursor:"pointer"}}>이메일로 가입</span>
+          </div>
+        </form>
+      )}
 
       {mode==="forgot" && (<>
         {fpSent ? (
@@ -2329,7 +2330,13 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
     await supabase.from("profiles").update({name, grade, target_ei:target, avatar_url:avatarUrl, updated_at:new Date().toISOString()}).eq("id", profile.id);
     if(newPw){
       const {error:pwErr} = await supabase.auth.updateUser({password:newPw});
-      if(pwErr){ setSaving(false); setErr("비밀번호 변경 실패: "+pwErr.message); return; }
+      if(pwErr){
+        setSaving(false);
+        const m = pwErr.message?.toLowerCase()||"";
+        if(m.includes("same password")||m.includes("different from")) setErr("현재 비밀번호와 동일합니다. 다른 비밀번호를 입력해주세요.");
+        else setErr("비밀번호 변경 실패: "+pwErr.message);
+        return;
+      }
     }
     setSaving(false);
     setDone(true);
@@ -2410,8 +2417,8 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
           <div style={{borderTop:`1px solid ${T.border}`,paddingTop:14}}>
             <label style={{...css.label,marginBottom:10}}>비밀번호 변경 <span style={{fontWeight:400,color:T.muted}}>(변경 시에만 입력)</span></label>
             <div style={{display:"grid",gap:10}}>
-              <input type="password" value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="새 비밀번호 (대소문자+특수문자 8자↑)" style={css.input}/>
-              <input type="password" value={newPwC} onChange={e=>setNewPwC(e.target.value)} placeholder="새 비밀번호 확인" style={css.input}/>
+              <input name="new-password" type="password" value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="새 비밀번호 (대소문자+특수문자 8자↑)" autoComplete="new-password" style={css.input}/>
+              <input name="new-password-confirm" type="password" value={newPwC} onChange={e=>setNewPwC(e.target.value)} placeholder="새 비밀번호 확인" autoComplete="new-password" style={css.input}/>
             </div>
           </div>
         </div>
