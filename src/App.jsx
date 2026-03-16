@@ -318,6 +318,7 @@ const AuthScreen = ({ onLogin }) => {
   const [pw, setPw]           = useState("");
   const [rememberMe, setRememberMe] = useState(()=>!!localStorage.getItem("20ha_saved_email"));
   const [mode, setMode]       = useState("login"); // "login"|"signup"
+  const [suRole, setSuRole]   = useState("student"); // "student" | "parent"
   const [suName, setSuName]   = useState("");
   const [suGrade, setSuGrade] = useState("고1");
   const [suEmail, setSuEmail] = useState("");
@@ -394,12 +395,12 @@ const AuthScreen = ({ onLogin }) => {
     if(!pwRegex.test(suPw)){ setError("비밀번호는 영문 대소문자, 특수문자를 포함한 8자 이상이어야 합니다."); return; }
     setLoad("signup",true);
     const {data,error:err} = await supabase.auth.updateUser({
-      password:suPw, data:{name:suName, grade:suGrade, target_ei:85, role:"student"}
+      password:suPw, data:{name:suName, grade:suRole==="student"?suGrade:"", target_ei:85, role:suRole}
     });
     if(!err && data?.user){
       await supabase.from("profiles").upsert({
-        id:data.user.id, name:suName, grade:suGrade,
-        target_ei:85, role:"student", approval_status:"pending"
+        id:data.user.id, name:suName, grade:suRole==="student"?suGrade:"",
+        target_ei:85, role:suRole, approval_status:"pending"
       });
     }
     await supabase.auth.signOut();
@@ -556,13 +557,25 @@ const handleSocial = async (provider) => {
       </>)}
 
       {mode==="signup" && (<>
+        {/* 역할 선택 */}
+        <div style={{display:"flex",gap:8,marginBottom:16,background:T.surfaceAlt,borderRadius:10,padding:4}}>
+          {[{v:"student",label:"🎓 학생"},{v:"parent",label:"👨‍👩‍👧 학부모"}].map(({v,label})=>(
+            <button key={v} onClick={()=>setSuRole(v)}
+              style={{flex:1,padding:"9px 0",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,
+                background:suRole===v?T.navy:"transparent",color:suRole===v?T.white:T.muted,transition:"all 0.15s"}}>
+              {label}
+            </button>
+          ))}
+        </div>
         <div style={{display:"grid",gap:12,marginBottom:12}}>
           <div><label style={css.label}>이름</label><input value={suName} onChange={e=>setSuName(e.target.value)} placeholder="홍길동" style={css.input}/></div>
-          <div><label style={css.label}>학년</label>
-            <select value={suGrade} onChange={e=>setSuGrade(e.target.value)} style={css.select}>
-              {GRADES.map(g=><option key={g} value={g}>{g}</option>)}
-            </select>
-          </div>
+          {suRole==="student" && (
+            <div><label style={css.label}>학년</label>
+              <select value={suGrade} onChange={e=>setSuGrade(e.target.value)} style={css.select}>
+                {GRADES.map(g=><option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+          )}
 
           <div>
             <label style={css.label}>이메일</label>
@@ -1668,6 +1681,98 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
 };
 
 // ══════════════════════════════════════════════════════
+// PARENT DASHBOARD
+// ══════════════════════════════════════════════════════
+const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChildrenUpdate}) => {
+  const [addEmail, setAddEmail]   = useState("");
+  const [addLoading, setAddLoading] = useState(false);
+  const [addMsg, setAddMsg]       = useState(null); // {type:"ok"|"err", text}
+  const [childView, setChildView] = useState("dashboard"); // "dashboard" | "history"
+  const isMobile = useMobile();
+
+  const selChild = children.find(c => c.profile?.id === selChildId);
+
+  const handleAddChild = async () => {
+    if(!addEmail){ setAddMsg({type:"err", text:"이메일을 입력해주세요."}); return; }
+    setAddLoading(true); setAddMsg(null);
+    // 이메일로 학생 검색
+    const { data, error } = await supabase.rpc("find_student_by_email", { student_email: addEmail.trim().toLowerCase() });
+    if(error || !data || data.length === 0) {
+      setAddMsg({type:"err", text:"해당 이메일의 학생을 찾을 수 없습니다. 학생이 가입 및 승인 완료된 상태여야 합니다."}); setAddLoading(false); return;
+    }
+    const student = data[0];
+    // 이미 연결된 경우
+    if(children.some(c => c.profile?.id === student.id)) {
+      setAddMsg({type:"err", text:"이미 연결된 학생입니다."}); setAddLoading(false); return;
+    }
+    const { error: insErr } = await supabase.from("parent_students").insert({ parent_id: parentId, student_id: student.id });
+    if(insErr){ setAddMsg({type:"err", text:"연결 중 오류가 발생했습니다."}); setAddLoading(false); return; }
+    // 새 자녀 데이터 로드
+    const { data: cl } = await supabase.rpc("get_child_logs", { child_id: student.id });
+    onChildrenUpdate([...children, { profile: {...student, role:"student"}, logs: cl || [] }], student.id);
+    setAddEmail("");
+    setAddMsg({type:"ok", text:`${student.name}(${student.grade}) 학생이 연결됐어요!`});
+    setAddLoading(false);
+  };
+
+  return (
+    <div>
+      {/* 자녀 탭 */}
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+        {children.map(c => (
+          <button key={c.profile.id} onClick={()=>setSelChildId(c.profile.id)}
+            style={{padding:"8px 16px",borderRadius:20,border:`2px solid ${selChildId===c.profile.id?T.navy:T.border}`,
+              background:selChildId===c.profile.id?T.navy:"transparent",
+              color:selChildId===c.profile.id?T.white:T.textMid,cursor:"pointer",
+              fontSize:13,fontWeight:700,transition:"all 0.15s"}}>
+            🎓 {c.profile.name} <span style={{opacity:0.7,fontWeight:400}}>({c.profile.grade})</span>
+          </button>
+        ))}
+        {/* 자녀 추가 */}
+        <div style={{display:"flex",gap:6,alignItems:"center",flex:isMobile?"1 1 100%":"initial"}}>
+          <input value={addEmail} onChange={e=>{setAddEmail(e.target.value);setAddMsg(null);}}
+            onKeyDown={e=>e.key==="Enter"&&handleAddChild()}
+            placeholder="자녀 이메일 입력" style={{...css.input,margin:0,width:isMobile?"100%":200,fontSize:12,padding:"8px 12px"}}/>
+          <button onClick={handleAddChild} disabled={addLoading}
+            style={{...css.btnPrimary,padding:"8px 14px",fontSize:12,fontWeight:700,flexShrink:0,display:"flex",alignItems:"center",gap:4}}>
+            {addLoading?<Spinner size={13} color="#fff"/>:"+ 추가"}
+          </button>
+        </div>
+      </div>
+      {addMsg && (
+        <div style={{background:addMsg.type==="ok"?"#F0FDF4":"#FEF2F2",border:`1px solid ${addMsg.type==="ok"?"#BBF7D0":"#FECACA"}`,
+          borderRadius:8,padding:"10px 14px",fontSize:13,color:addMsg.type==="ok"?"#166534":T.danger,marginBottom:12}}>
+          {addMsg.type==="ok"?"✅ ":"⚠️ "}{addMsg.text}
+        </div>
+      )}
+
+      {children.length === 0 ? (
+        <Card style={{textAlign:"center",padding:"48px 24px"}}>
+          <div style={{fontSize:40,marginBottom:12}}>👨‍👩‍👧</div>
+          <div style={{fontSize:16,fontWeight:700,color:T.navy,marginBottom:8}}>연결된 자녀가 없어요</div>
+          <div style={{fontSize:13,color:T.muted}}>위에서 자녀의 이메일을 입력해 연결해보세요.</div>
+        </Card>
+      ) : selChild ? (<>
+        {/* 자녀 뷰 탭 */}
+        <div style={{display:"flex",gap:2,marginBottom:16,background:T.surfaceAlt,borderRadius:10,padding:4,width:"fit-content"}}>
+          {[{v:"dashboard",label:"📊 대시보드"},{v:"history",label:"📅 학습 기록"}].map(({v,label})=>(
+            <button key={v} onClick={()=>setChildView(v)}
+              style={{padding:"7px 16px",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,
+                background:childView===v?T.navy:"transparent",color:childView===v?T.white:T.muted,transition:"all 0.15s"}}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {childView==="dashboard"
+          ? <StudentDashboard logs={selChild.logs} profile={selChild.profile} isAdminView={true}/>
+          : <LogHistory logs={selChild.logs} onDelete={null} isAdmin={false} allProfiles={[selChild.profile]}/>
+        }
+      </>) : null}
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════
 // ADMIN DASHBOARD (진단 + 회원 관리)
 // ══════════════════════════════════════════════════════
 const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
@@ -2388,11 +2493,13 @@ const BottomNav = ({nav,view,showInput,onNavigate,isAdmin}) => (
 export default function App() {
   const [authState, setAuthState] = useState("loading");
   const [showEISetup, setShowEISetup] = useState(false);
-  // "loading" | "unauthenticated" | "needsProfile" | "pending" | "ready"
+  // "loading" | "unauthenticated" | "needsProfile" | "pending" | "ready" | "passwordRecovery"
   const [session, setSession]     = useState(null);
   const [profile, setProfile]     = useState(null);
   const [logs, setLogs]           = useState([]);
   const [allProfiles, setAllProfiles] = useState([]);
+  const [children, setChildren]   = useState([]); // [{profile, logs}]
+  const [selChildId, setSelChildId] = useState(null);
   const getInitialView = () => {
     const path = window.location.pathname;
     if(path === "/history") return "history";
@@ -2459,6 +2566,20 @@ export default function App() {
       ]);
       setLogs(allLogs || []);
       setAllProfiles(allProfs || []);
+    } else if(prof.role === "parent") {
+      const { data: links } = await supabase
+        .from("parent_students").select("student_id").eq("parent_id", uid);
+      if(links && links.length > 0) {
+        const childData = await Promise.all(links.map(async ({ student_id }) => {
+          const [{ data: cp }, { data: cl }] = await Promise.all([
+            supabase.from("profiles").select("*").eq("id", student_id).single(),
+            supabase.rpc("get_child_logs", { child_id: student_id }),
+          ]);
+          return { profile: cp, logs: cl || [] };
+        }));
+        setChildren(childData.filter(c => c.profile));
+        if(childData[0]?.profile) setSelChildId(childData[0].profile.id);
+      }
     } else {
       const { data: myLogs } = await supabase
         .from("learning_logs").select("*").eq("uid", uid).order("date", { ascending: false });
@@ -2550,10 +2671,13 @@ export default function App() {
     </div>
   );
 
-  const isAdmin = profile.role === "admin";
+  const isAdmin  = profile.role === "admin";
+  const isParent = profile.role === "parent";
   const NAV = isAdmin
     ? [{ key:"dashboard", label:"진단 센터", icon:"🔍" }, { key:"history", label:"전체 기록", icon:"📅" }]
-    : [{ key:"dashboard", label:"대시보드", icon:"📊" }, { key:"history", label:"학습 기록", icon:"📅" }];
+    : isParent
+      ? [{ key:"dashboard", label:"자녀 현황", icon:"👨‍👩‍👧" }]
+      : [{ key:"dashboard", label:"대시보드", icon:"📊" }, { key:"history", label:"학습 기록", icon:"📅" }];
   const pendingCount = allProfiles.filter(p => p.role==="student" && p.approval_status==="pending").length;
 
   return (
@@ -2586,7 +2710,7 @@ export default function App() {
                 🔔 {pendingCount}명 승인 대기
               </div>
             )}
-            {!isAdmin && !isMobile && (
+            {!isAdmin && !isParent && !isMobile && (
               <button onClick={() => navigate(view, true)} style={{ padding:"8px 18px", borderRadius:8,
                 border:"none", cursor:"pointer", fontSize:13, fontWeight:700,
                 background:T.orange, color:T.white, display:"flex", alignItems:"center", gap:6 }}>
@@ -2600,15 +2724,6 @@ export default function App() {
                 display:"flex", alignItems:"center", gap:4, whiteSpace:"nowrap" }}>
               {isMobile ? "?" : "❓ 도움말"}
             </button>
-            {!isMobile && (
-              <a href="mailto:academy@isaacedu.co.kr?subject=META-X 문의&body=안녕하세요, META-X 관련 문의사항이 있습니다."
-                title="문의하기 (02-1522-5316)"
-                style={{ padding:"6px 10px", borderRadius:8, border:`1px solid ${T.border}`,
-                  background:"transparent", color:T.muted, cursor:"pointer", fontSize:13, fontWeight:700,
-                  display:"flex", alignItems:"center", gap:4, whiteSpace:"nowrap", textDecoration:"none" }}>
-                📞 문의
-              </a>
-            )}
             {!isMobile && <div style={{ height:24, width:1, background:T.border }}/>}
             <div onClick={()=>setShowProfileModal(true)}
               style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer", padding:"4px 8px", borderRadius:8,
@@ -2655,7 +2770,15 @@ export default function App() {
         ) : view === "dashboard" ? (
           isAdmin
             ? <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData}/>
-            : <StudentDashboard logs={logs} profile={profile}/>
+            : isParent
+              ? <ParentDashboard
+                  children={children}
+                  selChildId={selChildId}
+                  setSelChildId={setSelChildId}
+                  parentId={session.user.id}
+                  onChildrenUpdate={(newChildren, newSelId) => { setChildren(newChildren); if(newSelId) setSelChildId(newSelId); }}
+                />
+              : <StudentDashboard logs={logs} profile={profile}/>
         ) : (
           <LogHistory
             logs={logs}
@@ -2668,7 +2791,7 @@ export default function App() {
         )}
       </div>
 
-      {isMobile && <BottomNav nav={NAV} view={view} showInput={showInput} onNavigate={navigate} isAdmin={isAdmin}/>}
+      {isMobile && <BottomNav nav={NAV} view={view} showInput={showInput} onNavigate={navigate} isAdmin={isAdmin||isParent}/>}
       {showEISetup && <EISetupModal profile={profile} onSave={(t)=>{setProfile(p=>({...p,target_ei:t}));setShowEISetup(false);}}/> }
       {showProfileModal && <ProfileModal profile={profile} onClose={()=>setShowProfileModal(false)} onSave={(updated)=>{setProfile(updated);setShowProfileModal(false);}} onDelete={()=>{setShowProfileModal(false);handleLogout();}}/>}
     </div>
