@@ -1793,7 +1793,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
     qBasic:l.q_basic||0, qMid:l.q_mid||0, qAdv:l.q_adv||0,
   }));
 
-  const students = allProfiles.filter(p=>p.role==="student");
+  const students = allProfiles.filter(p=>p.role==="student"||p.role==="parent");
   const pendingCount = students.filter(s=>s.approval_status==="pending").length;
 
   const setApproval = async (id, status) => {
@@ -1934,7 +1934,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                   ))}
                   {filteredStudents.map(s=>[
                     <div key={`${s.id}-n`} style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:2}}>
-                      <span style={{fontSize:13,color:T.navy,fontWeight:700}}>{s.name||"(이름 미설정)"}</span>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontSize:13,color:T.navy,fontWeight:700}}>{s.name||"(이름 미설정)"}</span>
+                        {s.role==="parent"&&<span style={{fontSize:10,fontWeight:700,background:"#E0F2FE",color:"#0369A1",borderRadius:4,padding:"1px 5px"}}>학부모</span>}
+                      </div>
                       {!isMobile&&<span style={{fontSize:11,color:T.muted}}>{s.email||"이메일 없음"}</span>}
                     </div>,
                     <div key={`${s.id}-g`} style={{padding:"12px",fontSize:13,borderBottom:`1px solid ${T.border}`,color:T.textMid,display:"flex",alignItems:"center"}}>{s.grade||"—"}</div>,
@@ -2685,7 +2688,7 @@ export default function App() {
     : isParent
       ? [{ key:"dashboard", label:"자녀 현황", icon:"👨‍👩‍👧" }]
       : [{ key:"dashboard", label:"대시보드", icon:"📊" }, { key:"history", label:"학습 기록", icon:"📅" }];
-  const pendingCount = allProfiles.filter(p => p.role==="student" && p.approval_status==="pending").length;
+  const pendingCount = allProfiles.filter(p => (p.role==="student"||p.role==="parent") && p.approval_status==="pending").length;
 
   return (
     <div style={{ minHeight:"100vh", background:T.bg, fontFamily:"'Noto Sans KR',sans-serif", color:T.text, overflowX:"hidden" }}>
