@@ -1782,8 +1782,26 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const [editStudent, setEditStudent] = useState(null);
   const [saving, setSaving]     = useState(false);
   const [filterStatus, setFilterStatus] = useState("all"); // "all"|"pending"|"approved"|"rejected"
-  const [detailStudent, setDetailStudent] = useState(null); // 진단센터 학생 상세
+  const [filterRole, setFilterRole]   = useState("all"); // "all"|"student"|"parent"
+  const [detailStudent, setDetailStudent] = useState(null);
+  const [parentLinks, setParentLinks] = useState({}); // {parent_id: [{student_id, name, grade}]}
   const isMobile = useMobile();
+
+  // 학부모-자녀 연결 로드
+  useEffect(()=>{
+    const parents = allProfiles.filter(p=>p.role==="parent");
+    if(parents.length===0) return;
+    supabase.from("parent_students").select("parent_id, student_id").then(({data})=>{
+      if(!data) return;
+      const map = {};
+      data.forEach(({parent_id, student_id})=>{
+        if(!map[parent_id]) map[parent_id]=[];
+        const sp = allProfiles.find(p=>p.id===student_id);
+        if(sp) map[parent_id].push(sp);
+      });
+      setParentLinks(map);
+    });
+  },[allProfiles]);
 
   const normLogs = allLogs.map(l=>({
     ...l, engramIndex:l.engram_index, strategyScore:l.strategy_score,
@@ -1818,7 +1836,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
     setSaving(false); setEditStudent(null); onRefresh();
   };
 
-  const filteredStudents = filterStatus==="all" ? students : students.filter(s=>s.approval_status===filterStatus);
+  const roleFiltered = filterRole==="all" ? students : students.filter(s=>s.role===filterRole);
+  const filteredStudents = filterStatus==="all" ? roleFiltered : roleFiltered.filter(s=>s.approval_status===filterStatus);
 
   // Dashboard data
   const filtered=sel==="전체"?normLogs:normLogs.filter(l=>l.uid===sel);
@@ -1906,12 +1925,24 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
             </div>
           )}
 
+          {/* 역할 필터 */}
+          <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+            {[
+              {k:"all", l:`전체 (${students.length})`},
+              {k:"student", l:`🎓 학생 (${students.filter(s=>s.role==="student").length})`},
+              {k:"parent", l:`👨‍👩‍👧 학부모 (${students.filter(s=>s.role==="parent").length})`},
+            ].map(({k,l})=>(
+              <button key={k} onClick={()=>setFilterRole(k)}
+                style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${filterRole===k?T.navy:T.border}`,cursor:"pointer",fontSize:12,fontWeight:700,
+                  background:filterRole===k?T.navy:T.white,color:filterRole===k?T.white:T.muted}}>{l}</button>
+            ))}
+          </div>
           {/* 상태 필터 */}
           <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
-            {[{k:"all",l:"전체"},{k:"pending",l:`대기 (${students.filter(s=>s.approval_status==="pending").length})`},{k:"approved",l:"승인됨"},{k:"rejected",l:"거절됨"}].map(({k,l})=>(
+            {[{k:"all",l:"전체"},{k:"pending",l:`대기 (${roleFiltered.filter(s=>s.approval_status==="pending").length})`},{k:"approved",l:"승인됨"},{k:"rejected",l:"거절됨"}].map(({k,l})=>(
               <button key={k} onClick={()=>setFilterStatus(k)}
-                style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${filterStatus===k?T.navy:T.border}`,cursor:"pointer",fontSize:12,fontWeight:700,
-                  background:filterStatus===k?T.navy:T.white,color:filterStatus===k?T.white:T.muted}}>{l}</button>
+                style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${filterStatus===k?T.orange:T.border}`,cursor:"pointer",fontSize:12,fontWeight:700,
+                  background:filterStatus===k?T.orange:T.white,color:filterStatus===k?T.white:T.muted}}>{l}</button>
             ))}
           </div>
 
@@ -1933,12 +1964,22 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                     <div key={h} style={{padding:"8px 12px",fontSize:11,color:T.muted,fontWeight:700,borderBottom:`2px solid ${T.border}`,letterSpacing:"0.04em"}}>{h}</div>
                   ))}
                   {filteredStudents.map(s=>[
-                    <div key={`${s.id}-n`} style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:2}}>
+                    <div key={`${s.id}-n`} style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:3}}>
                       <div style={{display:"flex",alignItems:"center",gap:6}}>
                         <span style={{fontSize:13,color:T.navy,fontWeight:700}}>{s.name||"(이름 미설정)"}</span>
                         {s.role==="parent"&&<span style={{fontSize:10,fontWeight:700,background:"#E0F2FE",color:"#0369A1",borderRadius:4,padding:"1px 5px"}}>학부모</span>}
                       </div>
                       {!isMobile&&<span style={{fontSize:11,color:T.muted}}>{s.email||"이메일 없음"}</span>}
+                      {s.role==="parent"&&(parentLinks[s.id]?.length>0
+                        ? <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:2}}>
+                            {parentLinks[s.id].map(c=>(
+                              <span key={c.id} style={{fontSize:10,background:T.navy+"12",color:T.navy,borderRadius:4,padding:"1px 6px",fontWeight:600}}>
+                                {c.name} ({c.grade})
+                              </span>
+                            ))}
+                          </div>
+                        : <span style={{fontSize:10,color:T.muted,marginTop:2}}>연결된 자녀 없음</span>
+                      )}
                     </div>,
                     <div key={`${s.id}-g`} style={{padding:"12px",fontSize:13,borderBottom:`1px solid ${T.border}`,color:T.textMid,display:"flex",alignItems:"center"}}>{s.grade||"—"}</div>,
                     <div key={`${s.id}-st`} style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center"}}>{statusBadge(s.approval_status)}</div>,
