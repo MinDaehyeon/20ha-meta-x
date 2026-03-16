@@ -642,12 +642,19 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
     const bTime=netTime*rawBm/100, mTime=netTime*rawMm/100, aTime=netTime*rawAm/100;
     // 단계별 문항당 소요시간(초)으로 효율성 계산
     const spB=qB>0?bTime*60/qB:0, spM=qM>0?mTime*60/qM:0, spA=qA>0?aTime*60/qA:0;
-    // 이상적 기준: 기본60초, 중급90초, 심화150초 → 그보다 빠를수록 높은 효율
-    const effB=qB>0?Math.min(100,Math.max(0,100-(spB/60)*30)):null;
-    const effM=qM>0?Math.min(100,Math.max(0,100-(spM/90)*35)):null;
-    const effA=qA>0?Math.min(100,Math.max(0,100-(spA/150)*40)):null;
-    const effVals=[effB,effM,effA].filter(v=>v!==null);
-    const efficiencyIndex=effVals.length>0?effVals.reduce((s,v)=>s+v,0)/effVals.length:50;
+    let efficiencyIndex;
+    if(subjectCfg.qLevels){
+      // 수학: 기본60초, 응용90초, 심화150초 기준
+      const effB=qB>0?Math.min(100,Math.max(0,100-(spB/60)*30)):null;
+      const effM=qM>0?Math.min(100,Math.max(0,100-(spM/90)*35)):null;
+      const effA=qA>0?Math.min(100,Math.max(0,100-(spA/150)*40)):null;
+      const effVals=[effB,effM,effA].filter(v=>v!==null);
+      efficiencyIndex=effVals.length>0?effVals.reduce((s,v)=>s+v,0)/effVals.length:50;
+    } else {
+      // 비수학: 전체 문항 기준 90초/문항
+      const totalQ=qB; const sp=totalQ>0?netTime*60/totalQ:0;
+      efficiencyIndex=totalQ>0?Math.min(100,Math.max(0,100-(sp/90)*30)):50;
+    }
     const{cc,ci,ic,ii}=form.coinFilter; const tot=cc+ci+ic+ii;
     const metacognitionAccuracy=tot>0?((cc+ii)/tot)*100:0;
     return{strategyScore:+strategyScore.toFixed(1),efficiencyIndex:+efficiencyIndex.toFixed(1),metacognitionAccuracy:+metacognitionAccuracy.toFixed(1),engramIndex:calcEI({strategyScore,efficiencyIndex,metacognitionAccuracy})};
@@ -758,8 +765,8 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
             <input type="range" min={0} max={60} value={form.breakTime} onChange={e=>setForm(f=>({...f,breakTime:Number(e.target.value)}))} style={sliderFill(form.breakTime,0,60,T.orange)}/>
             {breakRatio>50&&<div style={{fontSize:12,color:T.danger,marginTop:4}}>⚠️ 쉬는 시간 50% 초과</div>}
 
-            {/* 단계별 시간 분배 - 띠 위에서 드래그로 경계 조절 */}
-            {netTime>0&&(()=>{
+            {/* 단계별 시간 분배 - 수학만 표시 */}
+            {netTime>0&&subjectCfg.qLevels&&(()=>{
               const hasB=form.qBasic>0, hasM=form.qMid>0, hasA=form.qAdv>0;
               const activeCount=[hasB,hasM,hasA].filter(Boolean).length;
               // 활성 구간별 비율 계산
@@ -1119,7 +1126,7 @@ const LearningCalendar = ({logs}) => {
           <strong>{tooltip.dateStr}</strong> — {tooltip.dayLogs.length}건 학습
           {tooltip.dayLogs.map((l,i)=>(
             <div key={i} style={{marginTop:4,color:"rgba(255,255,255,0.8)"}}>
-              {l.subject} {l.book_level===1?"기본":l.book_level===2?"응용":"심화"} · EI <strong style={{color:T.orange}}>{(l.engram_index||0).toFixed(1)}</strong>
+              {l.subject} {l.subject==="수학"?(l.book_level===1?"기본":l.book_level===2?"응용":"심화"):""} · EI <strong style={{color:T.orange}}>{(l.engram_index||0).toFixed(1)}</strong>
             </div>
           ))}
           <div style={{position:"absolute",bottom:-6,left:"50%",transform:"translateX(-50%)",
@@ -1470,12 +1477,12 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
       <Card style={{marginBottom:12}}>
         <SectionTitle sub="문항 1개를 푸는 데 걸린 평균 시간(초)입니다. 그래프가 우하향할수록 같은 시간에 더 많은 문제를 처리하게 된다는 뜻으로, 풀이 효율이 향상된 것입니다. 문제집 단계별 난이도가 가중치로 보정됩니다." tooltip="문항 1개를 푸는 데 평균적으로 얼마나 걸렸는지 보여줍니다.\n\n숫자가 낮아질수록(우하향) 같은 시간에 더 많은\n문제를 처리할 수 있게 된다는 뜻이에요.\n\n문제집 난이도에 따라 보정된 값을 사용합니다.">⚡ 문제 풀이 속도</SectionTitle>
         {(()=>{
+          const isMathView = subjectFilter==="수학" || subjectFilter==="전체";
           const allDates=[...new Set(sorted.map(l=>l.date.slice(5)))].sort();
           const speedData=allDates.map(d=>{
             const dayLogs=sorted.filter(l=>l.date.slice(5)===d);
             const calcLvl=(key)=>{const ls=dayLogs.filter(l=>l[key]>0);const tot=ls.reduce((s,l)=>s+l[key],0);return ls.length>0&&tot>0?+(ls.reduce((s,l)=>s+l.netTime*60,0)/tot).toFixed(1):null;};
-            const calc=(lvl)=>calcLvl(lvl==='basic'?'qBasic':lvl==='mid'?'qMid':'qAdv');
-            return{date:d, basic:calc('basic'), mid:calc('mid'), adv:calc('adv')};
+            return{date:d, basic:calcLvl('qBasic'), mid:calcLvl('qMid'), adv:calcLvl('qAdv')};
           });
           return(
             <ResponsiveContainer width="100%" height={170}>
@@ -1485,9 +1492,9 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
                 <YAxis tick={{fill:T.muted,fontSize:10}} unit="초" width={48}/>
                 <Tooltip content={<ChartTip/>}/>
                 <Legend formatter={v=><span style={{fontSize:11,color:T.textMid}}>{v}</span>}/>
-                <Line type="monotone" dataKey="basic" name="기본" stroke={T.navy} strokeWidth={2} dot={{r:2}} connectNulls/>
-                <Line type="monotone" dataKey="mid" name="중급" stroke={T.orange} strokeWidth={2} dot={{r:2}} connectNulls/>
-                <Line type="monotone" dataKey="adv" name="심화" stroke="#7C3AED" strokeWidth={2} dot={{r:2}} connectNulls/>
+                <Line type="monotone" dataKey="basic" name={isMathView?"기본":"전체"} stroke={T.navy} strokeWidth={2} dot={{r:2}} connectNulls/>
+                {isMathView&&<Line type="monotone" dataKey="mid" name="응용" stroke={T.orange} strokeWidth={2} dot={{r:2}} connectNulls/>}
+                {isMathView&&<Line type="monotone" dataKey="adv" name="심화" stroke="#7C3AED" strokeWidth={2} dot={{r:2}} connectNulls/>}
               </LineChart>
             </ResponsiveContainer>
           );
@@ -1885,7 +1892,11 @@ const LogHistory = ({logs, onDelete, isAdmin, allProfiles}) => {
               <div style={{display:"flex",gap:6,marginBottom:5,alignItems:"center",flexWrap:"wrap"}}>
                 {isAdmin&&<span style={{fontSize:12,color:T.orange,fontWeight:700}}>{nameMap[log.uid]||"—"}</span>}
                 <span style={{fontSize:14,fontWeight:700,color:T.navy}}>{log.subject}</span>
-                {log.q_basic>0&&<Pill color={T.navy}>기본 {log.q_basic}</Pill>}{log.q_mid>0&&<Pill color={T.orange}>응용 {log.q_mid}</Pill>}{log.q_adv>0&&<Pill color="#7C3AED">심화 {log.q_adv}</Pill>}
+                {log.subject==="수학"?(
+  <>{log.q_basic>0&&<Pill color={T.navy}>기본 {log.q_basic}</Pill>}{log.q_mid>0&&<Pill color={T.orange}>응용 {log.q_mid}</Pill>}{log.q_adv>0&&<Pill color="#7C3AED">심화 {log.q_adv}</Pill>}</>
+):(
+  (log.q_basic||log.question_count)>0&&<Pill color={T.navy}>{log.q_basic||log.question_count}문항</Pill>
+)}
               </div>
               <div style={{display:"flex",gap:10,fontSize:11,color:T.muted,flexWrap:"wrap"}}>
                 <span>전략 {log.strategy_score}</span>
