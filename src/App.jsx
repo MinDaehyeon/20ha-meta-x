@@ -2625,18 +2625,14 @@ export default function App() {
       setLogs(allLogs || []);
       setAllProfiles(allProfs || []);
     } else if(prof.role === "parent") {
-      const { data: links } = await supabase
-        .from("parent_students").select("student_id").eq("parent_id", uid);
-      if(links && links.length > 0) {
-        const childData = await Promise.all(links.map(async ({ student_id }) => {
-          const [{ data: cp }, { data: cl }] = await Promise.all([
-            supabase.from("profiles").select("*").eq("id", student_id).single(),
-            supabase.rpc("get_child_logs", { child_id: student_id }),
-          ]);
+      const { data: childProfiles } = await supabase.rpc("get_child_profiles");
+      if(childProfiles && childProfiles.length > 0) {
+        const childData = await Promise.all(childProfiles.map(async (cp) => {
+          const { data: cl } = await supabase.rpc("get_child_logs", { child_id: cp.id });
           return { profile: cp, logs: cl || [] };
         }));
-        setChildren(childData.filter(c => c.profile));
-        if(childData[0]?.profile) setSelChildId(childData[0].profile.id);
+        setChildren(childData);
+        setSelChildId(childData[0].profile.id);
       }
     } else {
       const { data: myLogs } = await supabase
