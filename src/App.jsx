@@ -51,6 +51,24 @@ const sliderFill = (value, min, max, color) => {
 const QUANT_ITEMS = ["white-out RPT","실수제로테스트","코넬 노트","백지목차 테스트","마인드맵","위클리 티칭 미션"];
 const QUAL_ITEMS  = ["10배빠른 복습법","데이터 채점법","웜업슬라이딩","슬립온리콜","유형/비유형 학습","5분 누적복습"];
 const SUBJECTS    = ["수학","영어","국어","과학","사회","한국사"];
+const SUBJECT_CONFIG = {
+  "수학":   { qLevels:true,  showQM:true,
+    quant:["white-out RPT","백지목차 테스트","마인드맵","위클리 티칭 미션"],
+    qual:["10배빠른 복습법","데이터 채점법","웜업슬라이딩"] },
+  "과학":   { qLevels:false, showQM:false,
+    quant:["white-out RPT","코넬 노트","백지목차 테스트","마인드맵","위클리 티칭 미션"],
+    qual:["5분 누적복습","슬립온리콜","데이터 채점법","웜업슬라이딩"] },
+  "사회":   { qLevels:false, showQM:false,
+    quant:["white-out RPT","코넬 노트","백지목차 테스트","마인드맵","위클리 티칭 미션"],
+    qual:["5분 누적복습","슬립온리콜","데이터 채점법","웜업슬라이딩"] },
+  "한국사": { qLevels:false, showQM:false,
+    quant:["white-out RPT","코넬 노트","백지목차 테스트","마인드맵","위클리 티칭 미션"],
+    qual:["5분 누적복습","슬립온리콜","데이터 채점법","웜업슬라이딩"] },
+  "영어":   { qLevels:false, showQM:false,
+    quant:["white-out RPT"], qual:["데이터 채점법"] },
+  "국어":   { qLevels:false, showQM:false,
+    quant:["white-out RPT"], qual:["데이터 채점법"] },
+};
 const ERR_CODES   = ["Q1","Q2","Q3","M1","M2","M3"];
 const ERR_LABELS  = { Q1:"개념 미숙지", Q2:"추론 실패", Q3:"지식 공백", M1:"계산 실수", M2:"문제 오독", M3:"단순 실수" };
 const GRADES      = ["초1","초2","초3","초4","초5","초6","중1","중2","중3","고1","고2","고3"];
@@ -590,20 +608,26 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
   const [form, setForm]   = useState({
     date:new Date().toISOString().slice(0,10), subject:"수학", bookLevel:1,
     startTime:"14:00", endTime:"16:00", breakTime:10, questionCount:20,
-    qBasic:10, qMid:5, qAdv:0,
-    timeRatio1:50, timeRatio2:80, // 기본/중급 경계(%), 중급/심화 경계(%)
+    qBasic:0, qMid:0, qAdv:0,
+    timeRatio1:50, timeRatio2:80,
     quant:Object.fromEntries(QUANT_ITEMS.map(k=>[k,80])),
     qual:Object.fromEntries(QUAL_ITEMS.map(k=>[k,3])),
-    coinFilter:{cc:10,ci:2,ic:1,ii:5},
-    errorAnalysis:{Q1:1,Q2:0,Q3:0,M1:1,M2:0,M3:0},
+    quantEnabled:{}, qualEnabled:{},
+    coinFilter:{cc:0,ci:0,ic:0,ii:0},
+    errorAnalysis:{Q1:0,Q2:0,Q3:0,M1:0,M2:0,M3:0},
   });
+  const subjectCfg = SUBJECT_CONFIG[form.subject] || SUBJECT_CONFIG["수학"];
+  const handleSubjectChange = s => setForm(f=>({...f, subject:s, qBasic:0, qMid:0, qAdv:0, quantEnabled:{}, qualEnabled:{}}));
   const toMin = t=>{const[h,m]=t.split(":").map(Number);return h*60+m;};
   const netTime = Math.max(0,toMin(form.endTime)-toMin(form.startTime)-Number(form.breakTime));
   const breakRatio = Number(form.breakTime)/Math.max(1,toMin(form.endTime)-toMin(form.startTime))*100;
   const metrics = (()=>{
-    const qT=QUANT_ITEMS.reduce((s,k)=>s+Number(form.quant[k]),0);
-    const qlT=QUAL_ITEMS.reduce((s,k)=>s+((form.qual[k]||0)/5*100),0);
-    const strategyScore=(qT*1.0+qlT*0.5)/9;
+    const aqKeys=subjectCfg.quant.filter(k=>form.quantEnabled[k]);
+    const alKeys=subjectCfg.qual.filter(k=>form.qualEnabled[k]);
+    const qT=aqKeys.reduce((s,k)=>s+Number(form.quant[k]||0),0);
+    const qlT=alKeys.reduce((s,k)=>s+((form.qual[k]||0)/5*100),0);
+    const denom=(aqKeys.length*100*1.0+alKeys.length*100*0.5)/100;
+    const strategyScore=denom>0?(qT*1.0+qlT*0.5)/denom:0;
     const qB=form.qBasic||0, qM=form.qMid||0, qA=form.qAdv||0;
     // 단계별 시간 - 활성 구간 기준으로 rawB/rawM/rawA 계산 (띠그래프와 동일 로직)
     const h1m=form.timeRatio1||50, h2m=form.timeRatio2||80;
@@ -632,14 +656,12 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
   const save = async()=>{
     if(!form.date){setErr("⚠️ 날짜를 입력해주세요.");return;}
     if(!form.subject){setErr("⚠️ 과목을 선택해주세요.");return;}
-    const totalQCheck=(form.qBasic||0)+(form.qMid||0)+(form.qAdv||0);
+    const totalQCheck=subjectCfg.qLevels?(form.qBasic||0)+(form.qMid||0)+(form.qAdv||0):(form.qBasic||0);
     if(totalQCheck===0){setErr("⚠️ 문항 수를 하나 이상 입력해주세요.");return;}
     if(toMin(form.endTime)<=toMin(form.startTime)){setErr("⚠️ 종료 시간이 시작 시간보다 빠릅니다.");return;}
     if(breakRatio>50){setErr("⚠️ 쉬는 시간이 전체 학습 시간의 50%를 초과했습니다.");return;}
-    const emptyQuant=QUANT_ITEMS.filter(k=>form.quant[k]===undefined||form.quant[k]==="");
-    if(emptyQuant.length>0){setErr("⚠️ 정량 평가를 모두 입력해주세요.");return;}
     const coinSum=Object.values(form.coinFilter).reduce((s,v)=>s+v,0);
-    if(coinSum===0){setErr("⚠️ Co-In 메타인지 필터를 입력해주세요.");return;}
+    if(coinSum===0){setErr("⚠️ CO-IN Filter를 입력해주세요.");return;}
     setSaving(true); setErr("");
     const{error}=await supabase.from("learning_logs").insert({
       uid, date:form.date, subject:form.subject, book_level:form.bookLevel,
@@ -684,28 +706,40 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
               </div>
               <div>
                 <label style={css.label}>과목</label>
-                <select value={form.subject} onChange={e=>setForm(f=>({...f,subject:e.target.value}))} style={css.select}>
+                <select value={form.subject} onChange={e=>handleSubjectChange(e.target.value)} style={css.select}>
                   {SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
             </div>
           </Card>
-          {/* 카드2: 문항 수 (단계별) */}
+          {/* 카드2: 문항 수 */}
           <Card>
-            <div style={{fontSize:12,fontWeight:700,color:T.muted,marginBottom:12,letterSpacing:"0.06em"}}>📚 단계별 풀이 문항 수</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-              {[{label:"기본",key:"qBasic",color:T.navy},{label:"중급",key:"qMid",color:T.orange},{label:"심화",key:"qAdv",color:"#7C3AED"}].map(({label,key,color})=>(
-                <div key={key}>
-                  <label style={{...css.label,color}}>{label}</label>
-                  <input type="number" min={0} max={200} value={form[key]||0}
-                    onChange={e=>setForm(f=>({...f,[key]:Number(e.target.value)}))}
-                    style={{...css.input,borderColor:color+"60",textAlign:"center",fontWeight:700,color}}/>
+            <div style={{fontSize:12,fontWeight:700,color:T.muted,marginBottom:12,letterSpacing:"0.06em"}}>📚 문제집 단계별 문항 수</div>
+            {subjectCfg.qLevels?(
+              <>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+                  {[{label:"기본(개념, 연산) 문제",sub:"예시: A step/ 1단계",key:"qBasic",color:T.navy},{label:"응용 문제",sub:"예시: B step/ 2단계",key:"qMid",color:T.orange},{label:"심화 문제",sub:"예시: C step/ 3단계",key:"qAdv",color:"#7C3AED"}].map(({label,sub,key,color})=>(
+                    <div key={key}>
+                      <label style={{...css.label,color}}>{label}</label>
+                      <div style={{fontSize:10,color:T.muted,marginBottom:4}}>{sub}</div>
+                      <input type="number" min={0} max={200} value={form[key]||0}
+                        onChange={e=>setForm(f=>({...f,[key]:Number(e.target.value)}))}
+                        style={{...css.input,borderColor:color+"60",textAlign:"center",fontWeight:700,color}}/>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div style={{marginTop:10,padding:"8px 12px",background:T.surfaceAlt,borderRadius:8,fontSize:12,color:T.muted}}>
-              총 문항: <strong style={{color:T.navy}}>{(form.qBasic||0)+(form.qMid||0)+(form.qAdv||0)}문항</strong>
-            </div>
+                <div style={{marginTop:10,padding:"8px 12px",background:T.surfaceAlt,borderRadius:8,fontSize:12,color:T.muted}}>
+                  총 문항: <strong style={{color:T.navy}}>{(form.qBasic||0)+(form.qMid||0)+(form.qAdv||0)}문항</strong>
+                </div>
+              </>
+            ):(
+              <div style={{maxWidth:200}}>
+                <label style={css.label}>총 문항 수</label>
+                <input type="number" min={0} max={500} value={form.qBasic||0}
+                  onChange={e=>setForm(f=>({...f,qBasic:Number(e.target.value),qMid:0,qAdv:0}))}
+                  style={{...css.input,textAlign:"center",fontWeight:700,color:T.navy}}/>
+              </div>
+            )}
           </Card>
           {/* 카드3: 시간 */}
           <Card>
@@ -786,7 +820,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
                       {rawB>=14&&<span style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.9)",whiteSpace:"nowrap"}}>기본 {bMin}분</span>}
                     </div>}
                     {hasM&&rawM>0&&<div style={{width:`${rawM}%`,background:T.orange,display:"flex",alignItems:"center",justifyContent:"center",transition:"width 0.05s",overflow:"hidden"}}>
-                      {rawM>=14&&<span style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.9)",whiteSpace:"nowrap"}}>중급 {mMin}분</span>}
+                      {rawM>=14&&<span style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.9)",whiteSpace:"nowrap"}}>응용 {mMin}분</span>}
                     </div>}
                     {hasA&&rawA>0&&<div style={{flex:1,background:"#7C3AED",display:"flex",alignItems:"center",justifyContent:"center",transition:"width 0.05s",overflow:"hidden"}}>
                       {rawA>=14&&<span style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.9)",whiteSpace:"nowrap"}}>심화 {aMin}분</span>}
@@ -810,15 +844,22 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
         <Card>
           <div style={{marginBottom:22}}>
             <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:14}}>📊 정량 평가 (0–100점)</div>
-            {QUANT_ITEMS.map(item=>{
-              const{g,c}=gradeInfo(form.quant[item]);
+            {subjectCfg.quant.map(item=>{
+              const on=!!form.quantEnabled[item];
+              const{g,c}=gradeInfo(on?form.quant[item]:0);
               return(
-                <div key={item} style={{marginBottom:14}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                    <span style={{fontSize:13,color:T.textMid}}>{item}</span>
-                    <div style={{display:"flex",gap:8,alignItems:"center"}}><Pill color={c}>{g}</Pill><span style={{fontSize:14,fontWeight:800,color:T.navy,minWidth:28,textAlign:"right"}}>{form.quant[item]}</span></div>
+                <div key={item} style={{marginBottom:14,opacity:on?1:0.45}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div onClick={()=>setForm(f=>({...f,quantEnabled:{...f.quantEnabled,[item]:!on}}))}
+                        style={{width:20,height:20,borderRadius:6,border:`2px solid ${on?T.navy:T.border}`,background:on?T.navy:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        {on&&<span style={{color:"#fff",fontSize:12,fontWeight:900}}>✓</span>}
+                      </div>
+                      <span style={{fontSize:13,color:T.textMid}}>{item}</span>
+                    </div>
+                    {on&&<div style={{display:"flex",gap:8,alignItems:"center"}}><Pill color={c}>{g}</Pill><span style={{fontSize:14,fontWeight:800,color:T.navy,minWidth:28,textAlign:"right"}}>{form.quant[item]}</span></div>}
                   </div>
-                  <input type="range" min={0} max={100} step={1} value={form.quant[item]} onChange={e=>setForm(f=>({...f,quant:{...f.quant,[item]:Number(e.target.value)}}))} style={sliderFill(form.quant[item],0,100,c)}/>
+                  {on&&<input type="range" min={0} max={100} step={1} value={form.quant[item]} onChange={e=>setForm(f=>({...f,quant:{...f.quant,[item]:Number(e.target.value)}}))} style={sliderFill(form.quant[item],0,100,c)}/>}
                 </div>
               );
             })}
@@ -840,20 +881,27 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
               ))}
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              {QUAL_ITEMS.map(item=>{
+              {subjectCfg.qual.map(item=>{
+                const on=!!form.qualEnabled[item];
                 const score=form.qual[item]||3;
                 const qualColor=score>=5?"#16A34A":score>=4?"#2563EB":score>=3?"#111827":score>=2?"#F97316":"#DC2626";
                 const qualLabel=["","전혀 하지 않음","시도만 했음","절반의 수행","충실히 수행","완벽히 몰입"][score];
                 return(
-                  <div key={item}>
+                  <div key={item} style={{opacity:on?1:0.45}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:6,alignItems:"center"}}>
-                      <span style={{fontSize:12,color:T.textMid,fontWeight:600}}>{item}</span>
-                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div onClick={()=>setForm(f=>({...f,qualEnabled:{...f.qualEnabled,[item]:!on}}))}
+                          style={{width:20,height:20,borderRadius:6,border:`2px solid ${on?T.navy:T.border}`,background:on?T.navy:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                          {on&&<span style={{color:"#fff",fontSize:12,fontWeight:900}}>✓</span>}
+                        </div>
+                        <span style={{fontSize:12,color:T.textMid,fontWeight:600}}>{item}</span>
+                      </div>
+                      {on&&<div style={{display:"flex",alignItems:"center",gap:6}}>
                         <span style={{fontSize:11,color:qualColor}}>{qualLabel}</span>
                         <span style={{fontSize:14,fontWeight:800,color:qualColor,minWidth:16,textAlign:"center"}}>{score}</span>
-                      </div>
+                      </div>}
                     </div>
-                    <div style={{display:"flex",gap:6}}>
+                    {on&&<div style={{display:"flex",gap:6}}>
                       {[1,2,3,4,5].map(n=>(
                         <div key={n} onClick={()=>setForm(f=>({...f,qual:{...f.qual,[item]:n}}))}
                           style={{flex:1,height:32,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",
@@ -862,7 +910,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
                             color:score===n?T.white:score>n?qualColor:T.muted,
                             border:`1px solid ${score>=n?qualColor:T.border}`}}>{n}</div>
                       ))}
-                    </div>
+                    </div>}
                   </div>
                 );
               })}
@@ -874,7 +922,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
       {step===2&&(
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <Card>
-            <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:14}}>🧠 Co-In 메타인지 필터</div>
+            <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:14}}>🧠 CO-IN Filter</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               {[{key:"cc",label:"C-C",desc:"맞을 것 같았고 실제로 맞음",color:GRAPH.ccColor},{key:"ci",label:"C-I",desc:"맞을 것 같았으나 틀림",color:GRAPH.ciColor},{key:"ic",label:"I-C",desc:"틀릴 것 같았으나 맞음",color:GRAPH.icColor},{key:"ii",label:"I-I",desc:"틀릴 것 같았고 실제로 틀림",color:GRAPH.iiColor}].map(({key,label,desc,color})=>(
                 <div key={key} style={{background:color+"0e",border:`1px solid ${color}30`,borderRadius:12,padding:"12px 14px"}}>
@@ -903,8 +951,8 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
               ))}
             </div>
           </Card>
-          <Card>
-            <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:14}}>❌ 오답 유형 분석</div>
+          {subjectCfg.showQM&&(<Card>
+            <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:14}}>❌ QM 오답분석</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
               {ERR_CODES.map(code=>{
                 const ec=code[0]==="Q"?T.danger:T.orange;
@@ -929,7 +977,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
                 </div>
               );})}
             </div>
-          </Card>
+          </Card>)}
         </div>
       )}
 
@@ -1071,7 +1119,7 @@ const LearningCalendar = ({logs}) => {
           <strong>{tooltip.dateStr}</strong> — {tooltip.dayLogs.length}건 학습
           {tooltip.dayLogs.map((l,i)=>(
             <div key={i} style={{marginTop:4,color:"rgba(255,255,255,0.8)"}}>
-              {l.subject} {l.book_level===1?"기본":l.book_level===2?"중급":"심화"} · EI <strong style={{color:T.orange}}>{(l.engram_index||0).toFixed(1)}</strong>
+              {l.subject} {l.book_level===1?"기본":l.book_level===2?"응용":"심화"} · EI <strong style={{color:T.orange}}>{(l.engram_index||0).toFixed(1)}</strong>
             </div>
           ))}
           <div style={{position:"absolute",bottom:-6,left:"50%",transform:"translateX(-50%)",
@@ -1837,7 +1885,7 @@ const LogHistory = ({logs, onDelete, isAdmin, allProfiles}) => {
               <div style={{display:"flex",gap:6,marginBottom:5,alignItems:"center",flexWrap:"wrap"}}>
                 {isAdmin&&<span style={{fontSize:12,color:T.orange,fontWeight:700}}>{nameMap[log.uid]||"—"}</span>}
                 <span style={{fontSize:14,fontWeight:700,color:T.navy}}>{log.subject}</span>
-                {log.q_basic>0&&<Pill color={T.navy}>기본 {log.q_basic}</Pill>}{log.q_mid>0&&<Pill color={T.orange}>중급 {log.q_mid}</Pill>}{log.q_adv>0&&<Pill color="#7C3AED">심화 {log.q_adv}</Pill>}
+                {log.q_basic>0&&<Pill color={T.navy}>기본 {log.q_basic}</Pill>}{log.q_mid>0&&<Pill color={T.orange}>응용 {log.q_mid}</Pill>}{log.q_adv>0&&<Pill color="#7C3AED">심화 {log.q_adv}</Pill>}
               </div>
               <div style={{display:"flex",gap:10,fontSize:11,color:T.muted,flexWrap:"wrap"}}>
                 <span>전략 {log.strategy_score}</span>
