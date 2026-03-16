@@ -251,6 +251,64 @@ const NaverIcon = () => (
 );
 
 // ══════════════════════════════════════════════════════
+// PASSWORD RESET SCREEN
+// ══════════════════════════════════════════════════════
+const PasswordResetScreen = ({ onDone }) => {
+  const [newPw, setNewPw]   = useState("");
+  const [newPwC, setNewPwC] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [done, setDone]     = useState(false);
+  const [err, setErr]       = useState("");
+  const isMobile = useMobile();
+
+  const handleReset = async () => {
+    const pwRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/;
+    if(newPw !== newPwC){ setErr("비밀번호가 일치하지 않습니다."); return; }
+    if(!pwRegex.test(newPw)){ setErr("영문 대소문자, 특수문자 포함 8자 이상이어야 합니다."); return; }
+    setSaving(true); setErr("");
+    const { error } = await supabase.auth.updateUser({ password: newPw });
+    setSaving(false);
+    if(error){ setErr("변경 실패: " + error.message); return; }
+    setDone(true);
+    setTimeout(onDone, 2000);
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Noto Sans KR',sans-serif",padding:20}}>
+      <Card style={{width:"100%",maxWidth:400,padding:"40px 36px"}}>
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <Logo size="md"/>
+        </div>
+        <div style={{fontSize:20,fontWeight:800,color:T.navy,marginBottom:6}}>새 비밀번호 설정</div>
+        <div style={{fontSize:13,color:T.muted,marginBottom:20}}>사용할 새 비밀번호를 입력해주세요.</div>
+        {done ? (
+          <div style={{textAlign:"center",padding:"20px 0"}}>
+            <div style={{fontSize:40,marginBottom:12}}>✅</div>
+            <div style={{fontSize:15,fontWeight:700,color:T.navy}}>비밀번호가 변경됐어요!</div>
+            <div style={{fontSize:13,color:T.muted,marginTop:6}}>잠시 후 로그인 화면으로 이동합니다...</div>
+          </div>
+        ) : (<>
+          <div style={{display:"grid",gap:12,marginBottom:12}}>
+            <div>
+              <label style={css.label}>새 비밀번호 <span style={{fontWeight:400,color:T.muted}}>(대소문자+특수문자 8자↑)</span></label>
+              <input type="password" value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="••••••••" style={css.input}/>
+            </div>
+            <div>
+              <label style={css.label}>새 비밀번호 확인</label>
+              <input type="password" value={newPwC} onChange={e=>setNewPwC(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleReset()} placeholder="••••••••" style={css.input}/>
+            </div>
+          </div>
+          {err && <div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",fontSize:13,color:T.danger,marginBottom:12}}>{err}</div>}
+          <button onClick={handleReset} disabled={saving} style={{...css.btnPrimary,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            {saving?<><Spinner size={18} color="#fff"/>변경 중...</>:"비밀번호 변경"}
+          </button>
+        </>)}
+      </Card>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════
 // AUTH SCREEN — 로그인 + 소셜 + 데모 버튼
 // ══════════════════════════════════════════════════════
 const AuthScreen = ({ onLogin }) => {
@@ -267,10 +325,14 @@ const AuthScreen = ({ onLogin }) => {
   const [suPwC, setSuPwC]     = useState("");
   const [suTarget, setSuTarget] = useState(85);
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [ageAgreed, setAgeAgreed] = useState(false);
   const [signupDone, setSignupDone] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpCode, setOtpCode] = useState("");
+  const [fpEmail, setFpEmail] = useState("");
+  const [fpSent, setFpSent] = useState(false);
   const isMobile = useMobile();
 
   const setLoad = (k,v) => setLoading(p=>({...p,[k]:v}));
@@ -287,6 +349,17 @@ const AuthScreen = ({ onLogin }) => {
     if(rememberMe) localStorage.setItem("20ha_saved_email", e);
     else localStorage.removeItem("20ha_saved_email");
     onLogin(data.session);
+  };
+
+  const handleForgotPassword = async () => {
+    if(!fpEmail){ setError("이메일을 입력해주세요."); return; }
+    setLoad("fp", true); setError("");
+    const { error:err } = await supabase.auth.resetPasswordForEmail(fpEmail, {
+      redirectTo: "https://meta-x.ai.kr"
+    });
+    setLoad("fp", false);
+    if(err){ setError(translateSupabaseError(err.message)); return; }
+    setFpSent(true);
   };
 
   const handleSendOtp = async () => {
@@ -411,10 +484,10 @@ const handleSocial = async (provider) => {
   const loginForm = (
     <div>
       <div style={{fontSize:22,fontWeight:900,color:T.navy,marginBottom:4}}>
-        {mode==="login"?"로그인":"회원가입"}
+        {mode==="login"?"로그인":mode==="forgot"?"비밀번호 찾기":"회원가입"}
       </div>
       <div style={{fontSize:13,color:T.muted,marginBottom:20}}>
-        {mode==="login"?"계정으로 로그인하세요.":"계정을 만들어 학습을 시작하세요."}
+        {mode==="login"?"계정으로 로그인하세요.":mode==="forgot"?"가입 시 사용한 이메일을 입력해주세요.":"계정을 만들어 학습을 시작하세요."}
       </div>
 
       {mode==="login" && (<>
@@ -448,9 +521,38 @@ const handleSocial = async (provider) => {
         </button>
 
 
-        <div style={{textAlign:"center",marginTop:14,fontSize:13,color:T.muted}}>
+        <div style={{textAlign:"center",marginTop:10,fontSize:12}}>
+          <span onClick={()=>{setMode("forgot");setError("");setFpSent(false);setFpEmail("");}} style={{color:T.muted,cursor:"pointer",textDecoration:"underline"}}>비밀번호를 잊으셨나요?</span>
+        </div>
+        <div style={{textAlign:"center",marginTop:10,fontSize:13,color:T.muted}}>
           계정이 없으신가요? <span onClick={()=>{setMode("signup");setError("");}} style={{color:T.orange,fontWeight:700,cursor:"pointer"}}>이메일로 가입</span>
         </div>
+      </>)}
+
+      {mode==="forgot" && (<>
+        {fpSent ? (
+          <div style={{textAlign:"center",padding:"20px 0"}}>
+            <div style={{fontSize:40,marginBottom:14}}>📧</div>
+            <div style={{fontSize:15,fontWeight:700,color:T.navy,marginBottom:8}}>이메일을 보냈어요!</div>
+            <div style={{fontSize:13,color:T.textMid,lineHeight:1.8,marginBottom:20}}>
+              <strong>{fpEmail}</strong>로 비밀번호 재설정 링크를 보냈어요.<br/>
+              이메일을 확인하고 링크를 클릭해 주세요. (스팸함도 확인!)
+            </div>
+            <button onClick={()=>{setMode("login");setFpSent(false);setError("");}} style={{...css.btnGhost,padding:"10px 28px"}}>로그인으로 돌아가기</button>
+          </div>
+        ) : (<>
+          <div style={{marginBottom:12}}>
+            <label style={css.label}>이메일</label>
+            <input value={fpEmail} onChange={e=>setFpEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleForgotPassword()} placeholder="가입 시 사용한 이메일" style={css.input}/>
+          </div>
+          {error && <div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",fontSize:13,color:T.danger,marginBottom:12}}>{error}</div>}
+          <button onClick={handleForgotPassword} disabled={loading.fp} style={{...css.btnPrimary,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            {loading.fp?<><Spinner size={18} color="#fff"/>전송 중...</>:"재설정 이메일 보내기"}
+          </button>
+          <div style={{textAlign:"center",marginTop:14,fontSize:13,color:T.muted}}>
+            <span onClick={()=>{setMode("login");setError("");}} style={{color:T.navy,fontWeight:700,cursor:"pointer"}}>← 로그인으로 돌아가기</span>
+          </div>
+        </>)}
       </>)}
 
       {mode==="signup" && (<>
@@ -495,8 +597,26 @@ const handleSocial = async (provider) => {
         <div style={{background:T.orangePale,border:`1px solid ${T.orange}30`,borderRadius:10,padding:"10px 14px",fontSize:12,color:T.textMid,marginBottom:12}}>
           ⚠️ 가입 후 <strong>관리자 승인</strong>이 완료되어야 로그인할 수 있습니다.
         </div>
+        {/* 서비스 이용약관 동의 */}
+        <div style={{border:`1px solid ${T.border}`,borderRadius:10,marginBottom:10}}>
+          <div style={{height:100,overflowY:"auto",padding:"12px 14px",fontSize:11,lineHeight:1.7,color:"#555",background:"#FAFAFA",borderRadius:"10px 10px 0 0"}}>
+            <div style={{fontWeight:700,color:T.navy,marginBottom:6,fontSize:12}}>서비스 이용약관</div>
+            <p><strong>제1조 (목적)</strong><br/>본 약관은 (주)아이작교육그룹(이하 "회사")이 제공하는 META-X 서비스(이하 "서비스") 이용에 관한 조건을 정함을 목적으로 합니다.</p>
+            <p style={{marginTop:6}}><strong>제2조 (서비스 이용)</strong><br/>서비스는 학습 데이터 기록 및 분석 기능을 제공합니다. 서비스 이용은 회원 가입 및 관리자 승인 후 가능합니다.</p>
+            <p style={{marginTop:6}}><strong>제3조 (회원의 의무)</strong><br/>회원은 타인의 정보를 도용하거나 서비스를 악용해서는 안 됩니다. 정직한 학습 데이터 입력이 권장됩니다.</p>
+            <p style={{marginTop:6}}><strong>제4조 (서비스 변경 및 중단)</strong><br/>회사는 운영상 필요에 따라 서비스 내용을 변경하거나 중단할 수 있으며, 이 경우 사전 공지합니다.</p>
+            <p style={{marginTop:6}}><strong>제5조 (면책)</strong><br/>회사는 회원의 귀책사유로 인한 서비스 이용 장애에 대해 책임지지 않습니다.</p>
+            <p style={{marginTop:6,color:"#888"}}>문의: (주)아이작교육그룹 &nbsp;|&nbsp; ☎ 02-1522-5316</p>
+          </div>
+          <label style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",cursor:"pointer",borderTop:`1px solid ${T.border}`}}>
+            <input type="checkbox" checked={termsAgreed} onChange={e=>setTermsAgreed(e.target.checked)}
+              style={{width:16,height:16,accentColor:T.navy,cursor:"pointer",flexShrink:0}}/>
+            <span style={{fontSize:13,color:T.text,fontWeight:600}}>(필수) 서비스 이용약관에 동의합니다.</span>
+          </label>
+        </div>
+
         {/* 개인정보 처리방침 동의 */}
-        <div style={{border:`1px solid ${T.border}`,borderRadius:10,marginBottom:12}}>
+        <div style={{border:`1px solid ${T.border}`,borderRadius:10,marginBottom:10}}>
           <div style={{height:120,overflowY:"auto",padding:"12px 14px",fontSize:11,lineHeight:1.7,color:"#555",background:"#FAFAFA",borderRadius:"10px 10px 0 0"}}>
             <div style={{fontWeight:700,color:T.navy,marginBottom:6,fontSize:12}}>개인정보 처리방침</div>
             <p><strong>(주)아이작교육그룹</strong>(이하 "회사")은 META-X 서비스(이하 "서비스") 운영을 위해 아래와 같이 개인정보를 수집·이용합니다.</p>
@@ -513,8 +633,16 @@ const handleSocial = async (provider) => {
             <span style={{fontSize:13,color:T.text,fontWeight:600}}>(필수) 개인정보 처리방침에 동의합니다.</span>
           </label>
         </div>
+        {/* 나이 확인 */}
+        <label style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:12,cursor:"pointer"}}>
+          <input type="checkbox" checked={ageAgreed} onChange={e=>setAgeAgreed(e.target.checked)}
+            style={{width:16,height:16,accentColor:T.navy,cursor:"pointer",flexShrink:0,marginTop:2}}/>
+          <span style={{fontSize:12,color:T.textMid,lineHeight:1.6}}>
+            (필수) 본인은 <strong>만 14세 이상</strong>이거나, 만 14세 미만인 경우 <strong>보호자(부모님)의 동의</strong>를 받았습니다.
+          </span>
+        </label>
         {error && <div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",fontSize:13,color:T.danger,marginBottom:12}}>{error}</div>}
-        <button onClick={handleSignup} disabled={loading.signup||!otpVerified||!privacyAgreed} style={{...css.btnOrange,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:(!otpVerified||!privacyAgreed)?0.4:1}}>
+        <button onClick={handleSignup} disabled={loading.signup||!otpVerified||!privacyAgreed||!termsAgreed||!ageAgreed} style={{...css.btnOrange,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:(!otpVerified||!privacyAgreed||!termsAgreed||!ageAgreed)?0.4:1}}>
           {loading.signup?<><Spinner size={18} color="#fff"/>가입 중...</>:"가입하기 →"}
         </button>
         <div style={{textAlign:"center",marginTop:14,fontSize:13,color:T.muted}}>
@@ -2027,7 +2155,7 @@ const EISetupModal = ({profile, onSave}) => {
 // ══════════════════════════════════════════════════════
 // PROFILE MODAL
 // ══════════════════════════════════════════════════════
-const ProfileModal = ({profile, onClose, onSave}) => {
+const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
   const [name, setName]           = useState(profile.name||"");
   const [grade, setGrade]         = useState(profile.grade||"고1");
   const [target, setTarget]       = useState(profile.target_ei||85);
@@ -2038,6 +2166,8 @@ const ProfileModal = ({profile, onClose, onSave}) => {
   const [saving, setSaving]       = useState(false);
   const [done, setDone]           = useState(false);
   const [err, setErr]             = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting]   = useState(false);
   const [cropSrc, setCropSrc]     = useState(null);
   const [crop, setCrop]           = useState();
   const [completedCrop, setCompletedCrop] = useState(null);
@@ -2190,6 +2320,38 @@ const ProfileModal = ({profile, onClose, onSave}) => {
                 {saving?<><Spinner size={16} color="#fff"/>저장 중...</>:"저장"}
               </button>
             </div>}
+
+        {/* 계정 탈퇴 */}
+        {profile.role !== "admin" && (
+          <div style={{marginTop:24,paddingTop:16,borderTop:`1px solid ${T.border}`}}>
+            {!deleteConfirm ? (
+              <button onClick={()=>setDeleteConfirm(true)}
+                style={{background:"none",border:"none",color:T.muted,fontSize:12,cursor:"pointer",textDecoration:"underline",padding:0}}>
+                계정 탈퇴 신청
+              </button>
+            ) : (
+              <div style={{background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:10,padding:"14px"}}>
+                <div style={{fontSize:13,fontWeight:700,color:T.danger,marginBottom:6}}>정말 탈퇴하시겠어요?</div>
+                <div style={{fontSize:12,color:"#666",lineHeight:1.6,marginBottom:12}}>
+                  탈퇴 신청 후 관리자가 7일 이내 처리합니다.<br/>
+                  탈퇴 시 모든 학습 데이터가 삭제되며 복구할 수 없습니다.
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>setDeleteConfirm(false)} style={{...css.btnGhost,flex:1,fontSize:12,padding:"8px 0"}}>취소</button>
+                  <button onClick={async()=>{
+                    setDeleting(true);
+                    await supabase.from("profiles").update({approval_status:"deletion_requested"}).eq("id",profile.id);
+                    setDeleting(false);
+                    if(onDelete) onDelete();
+                  }} disabled={deleting}
+                    style={{flex:2,background:T.danger,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",padding:"8px 0",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                    {deleting?<><Spinner size={14} color="#fff"/>처리 중...</>:"탈퇴 신청"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </Card>
     </div>
   );
@@ -2314,6 +2476,11 @@ export default function App() {
       else setAuthState("unauthenticated");
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, sess) => {
+      if(event === "PASSWORD_RECOVERY") {
+        setAuthState("passwordRecovery");
+        setSession(sess);
+        return;
+      }
       if(event === "SIGNED_OUT" || !sess) {
         setAuthState("unauthenticated");
         setSession(null); setProfile(null);
@@ -2340,6 +2507,11 @@ export default function App() {
       <Spinner size={36}/>
       <div style={{ fontSize:13, color:T.muted }}>로딩 중...</div>
     </div>
+  );
+
+  // ── 비밀번호 재설정
+  if(authState === "passwordRecovery") return (
+    <PasswordResetScreen onDone={()=>{ supabase.auth.signOut(); setAuthState("unauthenticated"); }}/>
   );
 
   // ── 비로그인
@@ -2428,6 +2600,15 @@ export default function App() {
                 display:"flex", alignItems:"center", gap:4, whiteSpace:"nowrap" }}>
               {isMobile ? "?" : "❓ 도움말"}
             </button>
+            {!isMobile && (
+              <a href="mailto:academy@isaacedu.co.kr?subject=META-X 문의&body=안녕하세요, META-X 관련 문의사항이 있습니다."
+                title="문의하기 (02-1522-5316)"
+                style={{ padding:"6px 10px", borderRadius:8, border:`1px solid ${T.border}`,
+                  background:"transparent", color:T.muted, cursor:"pointer", fontSize:13, fontWeight:700,
+                  display:"flex", alignItems:"center", gap:4, whiteSpace:"nowrap", textDecoration:"none" }}>
+                📞 문의
+              </a>
+            )}
             {!isMobile && <div style={{ height:24, width:1, background:T.border }}/>}
             <div onClick={()=>setShowProfileModal(true)}
               style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer", padding:"4px 8px", borderRadius:8,
@@ -2489,7 +2670,7 @@ export default function App() {
 
       {isMobile && <BottomNav nav={NAV} view={view} showInput={showInput} onNavigate={navigate} isAdmin={isAdmin}/>}
       {showEISetup && <EISetupModal profile={profile} onSave={(t)=>{setProfile(p=>({...p,target_ei:t}));setShowEISetup(false);}}/> }
-      {showProfileModal && <ProfileModal profile={profile} onClose={()=>setShowProfileModal(false)} onSave={(updated)=>{setProfile(updated);setShowProfileModal(false);}}/>}
+      {showProfileModal && <ProfileModal profile={profile} onClose={()=>setShowProfileModal(false)} onSave={(updated)=>{setProfile(updated);setShowProfileModal(false);}} onDelete={()=>{setShowProfileModal(false);handleLogout();}}/>}
     </div>
   );
 }
