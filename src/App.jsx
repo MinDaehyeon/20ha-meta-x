@@ -1714,7 +1714,7 @@ const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChild
       setAddMsg({type:"err", text:"이미 연결된 학생입니다."}); setAddLoading(false); return;
     }
     const { error: insErr } = await supabase.from("parent_students").insert({ parent_id: parentId, student_id: student.id });
-    if(insErr){ setAddMsg({type:"err", text:"연결 중 오류가 발생했습니다."}); setAddLoading(false); return; }
+    if(insErr && insErr.code !== '23505'){ setAddMsg({type:"err", text:"연결 중 오류가 발생했습니다."}); setAddLoading(false); return; }
     // 새 자녀 데이터 로드
     const { data: cl } = await supabase.rpc("get_child_logs", { child_id: student.id });
     onChildrenUpdate([...children, { profile: {...student, role:"student"}, logs: cl || [] }], student.id);
