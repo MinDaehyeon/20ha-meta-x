@@ -657,7 +657,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
     }
     const{cc,ci,ic,ii}=form.coinFilter; const tot=cc+ci+ic+ii;
     const metacognitionAccuracy=tot>0?((cc+ii)/tot)*100:0;
-    return{strategyScore:+strategyScore.toFixed(1),efficiencyIndex:+efficiencyIndex.toFixed(1),metacognitionAccuracy:+metacognitionAccuracy.toFixed(1),engramIndex:calcEI({strategyScore,efficiencyIndex,metacognitionAccuracy})};
+    return{strategyScore:+strategyScore.toFixed(1),efficiencyIndex:+efficiencyIndex.toFixed(1),metacognitionAccuracy:+metacognitionAccuracy.toFixed(1),engramIndex:calcEI({strategyScore,efficiencyIndex,metacognitionAccuracy}),bTime,mTime,aTime};
   })();
 
   const save = async()=>{
@@ -675,7 +675,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
       start_time:form.startTime, end_time:form.endTime, break_time:form.breakTime, net_time:netTime,
       question_count:(form.qBasic||0)+(form.qMid||0)+(form.qAdv||0)||form.questionCount,
       q_basic:form.qBasic||0, q_mid:form.qMid||0, q_adv:form.qAdv||0,
-      t_basic:Math.round(bTime), t_mid:Math.round(mTime), t_adv:Math.round(aTime),
+      t_basic:Math.round(metrics.bTime), t_mid:Math.round(metrics.mTime), t_adv:Math.round(metrics.aTime),
       strategy_score:metrics.strategyScore, efficiency_index:metrics.efficiencyIndex,
       metacognition_accuracy:metrics.metacognitionAccuracy, engram_index:metrics.engramIndex,
       coin_cc:form.coinFilter.cc, coin_ci:form.coinFilter.ci,
