@@ -2439,7 +2439,7 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
           </label>
           <div style={{fontSize:11,color:T.muted,marginTop:8}}>사진 클릭하여 변경</div>
           <div style={{fontSize:12,color:T.muted,marginTop:2}}>
-            {profile.role==="admin"?"관리자 계정":"학생 계정"} · 가입 {profile.created_at?.slice(0,10)||""}
+            {profile.role==="admin"?"관리자 계정":profile.role==="parent"?"학부모 계정":"학생 계정"} · 가입 {profile.created_at?.slice(0,10)||""}
           </div>
         </div>
 
@@ -2448,7 +2448,7 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
             <label style={css.label}>이름</label>
             <input value={name} onChange={e=>setName(e.target.value)} style={css.input}/>
           </div>
-          {profile.role!=="admin"&&<>
+          {profile.role==="student"&&<>
             <div>
               <label style={css.label}>학년</label>
               <select value={grade} onChange={e=>setGrade(e.target.value)} style={css.select}>
