@@ -266,6 +266,7 @@ const AuthScreen = ({ onLogin }) => {
   const [suPw, setSuPw]       = useState("");
   const [suPwC, setSuPwC]     = useState("");
   const [suTarget, setSuTarget] = useState(85);
+  const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const [signupDone, setSignupDone] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
@@ -494,8 +495,26 @@ const handleSocial = async (provider) => {
         <div style={{background:T.orangePale,border:`1px solid ${T.orange}30`,borderRadius:10,padding:"10px 14px",fontSize:12,color:T.textMid,marginBottom:12}}>
           ⚠️ 가입 후 <strong>관리자 승인</strong>이 완료되어야 로그인할 수 있습니다.
         </div>
+        {/* 개인정보 처리방침 동의 */}
+        <div style={{border:`1px solid ${T.border}`,borderRadius:10,marginBottom:12}}>
+          <div style={{height:120,overflowY:"auto",padding:"12px 14px",fontSize:11,lineHeight:1.7,color:"#555",background:"#FAFAFA",borderRadius:"10px 10px 0 0"}}>
+            <div style={{fontWeight:700,color:T.navy,marginBottom:6,fontSize:12}}>개인정보 처리방침</div>
+            <p><strong>(주)아이작교육그룹</strong>(이하 "회사")은 META-X 서비스(이하 "서비스") 운영을 위해 아래와 같이 개인정보를 수집·이용합니다.</p>
+            <p style={{marginTop:6}}><strong>1. 수집 항목</strong><br/>이름, 이메일 주소, 학년, 학습 기록 데이터</p>
+            <p style={{marginTop:6}}><strong>2. 수집·이용 목적</strong><br/>회원 식별 및 가입 관리, 학습 데이터 분석·제공, 서비스 운영 및 고객 지원</p>
+            <p style={{marginTop:6}}><strong>3. 보유 및 이용 기간</strong><br/>서비스 탈퇴 시까지. 단, 법령에 따라 일정 기간 보존이 필요한 경우 해당 기간까지 보유.</p>
+            <p style={{marginTop:6}}><strong>4. 개인정보 제3자 제공</strong><br/>회사는 이용자의 개인정보를 원칙적으로 제3자에게 제공하지 않습니다.</p>
+            <p style={{marginTop:6}}><strong>5. 동의 거부 권리</strong><br/>위 개인정보 수집·이용에 동의하지 않을 수 있으나, 미동의 시 서비스 이용이 제한됩니다.</p>
+            <p style={{marginTop:6,color:"#888"}}>문의: (주)아이작교육그룹 &nbsp;|&nbsp; ☎ 02-1522-5316</p>
+          </div>
+          <label style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",cursor:"pointer",borderTop:`1px solid ${T.border}`}}>
+            <input type="checkbox" checked={privacyAgreed} onChange={e=>setPrivacyAgreed(e.target.checked)}
+              style={{width:16,height:16,accentColor:T.navy,cursor:"pointer",flexShrink:0}}/>
+            <span style={{fontSize:13,color:T.text,fontWeight:600}}>(필수) 개인정보 처리방침에 동의합니다.</span>
+          </label>
+        </div>
         {error && <div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",fontSize:13,color:T.danger,marginBottom:12}}>{error}</div>}
-        <button onClick={handleSignup} disabled={loading.signup||!otpVerified} style={{...css.btnOrange,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:!otpVerified?0.4:1}}>
+        <button onClick={handleSignup} disabled={loading.signup||!otpVerified||!privacyAgreed} style={{...css.btnOrange,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:(!otpVerified||!privacyAgreed)?0.4:1}}>
           {loading.signup?<><Spinner size={18} color="#fff"/>가입 중...</>:"가입하기 →"}
         </button>
         <div style={{textAlign:"center",marginTop:14,fontSize:13,color:T.muted}}>
