@@ -607,7 +607,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
   const isMobile = useMobile();
   const [form, setForm]   = useState({
     date:new Date().toISOString().slice(0,10), subject:"수학", bookLevel:1,
-    startTime:"14:00", endTime:"16:00", breakTime:10, questionCount:20,
+    startTime:"", endTime:"", breakTime:10, questionCount:20,
     qBasic:0, qMid:0, qAdv:0,
     timeRatio1:50, timeRatio2:80,
     quant:Object.fromEntries(QUANT_ITEMS.map(k=>[k,80])),
@@ -618,7 +618,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
   });
   const subjectCfg = SUBJECT_CONFIG[form.subject] || SUBJECT_CONFIG["수학"];
   const handleSubjectChange = s => setForm(f=>({...f, subject:s, qBasic:0, qMid:0, qAdv:0, quantEnabled:{}, qualEnabled:{}}));
-  const toMin = t=>{const[h,m]=t.split(":").map(Number);return h*60+m;};
+  const toMin = t=>{if(!t)return 0;const[h,m]=t.split(":").map(Number);return h*60+m;};
   const netTime = Math.max(0,toMin(form.endTime)-toMin(form.startTime)-Number(form.breakTime));
   const breakRatio = Number(form.breakTime)/Math.max(1,toMin(form.endTime)-toMin(form.startTime))*100;
   const metrics = (()=>{
@@ -665,6 +665,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
     if(!form.subject){setErr("⚠️ 과목을 선택해주세요.");return;}
     const totalQCheck=subjectCfg.qLevels?(form.qBasic||0)+(form.qMid||0)+(form.qAdv||0):(form.qBasic||0);
     if(totalQCheck===0){setErr("⚠️ 문항 수를 하나 이상 입력해주세요.");return;}
+    if(!form.startTime||!form.endTime){setErr("⚠️ 시작 시간과 종료 시간을 입력해주세요.");return;}
     if(toMin(form.endTime)<=toMin(form.startTime)){setErr("⚠️ 종료 시간이 시작 시간보다 빠릅니다.");return;}
     if(breakRatio>50){setErr("⚠️ 쉬는 시간이 전체 학습 시간의 50%를 초과했습니다.");return;}
     const coinSum=Object.values(form.coinFilter).reduce((s,v)=>s+v,0);
@@ -721,7 +722,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
           </Card>
           {/* 카드2: 문항 수 */}
           <Card>
-            <div style={{fontSize:12,fontWeight:700,color:T.muted,marginBottom:12,letterSpacing:"0.06em"}}>📚 문제집 단계별 문항 수</div>
+            <div style={{fontSize:12,fontWeight:700,color:T.muted,marginBottom:12,letterSpacing:"0.06em"}}>📚 문제집으로 공부한 문항 수</div>
             {subjectCfg.qLevels?(
               <>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
