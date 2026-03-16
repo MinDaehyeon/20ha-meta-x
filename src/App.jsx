@@ -351,6 +351,13 @@ const AuthScreen = ({ onLogin }) => {
     if(err){ setError(translateSupabaseError(err.message)); return; }
     if(rememberMe) localStorage.setItem("20ha_saved_email", e);
     else localStorage.removeItem("20ha_saved_email");
+    // Chrome 비밀번호 저장 프롬프트 트리거
+    if(window.PasswordCredential) {
+      try {
+        const cred = new window.PasswordCredential({ id: e, password: p });
+        await navigator.credentials.store(cred);
+      } catch(_) {}
+    }
     onLogin(data.session);
   };
 
