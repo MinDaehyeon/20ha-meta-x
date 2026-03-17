@@ -1402,7 +1402,8 @@ const AIAdvice = ({logs, profile}) => {
     const avgEfficiency = (recent.reduce((s,l)=>s+(l.efficiency_index||0),0)/recent.length).toFixed(1);
 
     const prompt = `당신은 20HA META-X 학습 프로그램의 코치 AI입니다.
-EI(엔그램 지수): 학습 각인도 종합 점수(100점 만점), C-I: 과잉확신 비율, Q: 지식 결여 오답, M: 실행 오류 오답.
+EI(엔그램 지수): 학습 각인도 종합 점수(100점 만점), C-I: 과잉확신 비율.
+오답 유형 정의 — Q(지식 결여): Q1 개념미숙, Q2 추론실패, Q3 지식공백 / M(실행 오류): M1 계산실수, M2 문제오독, M3 단순실수.
 
 아래 학습 데이터를 바탕으로 학생에게 직접 전달하는 코칭 메시지를 작성해주세요.
 조건:
