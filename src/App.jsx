@@ -457,13 +457,13 @@ const handleSocial = async (provider) => {
         <Logo size="lg" dark />
         <div style={{height:1,background:"rgba(255,255,255,0.15)",margin:"28px 0"}}/>
         <div style={{fontSize:15,color:"rgba(255,255,255,0.6)",lineHeight:1.85,maxWidth:340,marginBottom:40}}>
-          인지과학 기반 학습 최적화 시스템.<br/>당신의 학습을 데이터로 증명합니다.
+          보이지 않던 공부의 과정을 데이터로 읽어내다.<br/>Meta-X, 성장의 흐름을 기록하는 학습 시스템
         </div>
         {[
-          {icon:"🧠",text:"엔그램 지수로 지식 각인도 측정"},
-          {icon:"🎯",text:"Co-In 메타인지 필터로 과신 오류 감지"},
-          {icon:"📈",text:"7일 이동평균으로 성장 궤적 시각화"},
-          {icon:"🔐",text:"Supabase 기반 보안 인증 & 암호화"},
+          {icon:"📋",text:"학습데이터 기록 — 공부 시간, 수행 여부, 이해도 등 학습 과정을 데이터로 기록합니다."},
+          {icon:"📊",text:"학습 상태 시각화 — 아이의 학습 흐름과 현재 상태를 한눈에 확인할 수 있습니다."},
+          {icon:"🔍",text:"학습 패턴 분석 — 반복적으로 막히는 지점과 공부 습관을 데이터로 분석합니다."},
+          {icon:"✅",text:"자기점검 시스템 — 학생이 자신의 학습을 스스로 점검하고 조정하도록 돕습니다."},
         ].map(f=>(
           <div key={f.text} style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
             <div style={{width:34,height:34,background:"rgba(255,255,255,0.1)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{f.icon}</div>
@@ -677,7 +677,7 @@ const handleSocial = async (provider) => {
     <div style={{minHeight:"100vh",background:T.bg,fontFamily:"'Noto Sans KR',sans-serif",display:"flex",flexDirection:"column"}}>
       <div style={{background:T.grad,padding:"48px 28px 36px",textAlign:"center"}}>
         <Logo size="lg" dark/>
-        <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",marginTop:14}}>인지과학 기반 학습 최적화 시스템</div>
+        <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",marginTop:14}}>성장의 흐름을 기록하는 학습 시스템</div>
       </div>
       <div style={{flex:1,padding:"24px 20px"}}><Card>{loginForm}</Card></div>
     </div>
@@ -1402,7 +1402,7 @@ const AIAdvice = ({logs, profile}) => {
     const avgEfficiency = (recent.reduce((s,l)=>s+(l.efficiency_index||0),0)/recent.length).toFixed(1);
 
     const prompt = `당신은 20HA META-X 학습 프로그램의 코치 AI입니다.
-EI(엔그램 지수): 학습 각인도 종합 점수(100점 만점), C-I: 과신 오류 비율, Q: 지식 결여 오답, M: 실행 오류 오답.
+EI(엔그램 지수): 학습 각인도 종합 점수(100점 만점), C-I: 과잉확신 비율, Q: 지식 결여 오답, M: 실행 오류 오답.
 
 아래 학습 데이터를 바탕으로 학생에게 직접 전달하는 코칭 메시지를 작성해주세요.
 조건:
@@ -1523,7 +1523,7 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
         {[
           {label:"오늘 EI 점수",desc:"최근 학습이 뇌에 얼마나 효과적으로 각인되었는지를 나타내는 종합 점수",kpi:"S(93~) A(81~) B(66~) C(51~) D(~50)\n\n세 가지 역량(전략 수행·풀이 효율·메타인지)을\n종합해 산출하는 학습 각인도 지수입니다.\n점수가 높을수록 오래 기억에 남는 학습을 했다는 의미예요.",value:latest?.engramIndex??"—",color:latest?EI_COLOR(latest.engramIndex):T.navy,sub:delta!==null?`${delta>=0?"▲":"▼"} ${Math.abs(delta)} 어제보다`:null,subColor:delta>=0?T.success:T.danger},
           {label:"목표 달성률",desc:"설정한 목표 점수 대비 현재 도달 정도",kpi:"100%이면 목표 달성, 100% 초과면 목표를 넘어선 상태입니다.\n\n프로필에서 목표 EI를 조정할 수 있어요.",value:latest?((latest.engramIndex/targetEI)*100).toFixed(0):"—",unit:"%",color:T.orange},
-          {label:"자기객관화 정확도",desc:"내 예측과 실제 결과가 일치한 비율",kpi:"문제를 풀기 전 맞출지 틀릴지 예측했을 때\n그 예측이 얼마나 정확했는지를 나타냅니다.\n\n높을수록 자신의 실력을 정확히 파악하고 있다는 뜻이에요.\n낮으면 과신하거나 과소평가하는 경향이 있을 수 있어요.",value:mAcc,unit:"%",color:"#7C3AED"},
+          {label:"메타인지 지수",desc:"내 예측과 실제 결과가 일치한 비율",kpi:"문제를 풀기 전 맞출지 틀릴지 예측했을 때\n그 예측이 얼마나 정확했는지를 나타냅니다.\n\n높을수록 자신의 실력을 정확히 파악하고 있다는 뜻이에요.\n낮으면 과신하거나 과소평가하는 경향이 있을 수 있어요.",value:mAcc,unit:"%",color:"#7C3AED"},
           {label:"누적 학습일",desc:"지금까지 기록된 총 학습 세션 수",kpi:"데이터를 입력한 날의 총 횟수입니다.\n꾸준히 쌓일수록 분석의 정확도가 높아져요.",value:normLogs.length,unit:"일",color:T.navyMid},
         ].map(({label,desc="",kpi,value,unit="",color,sub,subColor})=>(
           <KpiCard key={label} label={label} desc={desc} kpi={kpi} value={value} unit={unit} color={color} sub={sub} subColor={subColor} isMobile={isMobile}/>
@@ -1550,11 +1550,11 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
       </Card>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:12,marginBottom:12}}>
         <Card>
-          <SectionTitle sub="C-C: 정확한 자기예측 · C-I: 과신 오류 · I-C: 과소평가 · I-I: 정직한 오답 인식" tooltip="Co-In(Confidence-Incorrect) 메타인지 필터입니다.\n\nC-C: 맞을 것 같았고 실제로 맞음 → 이상적\nC-I: 맞을 것 같았으나 틀림 → 과신 경보(30% 초과 시 Red Flag)\nI-C: 틀릴 것 같았으나 맞음 → 과소평가\nI-I: 틀릴 것 같았고 실제로 틀림 → 정직한 인식\n\nC-C 비율이 높을수록 메타인지 정확도 우수">🧠 내 예측 vs 실제 결과</SectionTitle>
+          <SectionTitle sub="C-C: 정확한 자기예측 · C-I: 과잉확신 · I-C: 과소평가 · I-I: 정직한 오답 인식" tooltip="Co-In(Confidence-Incorrect) 메타인지 필터입니다.\n\nC-C: 맞을 것 같았고 실제로 맞음 → 이상적\nC-I: 맞을 것 같았으나 틀림 → 과신 경보(30% 초과 시 Red Flag)\nI-C: 틀릴 것 같았으나 맞음 → 과소평가\nI-I: 틀릴 것 같았고 실제로 틀림 → 정직한 인식\n\nC-C 비율이 높을수록 메타인지 정확도 우수">🧠 내 예측 vs 실제 결과</SectionTitle>
           <ResponsiveContainer width="100%" height={200}>
             <RadarChart data={[
               {label:"C-C 정확한 예측",value:coinT.cc||0,full:Math.max(coinT.cc||0,coinT.ci||0,coinT.ic||0,coinT.ii||0,1)},
-              {label:"C-I 과신 오류",value:coinT.ci||0,full:Math.max(coinT.cc||0,coinT.ci||0,coinT.ic||0,coinT.ii||0,1)},
+              {label:"C-I 과잉확신",value:coinT.ci||0,full:Math.max(coinT.cc||0,coinT.ci||0,coinT.ic||0,coinT.ii||0,1)},
               {label:"I-C 과소평가",value:coinT.ic||0,full:Math.max(coinT.cc||0,coinT.ci||0,coinT.ic||0,coinT.ii||0,1)},
               {label:"I-I 정직한 인식",value:coinT.ii||0,full:Math.max(coinT.cc||0,coinT.ci||0,coinT.ic||0,coinT.ii||0,1)},
             ]} margin={{top:10,right:24,bottom:10,left:24}}>
@@ -1580,7 +1580,7 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   <div>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                      <span style={{fontSize:11,color:GRAPH.ciColor,fontWeight:700}}>C-I 과신 오류</span>
+                      <span style={{fontSize:11,color:GRAPH.ciColor,fontWeight:700}}>C-I 과잉확신</span>
                       <span style={{fontSize:11,fontWeight:800,color:ciR>30?T.danger:T.orange}}>{ciR}% {ciR>30?"🔴 위험":"🟡 주의"}</span>
                     </div>
                     <div style={{height:6,background:T.surfaceAlt,borderRadius:3}}>
@@ -1859,7 +1859,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const advLogs=filtered.filter(l=>(l.qAdv||0)>0);
   const avgSec3=advLogs.length>0?advLogs.reduce((s,l)=>s+(l.qAdv>0?l.netTime*60/l.qAdv:0),0)/advLogs.length:0;
   const feedbacks=[];
-  if(ciRate>0.3) feedbacks.push({type:"warn",msg:"과신 오류(C-I) 비중이 높습니다. 백지목차 테스트 강도를 높이세요.",icon:"⚠️"});
+  if(ciRate>0.3) feedbacks.push({type:"warn",msg:"과잉확신(C-I) 비중이 높습니다. 백지목차 테스트 강도를 높이세요.",icon:"⚠️"});
   if(advLogs.length>0&&avgSec3>180) feedbacks.push({type:"alert",msg:`심화 문항 풀이 평균 ${avgSec3.toFixed(0)}초/문항 — 유형별 심화 학습 세션을 추가하세요.`,icon:"🔴"});
   if(feedbacks.length===0) feedbacks.push({type:"ok",msg:"현재 데이터에서 주요 위험 신호가 감지되지 않았습니다.",icon:"✅"});
   const byStudent=students.filter(s=>s.approval_status==="approved").map(s=>{
