@@ -1362,8 +1362,13 @@ const AIAdvice = ({logs, profile}) => {
 
     // ── 데이터 준비
     const all    = [...logs].sort((a,b)=>a.date.localeCompare(b.date));
-    const recent = all.slice(-7); // 최근 7일
-    const oldest = all[0];
+    // 최근 7일 기준, 7건 미만이면 최근 7건 fallback
+    const sevenDaysAgo = new Date(Date.now() - 7*24*60*60*1000);
+    const recent7d = all.filter(l => new Date(l.date) >= sevenDaysAgo);
+    const recent   = recent7d.length >= 7 ? recent7d : all.slice(-7);
+    const recentLabel = recent7d.length >= 7
+      ? `최근 7일 (${recent[0].date}~${recent[recent.length-1].date})`
+      : `최근 7건 (${recent[0].date}~${recent[recent.length-1].date})`;
     const latest = all[all.length-1];
 
     // EI 통계
@@ -1383,15 +1388,24 @@ const AIAdvice = ({logs, profile}) => {
     // 오답 유형 합산
     const errTot = {Q1:0,Q2:0,Q3:0,M1:0,M2:0,M3:0};
     recent.forEach(l=>{ errTot.Q1+=(l.err_q1||0);errTot.Q2+=(l.err_q2||0);errTot.Q3+=(l.err_q3||0);errTot.M1+=(l.err_m1||0);errTot.M2+=(l.err_m2||0);errTot.M3+=(l.err_m3||0); });
-    const totalErr = Object.values(errTot).reduce((s,v)=>s+v,0);
     const topErr = Object.entries(errTot).sort((a,b)=>b[1]-a[1]).filter(([,v])=>v>0).slice(0,3).map(([k,v])=>`${k}(${v}회)`).join(", ");
 
-    // 과목별 평균 EI
+    // 과목별 Co-In + 평균 EI
     const subjectMap = {};
-    all.forEach(l=>{ if(!subjectMap[l.subject]) subjectMap[l.subject]=[]; subjectMap[l.subject].push(l.engram_index||0); });
-    const subjectStats = Object.entries(subjectMap).map(([s,arr])=>
-      `${s}: 평균EI ${(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1)}점(${arr.length}회)`
-    ).join(", ");
+    recent.forEach(l=>{
+      if(!subjectMap[l.subject]) subjectMap[l.subject]={tot:0,ci:0,ic:0,eis:[]};
+      const tot=(l.coin_cc||0)+(l.coin_ci||0)+(l.coin_ic||0)+(l.coin_ii||0);
+      subjectMap[l.subject].tot+=tot;
+      subjectMap[l.subject].ci+=(l.coin_ci||0);
+      subjectMap[l.subject].ic+=(l.coin_ic||0);
+      subjectMap[l.subject].eis.push(l.engram_index||0);
+    });
+    const subjectCoIn = Object.entries(subjectMap).map(([s,d])=>{
+      const avgEIs=(d.eis.reduce((a,b)=>a+b,0)/d.eis.length).toFixed(1);
+      const ciPct=d.tot>0?(d.ci/d.tot*100).toFixed(1):0;
+      const icPct=d.tot>0?(d.ic/d.tot*100).toFixed(1):0;
+      return `  ${s}: C-I ${ciPct}%(${d.tot}문항 중 ${d.ci}회) / I-C ${icPct}%(${d.ic}회) / 평균EI ${avgEIs}점`;
+    }).join("\n");
 
     // 학습 시간 패턴
     const avgNetTime = (recent.reduce((s,l)=>s+(l.net_time||0),0)/recent.length).toFixed(0);
@@ -1402,8 +1416,10 @@ const AIAdvice = ({logs, profile}) => {
     const avgEfficiency = (recent.reduce((s,l)=>s+(l.efficiency_index||0),0)/recent.length).toFixed(1);
 
     const prompt = `당신은 20HA META-X 학습 프로그램의 코치 AI입니다.
-EI(엔그램 지수): 학습 각인도 종합 점수(100점 만점), C-I: 과잉확신 비율.
-오답 유형 정의 — Q(지식 결여): Q1 개념미숙, Q2 추론실패, Q3 지식공백 / M(실행 오류): M1 계산실수, M2 문제오독, M3 단순실수.
+[용어 정의]
+EI(엔그램 지수): 학습 각인도 종합 점수(100점 만점)
+Co-In(메타인지): C-C 정확한 자기예측 / C-I 과잉확신 / I-C 과소평가 / I-I 정직한 오답 인식
+오답 유형(수학 전용) — Q(지식 결여): Q1 개념미숙, Q2 추론실패, Q3 지식공백 / M(실행 오류): M1 계산실수, M2 문제오독, M3 단순실수
 
 아래 학습 데이터를 바탕으로 학생에게 직접 전달하는 코칭 메시지를 작성해주세요.
 조건:
@@ -1413,12 +1429,17 @@ EI(엔그램 지수): 학습 각인도 종합 점수(100점 만점), C-I: 과잉
 - 수치 나열이나 칭찬 위주 금지 — 개선 포인트와 오늘 실천할 구체적 행동 중심으로
 - 가장 시급한 문제 1가지만 콕 집어서
 
-EI: 최근7일평균 ${avgEI}점 / 목표 ${profile?.target_ei}점 / 추세 ${eiTrend!==null?(Number(eiTrend)>=0?"+":"")+eiTrend+"점":"유지"}
-메타인지: ${metaAcc}% / 과신비율 ${ciRate}%
-오답Top3: ${topErr||"없음"}
+[학습 데이터] (${recentLabel})
+EI: 평균 ${avgEI}점 / 목표 ${profile?.target_ei}점 / 추세 ${eiTrend!==null?(Number(eiTrend)>=0?"+":"")+eiTrend+"점":"유지"}
 전략수행: ${avgStrategy}점 / 효율성: ${avgEfficiency}점
 학습패턴: 평균 ${avgNetTime}분 / ${avgQCount}문항/회
-과목별: ${subjectStats}`;
+오답Top3: ${topErr||"없음"}
+
+메타인지 Co-In 분포 (총 ${coinTot}문항):
+  C-C ${coinTot>0?(coinCC/coinTot*100).toFixed(1):0}%(${coinCC}회) / C-I ${ciRate}%(${coinCI}회) / I-C ${coinTot>0?(coinIC/coinTot*100).toFixed(1):0}%(${coinIC}회) / I-I ${coinTot>0?(coinII/coinTot*100).toFixed(1):0}%(${coinII}회)
+
+과목별 Co-In:
+${subjectCoIn}`;
 
     try {
       const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
@@ -1434,7 +1455,7 @@ EI: 최근7일평균 ${avgEI}점 / 목표 ${profile?.target_ei}점 / 추세 ${ei
       const now  = new Date();
       const time = now.toLocaleString("ko-KR",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
       const cacheKey = getCacheKey();
-      const snapshot = { avgEI, allAvgEI, metaAcc, ciRate, avgStrategy, avgEfficiency, topErr, subjectStats, avgNetTime, avgQCount };
+      const snapshot = { avgEI, allAvgEI, metaAcc, ciRate, avgStrategy, avgEfficiency, topErr, subjectCoIn, avgNetTime, avgQCount, recentLabel };
       await supabase.from("ai_advice_logs").insert({ uid:profile.id, prompt, response:text, data_snapshot:snapshot, cache_key:cacheKey });
       setAdvice(text);
       setLastFetch(time);
