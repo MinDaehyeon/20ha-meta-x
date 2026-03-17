@@ -775,7 +775,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
   const isMobile = useMobile();
   const [form, setForm]   = useState({
     date:new Date().toISOString().slice(0,10), subject:"수학", bookLevel:1,
-    startTime:"", endTime:"", breakTime:10, questionCount:20,
+    startTime:"", endTime:"", breakTime:0, questionCount:20,
     qBasic:0, qMid:0, qAdv:0,
     timeRatio1:50, timeRatio2:80,
     quant:Object.fromEntries(QUANT_ITEMS.map(k=>[k,80])),
