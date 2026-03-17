@@ -1295,7 +1295,7 @@ const LearningCalendar = ({logs}) => {
           <strong>{tooltip.dateStr}</strong> — {tooltip.dayLogs.length}건 학습
           {tooltip.dayLogs.map((l,i)=>(
             <div key={i} style={{marginTop:4,color:"rgba(255,255,255,0.8)"}}>
-              {l.subject} {l.subject==="수학"&&l.book_level>1?(l.book_level===2?"응용":"심화"):""} · EI <strong style={{color:T.orange}}>{(l.engram_index||0).toFixed(1)}</strong>
+              {l.subject} · EI <strong style={{color:T.orange}}>{(l.engram_index||0).toFixed(1)}</strong>
             </div>
           ))}
           <div style={{position:"absolute",bottom:-6,left:"50%",transform:"translateX(-50%)",
