@@ -1597,18 +1597,18 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
                       </span>
                     </div>
                     <div style={{height:6,background:T.surfaceAlt,borderRadius:3}}>
-                      <div style={{height:"100%",width:`${Math.min(ciR,100)}%`,background:ciDanger?T.danger:ciWarn?T.orange:T.success,borderRadius:3,transition:"width 0.5s"}}/>
+                      <div style={{height:"100%",width:`${Math.min(ciR,100)}%`,background:GRAPH.ciColor,borderRadius:3,transition:"width 0.5s"}}/>
                     </div>
                   </div>
                   <div>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                      <span style={{fontSize:11,color:T.orange,fontWeight:700}}>I-C 과소평가</span>
+                      <span style={{fontSize:11,color:GRAPH.icColor,fontWeight:700}}>I-C 과소평가</span>
                       <span style={{fontSize:11,fontWeight:800,color:icDanger?T.danger:icWarn?T.orange:T.success}}>
                         {icR}% {icDanger?"🔴 위험":icWarn?"🟡 주의":"🟢 양호"}
                       </span>
                     </div>
                     <div style={{height:6,background:T.surfaceAlt,borderRadius:3}}>
-                      <div style={{height:"100%",width:`${Math.min(icR,100)}%`,background:icDanger?T.danger:icWarn?T.orange:T.success,borderRadius:3,transition:"width 0.5s"}}/>
+                      <div style={{height:"100%",width:`${Math.min(icR,100)}%`,background:GRAPH.icColor,borderRadius:3,transition:"width 0.5s"}}/>
                     </div>
                   </div>
                 </div>
