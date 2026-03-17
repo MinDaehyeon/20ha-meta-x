@@ -1493,7 +1493,9 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
   const ninetyDaysAgo=new Date(); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate()-90);
   const ninetyStr=ninetyDaysAgo.toISOString().slice(0,10);
   const sorted=[...filtered].filter(l=>l.date>=ninetyStr).sort((a,b)=>a.date.localeCompare(b.date));
-  const maData=sorted.map((d,i)=>{const w=sorted.slice(Math.max(0,i-6),i+1);return{...d,movingAvg:+(w.reduce((s,v)=>s+v.engramIndex,0)/w.length).toFixed(1)};});
+  const _dateEI={};sorted.forEach(l=>{if(!_dateEI[l.date])_dateEI[l.date]=[];_dateEI[l.date].push(l.engramIndex);});
+  const dailyAvg=Object.entries(_dateEI).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,eis])=>({date,engramIndex:+(eis.reduce((s,v)=>s+v,0)/eis.length).toFixed(1)}));
+  const maData=dailyAvg.map((d,i)=>{const w=dailyAvg.slice(Math.max(0,i-6),i+1);return{...d,movingAvg:+(w.reduce((s,v)=>s+v.engramIndex,0)/w.length).toFixed(1)};});
   const latest=sorted[sorted.length-1],prev=sorted[sorted.length-2];
   const delta=latest&&prev?+(latest.engramIndex-prev.engramIndex).toFixed(1):null;
   const coinT=filtered.reduce((acc,l)=>{const cf=l.coinFilter||{};Object.entries(cf).forEach(([k,v])=>{acc[k]=(acc[k]||0)+v;});return acc;},{cc:0,ci:0,ic:0,ii:0});
@@ -1853,7 +1855,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const ninetyDaysAgo=new Date(); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate()-90);
   const ninetyStr=ninetyDaysAgo.toISOString().slice(0,10);
   const sorted=[...filtered].filter(l=>l.date>=ninetyStr).sort((a,b)=>a.date.localeCompare(b.date));
-  const maData=sorted.map((d,i)=>{const w=sorted.slice(Math.max(0,i-6),i+1);return{...d,movingAvg:+(w.reduce((s,v)=>s+v.engramIndex,0)/w.length).toFixed(1)};});
+  const _dateEI2={};sorted.forEach(l=>{if(!_dateEI2[l.date])_dateEI2[l.date]=[];_dateEI2[l.date].push(l.engramIndex);});
+  const dailyAvg2=Object.entries(_dateEI2).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,eis])=>({date,engramIndex:+(eis.reduce((s,v)=>s+v,0)/eis.length).toFixed(1)}));
+  const maData=dailyAvg2.map((d,i)=>{const w=dailyAvg2.slice(Math.max(0,i-6),i+1);return{...d,movingAvg:+(w.reduce((s,v)=>s+v.engramIndex,0)/w.length).toFixed(1)};});
   const avgEI=filtered.length>0?(filtered.reduce((s,l)=>s+l.engramIndex,0)/filtered.length).toFixed(1):0;
   const coinT=filtered.reduce((acc,l)=>{const cf=l.coinFilter||{};Object.entries(cf).forEach(([k,v])=>{acc[k]=(acc[k]||0)+v;});return acc;},{cc:0,ci:0,ic:0,ii:0});
   const coinTot=Object.values(coinT).reduce((s,v)=>s+v,0);
@@ -2245,39 +2249,49 @@ const LogHistory = ({logs, onDelete, isAdmin, allProfiles}) => {
   const sorted=[...logs].sort((a,b)=>b.date.localeCompare(a.date));
   const nameMap=Object.fromEntries((allProfiles||[]).map(p=>[p.id,p.name]));
   if(sorted.length===0) return <div style={{textAlign:"center",padding:"80px 20px",color:T.muted,fontSize:14}}>학습 기록이 없습니다.</div>;
-  return(
-    <div>
-      {sorted.map(log=>{
-        const ei=log.engram_index||0;
-        const{g,c}=gradeInfo(ei);
-        return(
-          <Card key={log.id} style={{marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
-            <div style={{minWidth:60,textAlign:"center"}}>
-              <div style={{fontSize:10,color:T.muted,marginBottom:4}}>{log.date}</div>
-              <Pill color={c}>{g}</Pill>
-            </div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{display:"flex",gap:6,marginBottom:5,alignItems:"center",flexWrap:"wrap"}}>
-                {isAdmin&&<span style={{fontSize:12,color:T.orange,fontWeight:700}}>{nameMap[log.uid]||"—"}</span>}
-                <span style={{fontSize:14,fontWeight:700,color:T.navy}}>{log.subject}</span>
-                {log.subject==="수학"?(
+  const grouped={};sorted.forEach(log=>{if(!grouped[log.date])grouped[log.date]=[];grouped[log.date].push(log);});
+  const dates=Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
+  const LogCard=({log})=>{
+    const ei=log.engram_index||0;
+    const{g,c}=gradeInfo(ei);
+    return(
+      <Card style={{marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
+        <div style={{minWidth:44,textAlign:"center"}}>
+          <Pill color={c}>{g}</Pill>
+        </div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",gap:6,marginBottom:5,alignItems:"center",flexWrap:"wrap"}}>
+            {isAdmin&&<span style={{fontSize:12,color:T.orange,fontWeight:700}}>{nameMap[log.uid]||"—"}</span>}
+            <span style={{fontSize:14,fontWeight:700,color:T.navy}}>{log.subject}</span>
+            {log.subject==="수학"?(
   <>{log.q_basic>0&&<Pill color={T.navy}>기본 {log.q_basic}</Pill>}{log.q_mid>0&&<Pill color={T.orange}>응용 {log.q_mid}</Pill>}{log.q_adv>0&&<Pill color="#7C3AED">심화 {log.q_adv}</Pill>}</>
 ):(
   (log.q_basic||log.question_count)>0&&<Pill color={T.navy}>{log.q_basic||log.question_count}문항</Pill>
 )}
-              </div>
-              <div style={{display:"flex",gap:10,fontSize:11,color:T.muted,flexWrap:"wrap"}}>
-                <span>전략 {log.strategy_score}</span>
-                <span>효율 {log.efficiency_index}</span>
-                <span>메타인지 {(log.metacognition_accuracy||0).toFixed(1)}%</span>
-                <span>{log.question_count}문항 · {log.net_time}분</span>
-              </div>
-            </div>
-            <NavyNum value={ei.toFixed(1)} unit="EI" size={20} color={EI_COLOR(ei)}/>
-            {isAdmin&&<button onClick={()=>onDelete(log.id)} style={{background:"none",border:"none",color:T.muted,cursor:"pointer",fontSize:18,padding:4,flexShrink:0}}>✕</button>}
-          </Card>
-        );
-      })}
+          </div>
+          <div style={{display:"flex",gap:10,fontSize:11,color:T.muted,flexWrap:"wrap"}}>
+            <span>전략 {log.strategy_score}</span>
+            <span>효율 {log.efficiency_index}</span>
+            <span>메타인지 {(log.metacognition_accuracy||0).toFixed(1)}%</span>
+            <span>{log.question_count}문항 · {log.net_time}분</span>
+          </div>
+        </div>
+        <NavyNum value={ei.toFixed(1)} unit="EI" size={20} color={EI_COLOR(ei)}/>
+        {isAdmin&&<button onClick={()=>onDelete(log.id)} style={{background:"none",border:"none",color:T.muted,cursor:"pointer",fontSize:18,padding:4,flexShrink:0}}>✕</button>}
+      </Card>
+    );
+  };
+  return(
+    <div>
+      {dates.map(date=>(
+        <div key={date} style={{marginBottom:20}}>
+          <div style={{fontSize:12,fontWeight:700,color:T.muted,marginBottom:8,paddingBottom:6,borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:6}}>
+            📅 {date}
+            <span style={{fontSize:11,color:T.border,fontWeight:400}}>({grouped[date].length}건)</span>
+          </div>
+          {grouped[date].map(log=><LogCard key={log.id} log={log}/>)}
+        </div>
+      ))}
     </div>
   );
 };
