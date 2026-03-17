@@ -1791,6 +1791,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const [filterStatus, setFilterStatus] = useState("all"); // "all"|"pending"|"approved"|"rejected"
   const [filterRole, setFilterRole]   = useState("all"); // "all"|"student"|"parent"
   const [detailStudent, setDetailStudent] = useState(null);
+  const [dashColFilter, setDashColFilter] = useState({});
+  const [dashFilterOpen, setDashFilterOpen] = useState(null);
   const [parentLinks, setParentLinks] = useState({}); // {parent_id: [{student_id, name, grade}]}
   const isMobile = useMobile();
 
@@ -1864,12 +1866,30 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   if(feedbacks.length===0) feedbacks.push({type:"ok",msg:"현재 데이터에서 주요 위험 신호가 감지되지 않았습니다.",icon:"✅"});
   const byStudent=students.filter(s=>s.approval_status==="approved").map(s=>{
     const sl=normLogs.filter(l=>l.uid===s.id);
-    const avg=sl.length>0?(sl.reduce((a,l)=>a+l.engramIndex,0)/sl.length).toFixed(1):null;
+    const now=new Date(), d7=new Date(now-7*86400000), d30=new Date(now-30*86400000);
+    const sl7=sl.filter(l=>new Date(l.date)>=d7);
+    const sl30=sl.filter(l=>new Date(l.date)>=d30);
+    const avgAll=sl.length>0?(sl.reduce((a,l)=>a+l.engramIndex,0)/sl.length):null;
+    const avg7=sl7.length>0?(sl7.reduce((a,l)=>a+l.engramIndex,0)/sl7.length):null;
+    const avg30=sl30.length>0?(sl30.reduce((a,l)=>a+l.engramIndex,0)/sl30.length):null;
     const latest=sl.length>0?[...sl].sort((a,b)=>b.date.localeCompare(a.date))[0]:null;
     const ct=sl.reduce((acc,l)=>{const cf=l.coinFilter||{};Object.entries(cf).forEach(([k,v])=>{acc[k]=(acc[k]||0)+v;});return acc;},{cc:0,ci:0,ic:0,ii:0});
     const tot=Object.values(ct).reduce((s,v)=>s+v,0);
-    return{...s,avgEI:avg,logCount:sl.length,latestEI:latest?.engramIndex,redFlag:tot>0&&ct.ci/tot>0.3};
+    const ciRatePct=tot>0?(ct.ci/tot*100):null;
+    return{...s,avgAll,avg7,avg30,logCount:sl.length,latestEI:latest?.engramIndex,redFlag:tot>0&&ct.ci/tot>0.3,ciRatePct};
   });
+  const validEIs=byStudent.filter(s=>s.avgAll!==null);
+  const classAvgEI=validEIs.length>0?(validEIs.reduce((a,s)=>a+s.avgAll,0)/validEIs.length).toFixed(1):"—";
+  const GRADE_C={S:"#16A34A",A:"#2563EB",B:"#111827",C:"#F97316",D:"#DC2626"};
+  const ciGrp=pct=>pct<10?"S":pct<20?"A":pct<30?"B":pct<40?"C":"D";
+  const filteredByDash=byStudent.filter(s=>Object.entries(dashColFilter).every(([col,grp])=>{
+    if(!grp) return true;
+    if(col==="week7") return s.avg7!==null&&gradeInfo(s.avg7).g===grp;
+    if(col==="month30") return s.avg30!==null&&gradeInfo(s.avg30).g===grp;
+    if(col==="allTime") return s.avgAll!==null&&gradeInfo(s.avgAll).g===grp;
+    if(col==="ci") return s.ciRatePct!==null&&ciGrp(s.ciRatePct)===grp;
+    return true;
+  }));
   const bySubject=SUBJECTS.reduce((acc,s)=>{const sl=filtered.filter(l=>l.subject===s);if(sl.length>0)acc[s]=(sl.reduce((a,l)=>a+l.engramIndex,0)/sl.length).toFixed(1);return acc;},{});
 
   const statusBadge = (status) => {
@@ -2052,28 +2072,68 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
               </div>
 
               {/* ── 학생별 주요지표 목록 ── */}
-              <Card style={{marginBottom:12}}>
+              <Card style={{marginBottom:12}} onClick={()=>setDashFilterOpen(null)}>
                 <SectionTitle sub="클릭하면 상세 대시보드로 이동합니다">👥 전체 학생 현황</SectionTitle>
                 {byStudent.length===0
                   ? <div style={{color:T.muted,fontSize:13,textAlign:"center",padding:"24px 0"}}>학생 데이터 없음</div>
                   : <div style={{overflowX:"auto"}}>
-                      <div style={{display:"grid",gridTemplateColumns:isMobile?"2fr 1fr 1fr 1fr":"2fr 1fr 1fr 1fr 1fr 1fr 1fr",minWidth:isMobile?360:700,marginBottom:6}}>
-                        {(isMobile?["이름/학년","EI","로그","상태"]:["이름 / 학년","최근EI","목표","달성률","로그","과신비율","상태"]).map(h=>(
-                          <div key={h} style={{padding:"8px 12px",fontSize:11,color:T.muted,fontWeight:700,borderBottom:`2px solid ${T.border}`}}>{h}</div>
+                      {Object.values(dashColFilter).some(v=>v)&&(
+                        <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
+                          <span style={{fontSize:11,color:T.muted}}>필터:</span>
+                          {Object.entries(dashColFilter).filter(([,v])=>v).map(([col,grp])=>{
+                            const colLabel={week7:"7일EI",month30:"30일EI",allTime:"전체기간EI",ci:"과신비율"}[col];
+                            const color=GRADE_C[grp];
+                            const grpLabel={S:"녹색",A:"파랑",B:"검정",C:"주황",D:"빨강"}[grp];
+                            return(
+                              <span key={col} onClick={e=>{e.stopPropagation();setDashColFilter(f=>({...f,[col]:null}));}}
+                                style={{fontSize:11,padding:"3px 8px",borderRadius:20,border:`1px solid ${color}40`,color,background:color+"15",cursor:"pointer",fontWeight:700}}>
+                                {colLabel}: {grpLabel} ✕
+                              </span>
+                            );
+                          })}
+                          <span onClick={e=>{e.stopPropagation();setDashColFilter({});}} style={{fontSize:11,color:T.muted,cursor:"pointer",textDecoration:"underline"}}>전체 초기화</span>
+                        </div>
+                      )}
+                      <div style={{display:"grid",gridTemplateColumns:isMobile?"2fr 0.7fr 1fr 0.9fr":"2fr 0.7fr 1fr 1fr 1fr 1fr 1fr 0.9fr",minWidth:isMobile?360:960,marginBottom:6}}>
+                        {(isMobile
+                          ?[{key:null,label:"이름/학년"},{key:null,label:"로그"},{key:"week7",label:"7일EI"},{key:null,label:"상태"}]
+                          :[{key:null,label:"이름 / 학년"},{key:null,label:"로그(건)"},{key:null,label:"전체 학생 평균 EI"},{key:"week7",label:"최근 일주일 EI"},{key:"month30",label:"최근 한 달 EI"},{key:"allTime",label:"전체 기간 EI"},{key:"ci",label:"과신비율"},{key:null,label:"상태"}]
+                        ).map(h=>(
+                          <div key={h.label} onClick={e=>{if(h.key){e.stopPropagation();setDashFilterOpen(dashFilterOpen===h.key?null:h.key);}}}
+                            style={{position:"relative",padding:"8px 12px",fontSize:11,color:h.key?T.navy:T.muted,fontWeight:700,
+                              borderBottom:`2px solid ${T.border}`,cursor:h.key?"pointer":"default",userSelect:"none",
+                              background:dashColFilter[h.key]?T.surfaceAlt:"transparent"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:3}}>
+                              {h.key&&dashColFilter[h.key]&&<span style={{width:7,height:7,borderRadius:"50%",background:GRADE_C[dashColFilter[h.key]],display:"inline-block",flexShrink:0}}/>}
+                              {h.label}
+                              {h.key&&<span style={{fontSize:9,opacity:0.6,marginLeft:1}}>{dashFilterOpen===h.key?"▲":"▾"}</span>}
+                            </div>
+                            {h.key&&dashFilterOpen===h.key&&(
+                              <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:"100%",left:0,zIndex:200,background:T.white,
+                                border:`1px solid ${T.border}`,borderRadius:8,padding:6,boxShadow:"0 4px 12px rgba(0,0,0,0.12)",minWidth:90,marginTop:2}}>
+                                <div onClick={()=>{setDashColFilter(f=>({...f,[h.key]:null}));setDashFilterOpen(null);}}
+                                  style={{padding:"5px 8px",cursor:"pointer",fontSize:12,color:T.muted,borderRadius:4,background:!dashColFilter[h.key]?T.surfaceAlt:"transparent"}}>
+                                  전체
+                                </div>
+                                {[{g:"S",label:"녹색",color:"#16A34A"},{g:"A",label:"파랑",color:"#2563EB"},{g:"B",label:"검정",color:"#111827"},{g:"C",label:"주황",color:"#F97316"},{g:"D",label:"빨강",color:"#DC2626"}].map(({g,label,color})=>(
+                                  <div key={g} onClick={()=>{setDashColFilter(f=>({...f,[h.key]:g}));setDashFilterOpen(null);}}
+                                    style={{padding:"5px 8px",cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",gap:6,borderRadius:4,background:dashColFilter[h.key]===g?T.surfaceAlt:"transparent"}}>
+                                    <span style={{width:9,height:9,borderRadius:"50%",background:color,display:"inline-block",flexShrink:0}}/>{label}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         ))}
                       </div>
-                      {byStudent.map(s=>{
-                        const sLogs = normLogs.filter(l=>l.uid===s.id);
-                        const latestEI = s.latestEI != null ? (+s.latestEI).toFixed(2) : "—";
-                        const targetEI = allProfiles.find(p=>p.id===s.id)?.target_ei || 85;
-                        const achieve = s.latestEI ? ((s.latestEI/targetEI)*100).toFixed(0)+"%" : "—";
-                        const sTot = sLogs.reduce((a,l)=>a+(l.coin_cc||0)+(l.coin_ci||0)+(l.coin_ic||0)+(l.coin_ii||0),0);
-                        const sCi  = sLogs.reduce((a,l)=>a+(l.coin_ci||0),0);
-                        const sCiRate = sTot>0?(sCi/sTot*100).toFixed(0)+"%":"—";
+                      {filteredByDash.map(s=>{
+                        const fmtEI=v=>v!=null?v.toFixed(1):"—";
+                        const ciDisp=s.ciRatePct!=null?s.ciRatePct.toFixed(0)+"%":"—";
+                        const ciColor=s.ciRatePct!=null?(s.ciRatePct>=30?T.danger:s.ciRatePct>=20?T.orange:T.success):T.muted;
+                        const COLS=isMobile?"2fr 0.7fr 1fr 0.9fr":"2fr 0.7fr 1fr 1fr 1fr 1fr 1fr 0.9fr";
                         return(
                           <div key={s.id} onClick={()=>setDetailStudent(allProfiles.find(p=>p.id===s.id))}
-                            style={{display:"grid",gridTemplateColumns:isMobile?"2fr 1fr 1fr 1fr":"2fr 1fr 1fr 1fr 1fr 1fr 1fr",minWidth:isMobile?360:700,
-                              cursor:"pointer",borderRadius:8,transition:"background 0.15s"}}
+                            style={{display:"grid",gridTemplateColumns:COLS,minWidth:isMobile?360:960,cursor:"pointer",borderRadius:8,transition:"background 0.15s"}}
                             onMouseEnter={e=>e.currentTarget.style.background=T.surfaceAlt}
                             onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                             <div style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:8}}>
@@ -2088,19 +2148,22 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                               </div>
                             </div>
                             <div style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center"}}>
-                              <span style={{fontSize:14,fontWeight:800,color:EI_COLOR(latestEI)}}>{latestEI}</span>
+                              <span style={{fontSize:13,color:T.muted}}>{s.logCount}</span>
                             </div>
                             {!isMobile&&<div style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center"}}>
-                              <span style={{fontSize:13,color:T.muted}}>{targetEI}점</span>
-                            </div>}
-                            {!isMobile&&<div style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center"}}>
-                              <span style={{fontSize:13,fontWeight:700,color:T.orange}}>{achieve}</span>
+                              <span style={{fontSize:13,fontWeight:700,color:EI_COLOR(classAvgEI)}}>{classAvgEI}</span>
                             </div>}
                             <div style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center"}}>
-                              <span style={{fontSize:13,color:T.muted}}>{sLogs.length}건</span>
+                              <span style={{fontSize:13,fontWeight:700,color:s.avg7!=null?EI_COLOR(s.avg7):T.muted}}>{fmtEI(s.avg7)}</span>
                             </div>
                             {!isMobile&&<div style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center"}}>
-                              <span style={{fontSize:13,fontWeight:700,color:sTot>0&&sCi/sTot>0.3?T.danger:T.success}}>{sCiRate}</span>
+                              <span style={{fontSize:13,fontWeight:700,color:s.avg30!=null?EI_COLOR(s.avg30):T.muted}}>{fmtEI(s.avg30)}</span>
+                            </div>}
+                            {!isMobile&&<div style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center"}}>
+                              <span style={{fontSize:13,fontWeight:700,color:s.avgAll!=null?EI_COLOR(s.avgAll):T.muted}}>{fmtEI(s.avgAll)}</span>
+                            </div>}
+                            {!isMobile&&<div style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center"}}>
+                              <span style={{fontSize:13,fontWeight:700,color:ciColor}}>{ciDisp}</span>
                             </div>}
                             <div style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center"}}>
                               {statusBadge(allProfiles.find(p=>p.id===s.id)?.approval_status)}
