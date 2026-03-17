@@ -1898,7 +1898,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   if(ciRate>0.3) feedbacks.push({type:"warn",msg:"과잉확신(C-I) 비중이 높습니다. 백지목차 테스트 강도를 높이세요.",icon:"⚠️"});
   if(advLogs.length>0&&avgSec3>180) feedbacks.push({type:"alert",msg:`심화 문항 풀이 평균 ${avgSec3.toFixed(0)}초/문항 — 유형별 심화 학습 세션을 추가하세요.`,icon:"🔴"});
   if(feedbacks.length===0) feedbacks.push({type:"ok",msg:"현재 데이터에서 주요 위험 신호가 감지되지 않았습니다.",icon:"✅"});
-  const byStudent=students.filter(s=>s.approval_status==="approved").map(s=>{
+  const byStudent=students.filter(s=>s.approval_status==="approved"&&s.role!=="parent").map(s=>{
     const sl=normLogs.filter(l=>l.uid===s.id);
     const now=new Date(), d7=new Date(now-7*86400000), d30=new Date(now-30*86400000);
     const sl7=sl.filter(l=>new Date(l.date)>=d7);
