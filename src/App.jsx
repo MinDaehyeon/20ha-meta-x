@@ -2020,8 +2020,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
               <div style={{textAlign:"center",padding:"40px 0",color:T.muted,fontSize:13}}>해당 상태의 회원이 없습니다.</div>
             ):(
               <div style={{overflowX:"auto"}}>
-                <div style={{display:"grid",gridTemplateColumns:isMobile?"1.5fr 1fr 1fr 1.5fr":"2fr 0.8fr 1.2fr 1fr 1.5fr",minWidth:isMobile?480:600}}>
-                  {(isMobile?["이름","학년","상태","관리"]:["이름 / 이메일","학년","상태","로그","관리"]).map(h=>(
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"1.5fr 1fr 1fr 1.5fr":"2fr 0.8fr 1.2fr 0.9fr 1fr 1.5fr",minWidth:isMobile?480:640}}>
+                  {(isMobile?["이름","학년","상태","관리"]:["이름 / 이메일","학년","상태","가입일","로그","관리"]).map(h=>(
                     <div key={h} style={{padding:"8px 12px",fontSize:11,color:T.muted,fontWeight:700,borderBottom:`2px solid ${T.border}`,letterSpacing:"0.04em"}}>{h}</div>
                   ))}
                   {filteredStudents.map(s=>[
@@ -2044,6 +2044,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                     </div>,
                     <div key={`${s.id}-g`} style={{padding:"12px",fontSize:13,borderBottom:`1px solid ${T.border}`,color:T.textMid,display:"flex",alignItems:"center"}}>{s.grade||"—"}</div>,
                     <div key={`${s.id}-st`} style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center"}}>{statusBadge(s.approval_status)}</div>,
+                    ...(!isMobile?[<div key={`${s.id}-ca`} style={{padding:"12px",fontSize:12,borderBottom:`1px solid ${T.border}`,color:T.muted,display:"flex",alignItems:"center"}}>{s.created_at?.slice(0,10)||"—"}</div>]:[]),
                     ...(!isMobile?[<div key={`${s.id}-lc`} style={{padding:"12px",fontSize:13,borderBottom:`1px solid ${T.border}`,color:T.muted,display:"flex",alignItems:"center"}}>{normLogs.filter(l=>l.uid===s.id).length}건</div>]:[]),
                     <div key={`${s.id}-m`} style={{padding:"10px 12px",borderBottom:`1px solid ${T.border}`,display:"flex",gap:5,alignItems:"center",flexWrap:"wrap"}}>
                       {s.approval_status==="pending"&&<>
@@ -2349,7 +2350,7 @@ const GradeCards = ({selected, onSelect}) => (
         <div style={{minWidth:28,height:28,borderRadius:8,background:g.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:"#fff",flexShrink:0}}>{g.grade}</div>
         <div>
           <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:3}}>
-            <span style={{fontSize:12,fontWeight:800,color:g.color}}>{g.min}~{g.max}점</span>
+            <span style={{fontSize:12,fontWeight:800,color:g.color,whiteSpace:"nowrap"}}>{g.min}~{g.max}점</span>
             <span style={{fontSize:11,color:T.muted}}>|</span>
             <span style={{fontSize:11,fontWeight:700,color:T.textMid}}>{g.desc}</span>
           </div>
