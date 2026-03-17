@@ -1496,8 +1496,10 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
   const _dateEI={};sorted.forEach(l=>{if(!_dateEI[l.date])_dateEI[l.date]=[];_dateEI[l.date].push(l.engramIndex);});
   const dailyAvg=Object.entries(_dateEI).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,eis])=>({date,engramIndex:+(eis.reduce((s,v)=>s+v,0)/eis.length).toFixed(1)}));
   const maData=dailyAvg.map((d,i)=>{const w=dailyAvg.slice(Math.max(0,i-6),i+1);return{...d,movingAvg:+(w.reduce((s,v)=>s+v.engramIndex,0)/w.length).toFixed(1)};});
-  const latest=sorted[sorted.length-1],prev=sorted[sorted.length-2];
+  const latest=dailyAvg[dailyAvg.length-1],prev=dailyAvg[dailyAvg.length-2];
   const delta=latest&&prev?+(latest.engramIndex-prev.engramIndex).toFixed(1):null;
+  const todayStr=new Date().toISOString().slice(0,10);
+  const latestIsToday=latest?.date===todayStr;
   const coinT=filtered.reduce((acc,l)=>{const cf=l.coinFilter||{};Object.entries(cf).forEach(([k,v])=>{acc[k]=(acc[k]||0)+v;});return acc;},{cc:0,ci:0,ic:0,ii:0});
   const coinTot=Object.values(coinT).reduce((s,v)=>s+v,0);
   const mAcc=coinTot>0?(((coinT.cc+coinT.ii)/coinTot)*100).toFixed(1):0;
@@ -1523,7 +1525,7 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
       <LearningCalendar logs={logs}/>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:16}}>
         {[
-          {label:"오늘 EI 점수",desc:"최근 학습이 뇌에 얼마나 효과적으로 각인되었는지를 나타내는 종합 점수",kpi:"S(93~) A(81~) B(66~) C(51~) D(~50)\n\n세 가지 역량(전략 수행·풀이 효율·메타인지)을\n종합해 산출하는 학습 각인도 지수입니다.\n점수가 높을수록 오래 기억에 남는 학습을 했다는 의미예요.",value:latest?.engramIndex??"—",color:latest?EI_COLOR(latest.engramIndex):T.navy,sub:delta!==null?`${delta>=0?"▲":"▼"} ${Math.abs(delta)} 어제보다`:null,subColor:delta>=0?T.success:T.danger},
+          {label:latestIsToday?"오늘 EI 점수":(latest?`최근 EI (${latest.date.slice(5).replace('-','/')})`:  "최근 EI 점수"),desc:"최근 학습이 뇌에 얼마나 효과적으로 각인되었는지를 나타내는 종합 점수",kpi:"S(93~) A(81~) B(66~) C(51~) D(~50)\n\n세 가지 역량(전략 수행·풀이 효율·메타인지)을\n종합해 산출하는 학습 각인도 지수입니다.\n점수가 높을수록 오래 기억에 남는 학습을 했다는 의미예요.",value:latest?.engramIndex??"—",color:latest?EI_COLOR(latest.engramIndex):T.navy,sub:delta!==null?`${delta>=0?"▲":"▼"} ${Math.abs(delta)} 전 기록 대비`:null,subColor:delta>=0?T.success:T.danger},
           (()=>{
             const curEI = latest?.engramIndex??null;
             const curG = curEI!=null?gradeInfo(curEI):null;
