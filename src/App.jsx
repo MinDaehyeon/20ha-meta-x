@@ -1295,7 +1295,7 @@ const LearningCalendar = ({logs}) => {
           <strong>{tooltip.dateStr}</strong> — {tooltip.dayLogs.length}건 학습
           {tooltip.dayLogs.map((l,i)=>(
             <div key={i} style={{marginTop:4,color:"rgba(255,255,255,0.8)"}}>
-              {l.subject} {l.subject==="수학"?(l.book_level===1?"기본":l.book_level===2?"응용":"심화"):""} · EI <strong style={{color:T.orange}}>{(l.engram_index||0).toFixed(1)}</strong>
+              {l.subject} {l.subject==="수학"&&l.book_level>1?(l.book_level===2?"응용":"심화"):""} · EI <strong style={{color:T.orange}}>{(l.engram_index||0).toFixed(1)}</strong>
             </div>
           ))}
           <div style={{position:"absolute",bottom:-6,left:"50%",transform:"translateX(-50%)",
@@ -1557,8 +1557,8 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
             <RadarChart data={[
               {label:"C-C 정확한 예측",value:coinT.cc||0,full:Math.max(coinT.cc||0,coinT.ci||0,coinT.ic||0,coinT.ii||0,1)},
               {label:"C-I 과잉확신",value:coinT.ci||0,full:Math.max(coinT.cc||0,coinT.ci||0,coinT.ic||0,coinT.ii||0,1)},
-              {label:"I-C 과소평가",value:coinT.ic||0,full:Math.max(coinT.cc||0,coinT.ci||0,coinT.ic||0,coinT.ii||0,1)},
               {label:"I-I 정직한 인식",value:coinT.ii||0,full:Math.max(coinT.cc||0,coinT.ci||0,coinT.ic||0,coinT.ii||0,1)},
+              {label:"I-C 과소평가",value:coinT.ic||0,full:Math.max(coinT.cc||0,coinT.ci||0,coinT.ic||0,coinT.ii||0,1)},
             ]} margin={{top:10,right:24,bottom:10,left:24}}>
               <PolarGrid stroke={T.border}/>
               <PolarAngleAxis dataKey="label" tick={{fontSize:10,fill:T.muted,fontWeight:600}}/>
@@ -1574,28 +1574,41 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
           {/* C-I / I-C 위험 지표 강조 */}
           {(coinT.ci||0)+(coinT.ic||0)>0&&(()=>{
             const tot=Object.values(coinT).reduce((s,v)=>s+v,0)||1;
-            const ciR=((coinT.ci||0)/tot*100).toFixed(0);
-            const icR=((coinT.ic||0)/tot*100).toFixed(0);
+            const ciR=+((coinT.ci||0)/tot*100).toFixed(0);
+            const icR=+((coinT.ic||0)/tot*100).toFixed(0);
+            const ciDanger=ciR>30, ciWarn=ciR>15;
+            const icDanger=icR>30, icWarn=icR>15;
+            const anyDanger=ciDanger||icDanger;
+            const anyWarn=ciWarn||icWarn;
+            const borderColor=anyDanger?"#FECACA":anyWarn?"#FED7AA":"#BBF7D0";
+            const bgColor=anyDanger?"#FFF5F5":anyWarn?"#FFFBEB":"#F0FDF4";
+            const titleColor=anyDanger?T.danger:anyWarn?T.orange:T.success;
+            const titleIcon=anyDanger?"⚠️":anyWarn?"🟡":"✅";
+            const titleText=anyDanger?"메타인지 위험 지표":anyWarn?"메타인지 주의 지표":"메타인지 양호";
             return(
-              <div style={{background:"#FFF5F5",border:"1px solid #FECACA",borderRadius:10,padding:"10px 14px"}}>
-                <div style={{fontSize:11,fontWeight:800,color:T.danger,marginBottom:8}}>⚠️ 메타인지 위험 지표</div>
+              <div style={{background:bgColor,border:`1px solid ${borderColor}`,borderRadius:10,padding:"10px 14px"}}>
+                <div style={{fontSize:11,fontWeight:800,color:titleColor,marginBottom:8}}>{titleIcon} {titleText}</div>
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   <div>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
                       <span style={{fontSize:11,color:GRAPH.ciColor,fontWeight:700}}>C-I 과잉확신</span>
-                      <span style={{fontSize:11,fontWeight:800,color:ciR>30?T.danger:T.orange}}>{ciR}% {ciR>30?"🔴 위험":"🟡 주의"}</span>
+                      <span style={{fontSize:11,fontWeight:800,color:ciDanger?T.danger:ciWarn?T.orange:T.success}}>
+                        {ciR}% {ciDanger?"🔴 위험":ciWarn?"🟡 주의":"🟢 양호"}
+                      </span>
                     </div>
                     <div style={{height:6,background:T.surfaceAlt,borderRadius:3}}>
-                      <div style={{height:"100%",width:`${Math.min(ciR,100)}%`,background:ciR>30?T.danger:T.orange,borderRadius:3,transition:"width 0.5s"}}/>
+                      <div style={{height:"100%",width:`${Math.min(ciR,100)}%`,background:ciDanger?T.danger:ciWarn?T.orange:T.success,borderRadius:3,transition:"width 0.5s"}}/>
                     </div>
                   </div>
                   <div>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
                       <span style={{fontSize:11,color:T.orange,fontWeight:700}}>I-C 과소평가</span>
-                      <span style={{fontSize:11,fontWeight:800,color:T.navyMid}}>{icR}%</span>
+                      <span style={{fontSize:11,fontWeight:800,color:icDanger?T.danger:icWarn?T.orange:T.success}}>
+                        {icR}% {icDanger?"🔴 위험":icWarn?"🟡 주의":"🟢 양호"}
+                      </span>
                     </div>
                     <div style={{height:6,background:T.surfaceAlt,borderRadius:3}}>
-                      <div style={{height:"100%",width:`${Math.min(icR,100)}%`,background:T.orange,borderRadius:3,transition:"width 0.5s"}}/>
+                      <div style={{height:"100%",width:`${Math.min(icR,100)}%`,background:icDanger?T.danger:icWarn?T.orange:T.success,borderRadius:3,transition:"width 0.5s"}}/>
                     </div>
                   </div>
                 </div>
