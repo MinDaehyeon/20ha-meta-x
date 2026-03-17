@@ -2312,85 +2312,102 @@ const LogHistory = ({logs, onDelete, isAdmin, allProfiles}) => {
 // ══════════════════════════════════════════════════════
 // EI SETUP MODAL — 첫 로그인 목표 EI 설정
 // ══════════════════════════════════════════════════════
-const EISetupModal = ({profile, onSave}) => {
-  const [target, setTarget] = useState(profile?.target_ei||85);
+const GRADE_MIN = {S:93,A:81,B:66,C:51,D:50};
+const GRADE_NEXT = {D:"C",C:"B",B:"A",A:"S",S:null};
+const EI_GRADES_DEF = [
+  {grade:"S",min:93,max:100,color:"#16A34A",desc:"매 회차 집중이 흐트러지지 않고, 내가 아는 것과 모르는 것을 정확히 구분하는 상태.",sub:"현실적으로 달성하기 매우 어렵지만, 이 수준을 목표로 삼는 것 자체가 성장의 출발점입니다."},
+  {grade:"A",min:81,max:92,color:"#2563EB",desc:"배운 내용을 정해진 방식대로 꾸준히 실천하고, 자기 실력을 객관적으로 파악하는 단계.",sub:"상위 10% 수준의 학습 밀도. 하루하루 루틴을 성실히 이어가는 학생이 도달하는 목표입니다."},
+  {grade:"B",min:66,max:80,color:"#111827",desc:"학습 루틴이 잡혀가고 있지만, 가끔 집중이 흔들리거나 자신의 실력을 과대·과소평가하는 경향이 있는 상태.",sub:"성실하게 공부하는 대부분의 학생이 처음 도달하는 구간입니다. 여기서 A로 올리는 것이 핵심 과제입니다."},
+  {grade:"C",min:51,max:65,color:"#F97316",desc:"공부 시간은 채우고 있지만, 방법이 습관화되지 않았거나 틀린 문제를 반복하는 패턴이 있는 상태.",sub:"지금 당장 높은 목표보다 루틴을 먼저 잡는 것이 중요한 시점입니다."},
+  {grade:"D",min:0,max:50,color:"#DC2626",desc:"공부 방법·집중도·자기 파악 모두 아직 자리를 잡지 못한 상태.",sub:"지금 수준을 솔직하게 인정하고 시작하는 것이 가장 빠른 방법입니다."},
+];
+
+const GradeCards = ({selected, onSelect}) => (
+  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+    {EI_GRADES_DEF.map(g=>(
+      <div key={g.grade} onClick={()=>onSelect(g.grade)}
+        style={{display:"flex",gap:10,alignItems:"flex-start",padding:"10px 12px",borderRadius:10,cursor:"pointer",
+          border:`2px solid ${selected===g.grade?g.color:"transparent"}`,
+          background:selected===g.grade?g.color+"12":T.surfaceAlt,transition:"all 0.15s"}}>
+        <div style={{minWidth:28,height:28,borderRadius:8,background:g.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:"#fff",flexShrink:0}}>{g.grade}</div>
+        <div>
+          <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:3}}>
+            <span style={{fontSize:12,fontWeight:800,color:g.color}}>{g.min}~{g.max}점</span>
+            <span style={{fontSize:11,color:T.muted}}>|</span>
+            <span style={{fontSize:11,fontWeight:700,color:T.textMid}}>{g.desc}</span>
+          </div>
+          <div style={{fontSize:11,color:T.muted,lineHeight:1.6}}>{g.sub}</div>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+const EISetupModal = ({profile, logs=[], onSave}) => {
+  const [selected, setSelected] = useState(gradeInfo(profile?.target_ei||85).g);
   const [saving, setSaving] = useState(false);
-  const isMobile = useMobile();
-  const EI_GRADES = [
-    {min:93,max:100,grade:"S",color:"#16A34A",
-      desc:"매 회차 집중이 흐트러지지 않고, 내가 아는 것과 모르는 것을 정확히 구분하는 상태.",
-      sub:"현실적으로 달성하기 매우 어렵지만, 이 수준을 목표로 삼는 것 자체가 성장의 출발점입니다."},
-    {min:81,max:92,grade:"A",color:"#2563EB",
-      desc:"배운 내용을 정해진 방식대로 꾸준히 실천하고, 자기 실력을 객관적으로 파악하는 단계.",
-      sub:"상위 10% 수준의 학습 밀도. 하루하루 루틴을 성실히 이어가는 학생이 도달하는 목표입니다."},
-    {min:66,max:80,grade:"B",color:"#111827",
-      desc:"학습 루틴이 잡혀가고 있지만, 가끔 집중이 흔들리거나 자신의 실력을 과대·과소평가하는 경향이 있는 상태.",
-      sub:"성실하게 공부하는 대부분의 학생이 처음 도달하는 구간입니다. 여기서 A로 올리는 것이 핵심 과제입니다."},
-    {min:51,max:65,grade:"C",color:"#F97316",
-      desc:"공부 시간은 채우고 있지만, 방법이 습관화되지 않았거나 틀린 문제를 반복하는 패턴이 있는 상태.",
-      sub:"지금 당장 높은 목표보다 루틴을 먼저 잡는 것이 중요한 시점입니다."},
-    {min:0, max:50,grade:"D",color:"#DC2626",
-      desc:"공부 방법·집중도·자기 파악 모두 아직 자리를 잡지 못한 상태.",
-      sub:"지금 수준을 솔직하게 인정하고 시작하는 것이 가장 빠른 방법입니다."},
-  ];
-  const currentGrade = EI_GRADES.find(g=>target>=g.min)||EI_GRADES[4];
+
+  // 자동 추천
+  const recent7 = logs.filter(l=>new Date(l.date)>=new Date(Date.now()-7*86400000));
+  const avg7 = recent7.length>0?(recent7.reduce((s,l)=>s+l.engramIndex,0)/recent7.length):null;
+  const curGrade = avg7?gradeInfo(avg7).g:null;
+  const sugGrade = curGrade?GRADE_NEXT[curGrade]:null;
+  const showRec = logs.length>=3 && sugGrade;
+  const sugColor = sugGrade?EI_GRADES_DEF.find(g=>g.grade===sugGrade)?.color:null;
+
   const save = async()=>{
     setSaving(true);
-    await supabase.from("profiles").update({target_ei:target,updated_at:new Date().toISOString()}).eq("id",profile.id);
+    const targetEI = GRADE_MIN[selected];
+    await supabase.from("profiles").update({target_ei:targetEI,updated_at:new Date().toISOString()}).eq("id",profile.id);
     setSaving(false);
-    onSave(target);
+    onSave(targetEI);
   };
   return(
-    <div style={{position:"fixed",inset:0,background:"rgba(25,29,84,0.6)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(25,29,84,0.6)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20,overflowY:"auto"}}>
       <Card style={{width:"100%",maxWidth:480}}>
-        <div style={{textAlign:"center",marginBottom:20}}>
-          <div style={{fontSize:22,fontWeight:900,color:T.navy,marginBottom:4}}>목표 EI를 설정해주세요</div>
-          <div style={{fontSize:13,color:T.muted}}>엔그램 지수(EI)는 학습이 뇌에 얼마나 효과적으로 각인되었는지를 나타내는 종합 지표입니다.</div>
+        <div style={{textAlign:"center",marginBottom:16}}>
+          <div style={{fontSize:22,fontWeight:900,color:T.navy,marginBottom:4}}>목표 등급을 선택해주세요</div>
+          <div style={{fontSize:13,color:T.muted}}>목표 등급을 선택하면 EI 기준점이 자동으로 설정됩니다.</div>
         </div>
 
-        {/* 등급 설명표 */}
-        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:20}}>
-          {EI_GRADES.map(g=>(
-            <div key={g.grade} onClick={()=>setTarget(g.grade==="D"?50:g.grade==="S"?95:Math.round((g.min+g.max)/2))}
-              style={{display:"flex",gap:10,alignItems:"flex-start",padding:"10px 12px",borderRadius:10,cursor:"pointer",
-                border:`2px solid ${target>=g.min&&target<=(g.max===100?100:g.max)?g.color:"transparent"}`,
-                background:target>=g.min&&target<=(g.max===100?100:g.max)?g.color+"12":T.surfaceAlt,
-                transition:"all 0.15s"}}>
-              <div style={{minWidth:28,height:28,borderRadius:8,background:g.color,display:"flex",alignItems:"center",justifyContent:"center",
-                fontSize:13,fontWeight:900,color:"#fff",flexShrink:0}}>{g.grade}</div>
-              <div>
-                <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:3}}>
-                  <span style={{fontSize:12,fontWeight:800,color:g.color}}>{g.min}~{g.max}점</span>
-                  <span style={{fontSize:11,color:T.muted}}>|</span>
-                  <span style={{fontSize:11,fontWeight:700,color:T.textMid}}>{g.desc}</span>
-                </div>
-                <div style={{fontSize:11,color:T.muted,lineHeight:1.6}}>{g.sub}</div>
+        {/* 자동 추천 배너 */}
+        {showRec&&(
+          <div style={{background:sugColor+"12",border:`1px solid ${sugColor}40`,borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+            <div>
+              <div style={{fontSize:12,fontWeight:800,color:sugColor,marginBottom:2}}>✨ 추천 목표</div>
+              <div style={{fontSize:12,color:T.textMid}}>
+                최근 7일 평균 <strong>{avg7.toFixed(1)}점</strong> ({curGrade}등급) → <strong style={{color:sugColor}}>{sugGrade}등급</strong> ({GRADE_MIN[sugGrade]}점) 추천
               </div>
             </div>
-          ))}
+            <button onClick={()=>setSelected(sugGrade)}
+              style={{padding:"6px 12px",borderRadius:8,border:"none",background:sugColor,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>
+              적용
+            </button>
+          </div>
+        )}
+
+        <div style={{marginBottom:16}}>
+          <GradeCards selected={selected} onSelect={setSelected}/>
         </div>
 
-        {/* 슬라이더 */}
-        <div style={{background:T.grad,borderRadius:12,padding:"16px 20px",marginBottom:16}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <span style={{fontSize:13,color:"rgba(255,255,255,0.7)",fontWeight:600}}>목표 EI</span>
-            <div style={{display:"flex",alignItems:"baseline",gap:4}}>
-              <span style={{fontSize:32,fontWeight:900,color:"#fff",fontFamily:"'DM Mono',monospace"}}>{target}</span>
-              <span style={{fontSize:14,fontWeight:800,color:currentGrade.color,background:"rgba(255,255,255,0.15)",borderRadius:6,padding:"2px 8px"}}>{currentGrade.grade}등급</span>
+        {/* 선택된 등급 요약 */}
+        {selected&&(()=>{
+          return(
+            <div style={{background:T.grad,borderRadius:10,padding:"12px 16px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <span style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>선택한 목표 등급</span>
+              <div style={{display:"flex",alignItems:"baseline",gap:6}}>
+                <span style={{fontSize:28,fontWeight:900,color:"#fff"}}>{selected}</span>
+                <span style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>({GRADE_MIN[selected]}점 이상)</span>
+              </div>
             </div>
-          </div>
-          <input type="range" min={50} max={100} step={1} value={target} onChange={e=>setTarget(Number(e.target.value))}
-            style={sliderFill(target,50,100,currentGrade.color)}/>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"rgba(255,255,255,0.5)",marginTop:4}}>
-            <span>50 (D)</span><span>65 (C)</span><span>80 (B)</span><span>92 (A)</span><span>100 (S)</span>
-          </div>
-        </div>
+          );
+        })()}
 
         <div style={{background:T.orangePale,border:`1px solid ${T.orange}30`,borderRadius:10,padding:"10px 14px",fontSize:12,color:T.textMid,marginBottom:16}}>
           💡 목표는 나중에 프로필에서 언제든지 변경할 수 있습니다.
         </div>
 
-        <button onClick={save} disabled={saving}
+        <button onClick={save} disabled={saving||!selected}
           style={{...css.btnPrimary,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
           {saving?<><Spinner size={18} color="#fff"/>저장 중...</>:"목표 설정 완료 →"}
         </button>
@@ -2405,7 +2422,7 @@ const EISetupModal = ({profile, onSave}) => {
 const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
   const [name, setName]           = useState(profile.name||"");
   const [grade, setGrade]         = useState(profile.grade||"고1");
-  const [target, setTarget]       = useState(profile.target_ei||85);
+  const [target, setTarget]       = useState(gradeInfo(profile.target_ei||85).g);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url||"");
   const [uploading, setUploading] = useState(false);
   const [newPw, setNewPw]         = useState("");
@@ -2468,7 +2485,8 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
       if(!pwRegex.test(newPw)){ setErr("대소문자+특수문자 포함 8자 이상이어야 합니다."); return; }
     }
     setSaving(true);
-    await supabase.from("profiles").update({name, grade, target_ei:target, avatar_url:avatarUrl, updated_at:new Date().toISOString()}).eq("id", profile.id);
+    const targetEI = GRADE_MIN[target]||85;
+    await supabase.from("profiles").update({name, grade, target_ei:targetEI, avatar_url:avatarUrl, updated_at:new Date().toISOString()}).eq("id", profile.id);
     if(newPw){
       const {error:pwErr} = await supabase.auth.updateUser({password:newPw});
       if(pwErr){
@@ -2481,7 +2499,7 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
     }
     setSaving(false);
     setDone(true);
-    setTimeout(()=>onSave({...profile,name,grade,target_ei:target,avatar_url:avatarUrl}), 800);
+    setTimeout(()=>onSave({...profile,name,grade,target_ei:GRADE_MIN[target]||85,avatar_url:avatarUrl}), 800);
   };
 
   return (
@@ -2546,11 +2564,8 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
               </select>
             </div>
             <div>
-              <label style={css.label}>목표 EI <strong style={{color:T.navy}}>{target}</strong></label>
-              <input type="range" min={50} max={100} value={target} onChange={e=>setTarget(Number(e.target.value))} style={sliderFill(target,50,100,T.orange)}/>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:T.muted,marginTop:2}}>
-                <span>50 (D)</span><span>66 (B)</span><span>81 (A)</span><span>93 (S)</span>
-              </div>
+              <label style={css.label}>목표 등급</label>
+              <GradeCards selected={target} onSelect={setTarget}/>
             </div>
           </>}
 
@@ -2936,7 +2951,7 @@ export default function App() {
       </div>
 
       {isMobile && <BottomNav nav={NAV} view={view} showInput={showInput} onNavigate={navigate} isAdmin={isAdmin||isParent}/>}
-      {showEISetup && <EISetupModal profile={profile} onSave={(t)=>{setProfile(p=>({...p,target_ei:t}));setShowEISetup(false);}}/> }
+      {showEISetup && <EISetupModal profile={profile} logs={logs} onSave={(t)=>{setProfile(p=>({...p,target_ei:t}));setShowEISetup(false);}}/> }
       {showProfileModal && <ProfileModal profile={profile} onClose={()=>setShowProfileModal(false)} onSave={(updated)=>{setProfile(updated);setShowProfileModal(false);}} onDelete={()=>{setShowProfileModal(false);handleLogout();}}/>}
     </div>
   );
