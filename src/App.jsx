@@ -1524,7 +1524,24 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:16}}>
         {[
           {label:"오늘 EI 점수",desc:"최근 학습이 뇌에 얼마나 효과적으로 각인되었는지를 나타내는 종합 점수",kpi:"S(93~) A(81~) B(66~) C(51~) D(~50)\n\n세 가지 역량(전략 수행·풀이 효율·메타인지)을\n종합해 산출하는 학습 각인도 지수입니다.\n점수가 높을수록 오래 기억에 남는 학습을 했다는 의미예요.",value:latest?.engramIndex??"—",color:latest?EI_COLOR(latest.engramIndex):T.navy,sub:delta!==null?`${delta>=0?"▲":"▼"} ${Math.abs(delta)} 어제보다`:null,subColor:delta>=0?T.success:T.danger},
-          {label:"목표 달성률",desc:"설정한 목표 점수 대비 현재 도달 정도",kpi:"100%이면 목표 달성, 100% 초과면 목표를 넘어선 상태입니다.\n\n프로필에서 목표 EI를 조정할 수 있어요.",value:latest?((latest.engramIndex/targetEI)*100).toFixed(0):"—",unit:"%",color:T.orange},
+          (()=>{
+            const curEI = latest?.engramIndex??null;
+            const curG = curEI!=null?gradeInfo(curEI):null;
+            const nextG = curG?GRADE_NEXT[curG.g]:null;
+            const nextMin = nextG?GRADE_MIN[nextG]:null;
+            const diff = curEI!=null&&nextMin!=null?(nextMin-curEI).toFixed(1):null;
+            const atTop = curG?.g==="S";
+            return {
+              label:"다음 등급까지",
+              desc:"현재 등급에서 다음 등급 최솟값까지 남은 점수",
+              kpi:"현재 최근 EI 기준으로 다음 등급까지 얼마나 남았는지 보여줍니다.\n목표 설정과 무관한 절대적 지표입니다.",
+              value: atTop?"MAX":diff!=null?`+${diff}`:"—",
+              unit: atTop?"":diff!=null?"점":"",
+              color: atTop?"#16A34A":curG?curG.c:T.orange,
+              sub: curG&&!atTop?`현재 ${curG.g}등급 → ${nextG}등급`:curG?"S등급 달성!":null,
+              subColor: atTop?"#16A34A":T.muted,
+            };
+          })(),
           {label:"메타인지 지수",desc:"내 예측과 실제 결과가 일치한 비율",kpi:"문제를 풀기 전 맞출지 틀릴지 예측했을 때\n그 예측이 얼마나 정확했는지를 나타냅니다.\n\n높을수록 자신의 실력을 정확히 파악하고 있다는 뜻이에요.\n낮으면 과신하거나 과소평가하는 경향이 있을 수 있어요.",value:mAcc,unit:"%",color:"#7C3AED"},
           {label:"누적 학습일",desc:"지금까지 기록된 총 학습 세션 수",kpi:"데이터를 입력한 날의 총 횟수입니다.\n꾸준히 쌓일수록 분석의 정확도가 높아져요.",value:normLogs.length,unit:"일",color:T.navyMid},
         ].map(({label,desc="",kpi,value,unit="",color,sub,subColor})=>(
