@@ -377,8 +377,9 @@ const AuthScreen = ({ onLogin }) => {
     if(!suEmail){ setError("이메일을 입력해주세요."); return; }
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(suEmail)){ setError("유효하지 않은 이메일 형식입니다."); return; }
     setLoad("sendOtp",true);
-    const tempPw = `Tmp${Date.now()}@x`;
-    const {error:err} = await supabase.auth.signUp({ email:suEmail, password:tempPw });
+    // signUp() 대신 signInWithOtp() 사용 — 이메일 인증 시점에 계정 생성 안 됨
+    // 계정은 가입하기 버튼(handleSignup)에서 updateUser + profiles.upsert 시 확정
+    const {error:err} = await supabase.auth.signInWithOtp({ email:suEmail, options:{ shouldCreateUser:true } });
     setLoad("sendOtp",false);
     if(err){ setError(translateSupabaseError(err.message)); return; }
     setOtpSent(true); setOtpVerified(false); setOtpCode("");
@@ -387,7 +388,7 @@ const AuthScreen = ({ onLogin }) => {
   const handleVerifyOtp = async () => {
     if(otpCode.length !== 6){ setError("6자리 코드를 입력해주세요."); return; }
     setLoad("otp",true); setError("");
-    const {error:err} = await supabase.auth.verifyOtp({ email:suEmail, token:otpCode, type:"signup" });
+    const {error:err} = await supabase.auth.verifyOtp({ email:suEmail, token:otpCode, type:"email" });
     setLoad("otp",false);
     if(err){ setError("인증 코드가 올바르지 않습니다. 다시 확인해주세요."); return; }
     setOtpSent(false); setOtpVerified(true);
@@ -2740,11 +2741,10 @@ export default function App() {
     const { data: prof, error } = await supabase
       .from("profiles").select("*").eq("id", uid).single();
 
-    // 프로필 없음 or 미완성 프로필(트리거로 생성된 "미입력") → 가입 미완료 상태
-    // signOut하지 않고 세션 유지 → 가입 폼에서 updateUser + upsert 완료 가능
+    // 프로필 없음 or 미완성 프로필(트리거로 생성된 "미입력") → 가입 완료 화면으로
     if(!prof || error || !prof.name || prof.name === "미입력") {
       setSession(sess);
-      setAuthState("unauthenticated");
+      setAuthState("needsProfile");
       return;
     }
 
@@ -2841,6 +2841,9 @@ export default function App() {
   if(authState === "unauthenticated") return (
     <AuthScreen onLogin={(sess) => { setAuthState("loading"); loadUserData(sess); }}/>
   );
+
+  // ── 가입 미완료 (이름 미입력) → 이름/역할/비밀번호 입력 완료 화면
+  if(authState === "needsProfile") return <CompleteProfileScreen session={session} onDone={async()=>{ await supabase.auth.signOut(); setSession(null); setAuthState("unauthenticated"); }}/>;
 
   // ── 승인 대기
   if(authState === "pending") return (
