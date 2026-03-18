@@ -860,6 +860,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
   const [step, setStep]   = useState(0);
   const [err, setErr]     = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveWarnings, setSaveWarnings] = useState([]);
   const isMobile = useMobile();
   const [form, setForm]   = useState({
     date:new Date().toISOString().slice(0,10), subject:"수학", bookLevel:1,
@@ -916,17 +917,8 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
     return{strategyScore:+strategyScore.toFixed(1),efficiencyIndex:+efficiencyIndex.toFixed(1),metacognitionAccuracy:+metacognitionAccuracy.toFixed(1),engramIndex:calcEI({strategyScore,efficiencyIndex,metacognitionAccuracy}),bTime,mTime,aTime};
   })();
 
-  const save = async()=>{
-    if(!form.date){setErr("⚠️ 날짜를 입력해주세요.");return;}
-    if(!form.subject){setErr("⚠️ 과목을 선택해주세요.");return;}
-    const totalQCheck=subjectCfg.qLevels?(form.qBasic||0)+(form.qMid||0)+(form.qAdv||0):(form.qBasic||0);
-    if(totalQCheck===0){setErr("⚠️ 문항 수를 하나 이상 입력해주세요.");return;}
-    if(!form.startTime||!form.endTime){setErr("⚠️ 시작 시간과 종료 시간을 입력해주세요.");return;}
-    if(toMin(form.endTime)<=toMin(form.startTime)){setErr("⚠️ 종료 시간이 시작 시간보다 빠릅니다.");return;}
-    if(breakRatio>50){setErr("⚠️ 쉬는 시간이 전체 학습 시간의 50%를 초과했습니다.");return;}
-    const coinSum=Object.values(form.coinFilter).reduce((s,v)=>s+v,0);
-    if(coinSum===0){setErr("⚠️ CO-IN Filter를 입력해주세요.");return;}
-    setSaving(true); setErr("");
+  const doSave = async()=>{
+    setSaveWarnings([]); setSaving(true); setErr("");
     const{error}=await supabase.from("learning_logs").insert({
       uid, date:form.date, subject:form.subject, book_level:form.bookLevel,
       start_time:form.startTime, end_time:form.endTime, break_time:form.breakTime, net_time:netTime,
@@ -944,6 +936,30 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
     setSaving(false);
     if(error){setErr("저장 오류: "+error.message);return;}
     onSave();
+  };
+
+  const save = async()=>{
+    if(!form.date){setErr("⚠️ 날짜를 입력해주세요.");return;}
+    if(!form.subject){setErr("⚠️ 과목을 선택해주세요.");return;}
+    const totalQCheck=subjectCfg.qLevels?(form.qBasic||0)+(form.qMid||0)+(form.qAdv||0):(form.qBasic||0);
+    if(totalQCheck===0){setErr("⚠️ 문항 수를 하나 이상 입력해주세요.");return;}
+    if(!form.startTime||!form.endTime){setErr("⚠️ 시작 시간과 종료 시간을 입력해주세요.");return;}
+    if(toMin(form.endTime)<=toMin(form.startTime)){setErr("⚠️ 종료 시간이 시작 시간보다 빠릅니다.");return;}
+    if(breakRatio>50){setErr("⚠️ 쉬는 시간이 전체 학습 시간의 50%를 초과했습니다.");return;}
+    const coinSum=Object.values(form.coinFilter).reduce((s,v)=>s+v,0);
+    if(coinSum===0){setErr("⚠️ CO-IN Filter를 입력해주세요.");return;}
+    // 문항 수 불일치 경고 검사
+    const warns=[];
+    const totalQ=(form.qBasic||0)+(form.qMid||0)+(form.qAdv||0);
+    const{cc,ci,ic,ii}=form.coinFilter; const coinTotal=cc+ci+ic+ii;
+    if(coinTotal!==totalQ) warns.push(`CO-IN 합계(${coinTotal}문항)가 총 문항 수(${totalQ}문항)와 다릅니다.`);
+    if(subjectCfg.showQM){
+      const qmTotal=Object.values(form.errorAnalysis).reduce((s,v)=>s+v,0);
+      const wrongCount=ci+ii;
+      if(qmTotal!==wrongCount) warns.push(`QM 오답 합계(${qmTotal}문항)가 오답 수 C-I+I-I(${wrongCount}문항)와 다릅니다.`);
+    }
+    if(warns.length>0){setSaveWarnings(warns);return;}
+    await doSave();
   };
 
   const STEPS=["① 기본 정보","② 전략 수행","③ 메타인지"];
@@ -1245,6 +1261,19 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
         </div>
       )}
 
+      {saveWarnings.length>0&&(
+        <div style={{background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:12,padding:"14px 16px",marginTop:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:T.orange,marginBottom:8}}>⚠️ 문항 수 불일치</div>
+          {saveWarnings.map((w,i)=><div key={i} style={{fontSize:12,color:T.text,marginBottom:4}}>• {w}</div>)}
+          <div style={{fontSize:12,color:T.muted,marginTop:8,marginBottom:12}}>이대로 입력하시겠습니까?</div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={doSave} disabled={saving} style={{...css.btnOrange,flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:13}}>
+              {saving?<><Spinner size={14} color="#fff"/>저장 중...</>:"그래도 저장"}
+            </button>
+            <button onClick={()=>setSaveWarnings([])} style={{...css.btnGhost,flex:1,fontSize:13}}>다시 확인</button>
+          </div>
+        </div>
+      )}
       <div style={{fontSize:11,color:T.muted,textAlign:"center",marginTop:16,marginBottom:6}}>
         ⚠️ 저장된 데이터는 수정할 수 없습니다. 입력 내용을 다시 한번 확인해 주세요.
       </div>
@@ -1252,7 +1281,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
         {step>0&&<button onClick={()=>{setErr("");setStep(s=>s-1);}} style={{...css.btnGhost,flex:1}}>← 이전</button>}
         {step<2
           ?<button onClick={()=>{setErr("");setStep(s=>s+1);}} style={{...css.btnPrimary,flex:2}}>다음 →</button>
-          :<button onClick={save} disabled={saving} style={{...css.btnOrange,flex:2,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          :<button onClick={save} disabled={saving||saveWarnings.length>0} style={{...css.btnOrange,flex:2,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:saveWarnings.length>0?0.4:1}}>
             {saving?<><Spinner size={16} color="#fff"/>저장 중...</>:"💾 오늘의 학습 저장"}
           </button>}
         <button onClick={onCancel} style={{...css.btnGhost,padding:"12px 14px"}}>취소</button>
