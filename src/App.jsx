@@ -378,13 +378,20 @@ const AuthScreen = ({ onLogin }) => {
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(suEmail)){ setError("유효하지 않은 이메일 형식입니다."); return; }
     setLoad("sendOtp",true);
     const tempPw = `Tmp${Date.now()}@x`;
-    let {error:err} = await supabase.auth.signUp({ email:suEmail, password:tempPw });
-    // 이미 가입된 이메일 → 프로필 없으면(가입 미완성) auth 계정 삭제 후 재시도
-    if(err && (err.message.toLowerCase().includes("already registered") || err.message.toLowerCase().includes("already been registered"))) {
+    let { data: signUpData, error:err } = await supabase.auth.signUp({ email:suEmail, password:tempPw });
+    // 케이스 1: 명시적 "already registered" 에러
+    // 케이스 2: Supabase가 에러 없이 성공하지만 identities=[] (이미 인증된 이메일 — 이메일 안 보냄)
+    const isExisting =
+      (err && (err.message.toLowerCase().includes("already registered") || err.message.toLowerCase().includes("already been registered"))) ||
+      (!err && signUpData?.user?.identities?.length === 0);
+    if(isExisting) {
+      err = null;
       const { data: cleaned } = await supabase.rpc("cleanup_incomplete_signup", { p_email: suEmail });
       if(cleaned) {
         const retry = await supabase.auth.signUp({ email:suEmail, password:tempPw });
         err = retry.error;
+      } else {
+        err = { message: "already registered" };
       }
     }
     setLoad("sendOtp",false);
