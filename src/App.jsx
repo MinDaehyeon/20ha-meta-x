@@ -410,8 +410,9 @@ const AuthScreen = ({ onLogin }) => {
 
   const handleSignup = async () => {
     setError("");
-    if(!suName||!suPw){ setError("모든 항목을 입력해 주세요."); return; }
     if(!otpVerified){ setError("이메일 인증을 먼저 완료해주세요."); return; }
+    if(!termsAgreed||!privacyAgreed||!ageAgreed){ setError("필수 동의 항목을 모두 체크해 주세요."); return; }
+    if(!suName||!suPw){ setError("모든 항목을 입력해 주세요."); return; }
     if(suName.trim()!==suName||suName.includes(" ")){ setError("이름에 공백을 포함할 수 없습니다."); return; }
     if(suName.trim().length<2){ setError("이름은 2자 이상 입력해주세요."); return; }
     const pwRegex=/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/;
@@ -678,7 +679,7 @@ const handleSocial = async (provider) => {
           </span>
         </label>
         {error && <div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",fontSize:13,color:T.danger,marginBottom:12}}>{error}</div>}
-        <button onClick={handleSignup} disabled={loading.signup||!otpVerified||!privacyAgreed||!termsAgreed||!ageAgreed} style={{...css.btnOrange,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:(!otpVerified||!privacyAgreed||!termsAgreed||!ageAgreed)?0.4:1}}>
+        <button onClick={handleSignup} disabled={loading.signup} style={{...css.btnOrange,width:"100%",padding:"13px 0",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:(!otpVerified||!privacyAgreed||!termsAgreed||!ageAgreed)?0.4:1}}>
           {loading.signup?<><Spinner size={18} color="#fff"/>가입 중...</>:"가입하기 →"}
         </button>
         <div style={{textAlign:"center",marginTop:14,fontSize:13,color:T.muted}}>
