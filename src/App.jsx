@@ -576,7 +576,7 @@ const handleSocial = async (provider) => {
           ))}
         </div>
         <div style={{display:"grid",gap:12,marginBottom:12}}>
-          <div><label style={css.label}>이름</label><input value={suName} onChange={e=>setSuName(e.target.value)} placeholder="홍길동" style={css.input}/></div>
+          <div><label style={css.label}>이름 <span style={{color:"#e53e3e"}}>*</span></label><input value={suName} onChange={e=>setSuName(e.target.value)} placeholder="홍길동" required style={css.input}/></div>
           {suRole==="student" && (
             <div><label style={css.label}>학년</label>
               <select value={suGrade} onChange={e=>setSuGrade(e.target.value)} style={css.select}>
