@@ -377,9 +377,16 @@ const AuthScreen = ({ onLogin }) => {
     if(!suEmail){ setError("이메일을 입력해주세요."); return; }
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(suEmail)){ setError("유효하지 않은 이메일 형식입니다."); return; }
     setLoad("sendOtp",true);
-    // signUp() 대신 signInWithOtp() 사용 — 이메일 인증 시점에 계정 생성 안 됨
-    // 계정은 가입하기 버튼(handleSignup)에서 updateUser + profiles.upsert 시 확정
-    const {error:err} = await supabase.auth.signInWithOtp({ email:suEmail, options:{ shouldCreateUser:true } });
+    const tempPw = `Tmp${Date.now()}@x`;
+    let {error:err} = await supabase.auth.signUp({ email:suEmail, password:tempPw });
+    // 이미 가입된 이메일 → 프로필 없으면(가입 미완성) auth 계정 삭제 후 재시도
+    if(err && (err.message.toLowerCase().includes("already registered") || err.message.toLowerCase().includes("already been registered"))) {
+      const { data: cleaned } = await supabase.rpc("cleanup_incomplete_signup", { p_email: suEmail });
+      if(cleaned) {
+        const retry = await supabase.auth.signUp({ email:suEmail, password:tempPw });
+        err = retry.error;
+      }
+    }
     setLoad("sendOtp",false);
     if(err){ setError(translateSupabaseError(err.message)); return; }
     setOtpSent(true); setOtpVerified(false); setOtpCode("");
@@ -388,7 +395,7 @@ const AuthScreen = ({ onLogin }) => {
   const handleVerifyOtp = async () => {
     if(otpCode.length !== 6){ setError("6자리 코드를 입력해주세요."); return; }
     setLoad("otp",true); setError("");
-    const {error:err} = await supabase.auth.verifyOtp({ email:suEmail, token:otpCode, type:"email" });
+    const {error:err} = await supabase.auth.verifyOtp({ email:suEmail, token:otpCode, type:"signup" });
     setLoad("otp",false);
     if(err){ setError("인증 코드가 올바르지 않습니다. 다시 확인해주세요."); return; }
     setOtpSent(false); setOtpVerified(true);
