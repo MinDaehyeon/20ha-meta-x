@@ -2740,10 +2740,10 @@ export default function App() {
     const { data: prof, error } = await supabase
       .from("profiles").select("*").eq("id", uid).single();
 
-    // 프로필 없음 → 소셜 최초 or 미완성 세션 → 로그아웃
-    if(!prof || error) {
-      await supabase.auth.signOut();
-      setSession(null);
+    // 프로필 없음 or 미완성 프로필(트리거로 생성된 "미입력") → 가입 미완료 상태
+    // signOut하지 않고 세션 유지 → 가입 폼에서 updateUser + upsert 완료 가능
+    if(!prof || error || !prof.name || prof.name === "미입력") {
+      setSession(sess);
       setAuthState("unauthenticated");
       return;
     }
