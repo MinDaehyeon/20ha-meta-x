@@ -767,6 +767,79 @@ const ProfileSetupScreen = ({user, onComplete}) => {
 };
 
 // ══════════════════════════════════════════════════════
+// COMPLETE PROFILE SCREEN (가입 미완료 사용자 - 이름/비밀번호 입력)
+// ══════════════════════════════════════════════════════
+const CompleteProfileScreen = ({ session, onDone }) => {
+  const [name, setName]     = useState("");
+  const [role, setRole]     = useState("student");
+  const [grade, setGrade]   = useState("고1");
+  const [pw, setPw]         = useState("");
+  const [pwC, setPwC]       = useState("");
+  const [saving, setSaving] = useState(false);
+  const [done, setDone]     = useState(false);
+  const [error, setError]   = useState("");
+
+  const save = async () => {
+    setError("");
+    if(!name.trim() || name.trim().length < 2){ setError("이름을 2자 이상 입력해주세요."); return; }
+    const pwRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/;
+    if(!pwRegex.test(pw)){ setError("비밀번호는 영문 대소문자+특수문자 8자 이상이어야 합니다."); return; }
+    if(pw !== pwC){ setError("비밀번호가 일치하지 않습니다."); return; }
+    setSaving(true);
+    const uid = session?.user?.id;
+    const { error: ue } = await supabase.auth.updateUser({ password: pw, data: { name, role, grade: role==="student"?grade:"" } });
+    if(!ue && uid) {
+      await supabase.from("profiles").upsert({ id: uid, name, grade: role==="student"?grade:"", role, approval_status:"pending", target_ei:85, is_active:true });
+    }
+    setSaving(false);
+    if(ue){ setError("오류가 발생했습니다. 다시 시도해주세요."); return; }
+    setDone(true);
+  };
+
+  if(done) return (
+    <div style={{minHeight:"100vh",background:T.bg,fontFamily:"'Noto Sans KR',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <Card style={{width:"100%",maxWidth:400,textAlign:"center",padding:"40px 32px"}}>
+        <div style={{fontSize:48,marginBottom:16}}>⏳</div>
+        <Logo size="md"/>
+        <div style={{height:1,background:T.border,margin:"20px 0"}}/>
+        <div style={{fontSize:18,fontWeight:800,color:T.navy,marginBottom:8}}>승인 대기 중</div>
+        <div style={{fontSize:14,color:T.textMid,lineHeight:1.8,marginBottom:24}}>가입 신청이 완료됐습니다.<br/>관리자 승인 후 로그인하실 수 있습니다.</div>
+        <button onClick={onDone} style={{...css.btnGhost,padding:"10px 28px"}}>로그인 화면으로</button>
+      </Card>
+    </div>
+  );
+
+  return (
+    <div style={{minHeight:"100vh",background:T.bg,fontFamily:"'Noto Sans KR',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <Card style={{width:"100%",maxWidth:420}}>
+        <Logo size="md"/>
+        <div style={{height:1,background:T.border,margin:"16px 0"}}/>
+        <div style={{fontSize:18,fontWeight:800,color:T.navy,marginBottom:4}}>가입 정보 입력</div>
+        <div style={{fontSize:13,color:T.muted,marginBottom:20}}>이메일 인증이 완료됐습니다. 아래 정보를 입력해 가입을 완료해주세요.</div>
+        <div style={{display:"grid",gap:14,marginBottom:16}}>
+          <div><label style={css.label}>이름 <span style={{color:"#e53e3e"}}>*</span></label><input value={name} onChange={e=>setName(e.target.value)} placeholder="홍길동" style={css.input}/></div>
+          <div>
+            <label style={css.label}>역할</label>
+            <div style={{display:"flex",gap:8}}>
+              {[["student","학생"],["parent","학부모"]].map(([v,l])=>(
+                <button key={v} onClick={()=>setRole(v)} style={{...( role===v?css.btnPrimary:css.btnGhost),flex:1,padding:"10px 0",fontSize:13}}>{l}</button>
+              ))}
+            </div>
+          </div>
+          {role==="student"&&<div><label style={css.label}>학년</label><select value={grade} onChange={e=>setGrade(e.target.value)} style={css.select}>{GRADES.map(g=><option key={g} value={g}>{g}</option>)}</select></div>}
+          <div><label style={css.label}>비밀번호 <span style={{fontWeight:400,color:T.muted,fontSize:11}}>(대소문자+특수문자 8자↑)</span></label><input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="••••••••" style={css.input}/></div>
+          <div><label style={css.label}>비밀번호 확인</label><input type="password" value={pwC} onChange={e=>setPwC(e.target.value)} placeholder="••••••••" style={css.input}/></div>
+        </div>
+        {error&&<div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",fontSize:13,color:T.danger,marginBottom:12}}>{error}</div>}
+        <button onClick={save} disabled={saving} style={{...css.btnOrange,width:"100%",padding:"13px 0",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          {saving?<><Spinner size={18} color="#fff"/>저장 중...</>:"가입 완료 →"}
+        </button>
+      </Card>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════
 // DATA INPUT FORM
 // ══════════════════════════════════════════════════════
 const DataInputForm = ({uid, onSave, onCancel}) => {
