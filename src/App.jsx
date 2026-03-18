@@ -956,7 +956,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
     if(subjectCfg.showQM){
       const qmTotal=Object.values(form.errorAnalysis).reduce((s,v)=>s+v,0);
       const wrongCount=ci+ii;
-      if(qmTotal!==wrongCount) warns.push(`QM 오답 합계(${qmTotal}문항)가 오답 수 C-I+I-I(${wrongCount}문항)와 다릅니다.`);
+      if(qmTotal!==wrongCount) warns.push(`QM 오답 합계(${qmTotal}문항)가 오답 수 [C-I], [I-I] 합계(${wrongCount}문항)와 다릅니다.`);
     }
     if(warns.length>0){setSaveWarnings(warns);return;}
     await doSave();
