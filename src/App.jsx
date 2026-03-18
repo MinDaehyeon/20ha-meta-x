@@ -377,13 +377,19 @@ const AuthScreen = ({ onLogin }) => {
     if(!suEmail){ setError("이메일을 입력해주세요."); return; }
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(suEmail)){ setError("유효하지 않은 이메일 형식입니다."); return; }
     setLoad("sendOtp",true);
-    const tempPw = `Tmp${Date.now()}@x`;
+    const tempPw = `Tmp${Date.now()}`;
     let { data: signUpData, error:err } = await supabase.auth.signUp({ email:suEmail, password:tempPw });
     // 케이스 1: 명시적 "already registered" 에러
-    // 케이스 2: Supabase가 에러 없이 성공하지만 identities=[] (이미 인증된 이메일 — 이메일 안 보냄)
+    // 케이스 2: identities=[] → 이미 인증된 이메일 (확인된 기존 계정)
+    // 케이스 3: identities 있지만 created_at이 과거 → OTP 보냈지만 인증 안 한 기존 계정
+    //           → cleanup 후 재생성해야 새 OTP가 확실히 발송됨
+    const createdAgo = signUpData?.user?.created_at
+      ? Date.now() - new Date(signUpData.user.created_at).getTime()
+      : 0;
     const isExisting =
       (err && (err.message.toLowerCase().includes("already registered") || err.message.toLowerCase().includes("already been registered"))) ||
-      (!err && signUpData?.user?.identities?.length === 0);
+      (!err && signUpData?.user?.identities?.length === 0) ||
+      (!err && signUpData?.user?.identities?.length > 0 && createdAgo > 10000);
     if(isExisting) {
       err = null;
       const { data: cleaned } = await supabase.rpc("cleanup_incomplete_signup", { p_email: suEmail });
@@ -404,7 +410,16 @@ const AuthScreen = ({ onLogin }) => {
     setLoad("otp",true); setError("");
     const {error:err} = await supabase.auth.verifyOtp({ email:suEmail, token:otpCode, type:"signup" });
     setLoad("otp",false);
-    if(err){ setError("인증 코드가 올바르지 않습니다. 다시 확인해주세요."); return; }
+    if(err){
+      const m = err.message?.toLowerCase() || "";
+      if(m.includes("expired") || m.includes("otp_expired") || m.includes("token has expired")){
+        setError("인증 코드가 만료되었습니다. 인증 메일을 다시 요청해주세요.");
+        setOtpSent(false); setOtpCode(""); // 인증 메일 보내기 버튼으로 돌아가기
+      } else {
+        setError("인증 코드가 올바르지 않습니다. 다시 확인해주세요.");
+      }
+      return;
+    }
     setOtpSent(false); setOtpVerified(true);
   };
 
@@ -422,15 +437,25 @@ const AuthScreen = ({ onLogin }) => {
     const {data,error:err} = await supabase.auth.updateUser({
       password:suPw, data:{name:suName, grade:suRole==="student"?suGrade:"", target_ei:85, role:suRole}
     });
-    if(!err && data?.user){
-      await supabase.from("profiles").upsert({
+    if(err){
+      // 세션 유지 — 사용자가 바로 재시도 가능
+      setLoad("signup",false);
+      setError(translateSupabaseError(err.message));
+      return;
+    }
+    if(data?.user){
+      const { error:profErr } = await supabase.from("profiles").upsert({
         id:data.user.id, name:suName, grade:suRole==="student"?suGrade:"",
         target_ei:85, role:suRole, approval_status:"pending"
       });
+      if(profErr){
+        setLoad("signup",false);
+        setError("프로필 저장 중 오류가 발생했습니다. 다시 시도해주세요.");
+        return;
+      }
     }
     await supabase.auth.signOut();
     setLoad("signup",false);
-    if(err){ setError(translateSupabaseError(err.message)); return; }
     setSignupDone(true);
   };
 
@@ -447,7 +472,8 @@ const AuthScreen = ({ onLogin }) => {
   if(m.includes("unable to validate email")) return "유효하지 않은 이메일 형식입니다.";
   if(m.includes("email address") && m.includes("invalid")) return "유효하지 않은 이메일 형식입니다.";
   if(m.includes("network")) return "네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.";
-  if(m.includes("expired")) return "세션이 만료되었습니다. 다시 로그인해주세요.";
+  if(m.includes("token has expired")||m.includes("otp_expired")) return "인증 코드가 만료되었습니다. 인증 메일을 다시 요청해주세요.";
+  if(m.includes("expired")) return "세션이 만료되었습니다. 다시 시도해주세요.";
   // 영어 메시지 그대로 노출 방지 - 알 수 없는 오류
   if(/[a-zA-Z]{4,}/.test(msg) && !/[가-힣]/.test(msg)) return "오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
   return msg;
