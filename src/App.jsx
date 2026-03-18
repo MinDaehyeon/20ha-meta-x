@@ -2821,10 +2821,12 @@ export default function App() {
     const { data: prof, error } = await supabase
       .from("profiles").select("*").eq("id", uid).single();
 
-    // 프로필 없음 or 미완성 프로필(트리거로 생성된 "미입력") → 가입 완료 화면으로
+    // 프로필 없음 or 미완성 프로필 → 로그아웃 후 처음부터 재가입
+    // cleanup_incomplete_signup이 같은 이메일 재시도 시 자동 처리
     if(!prof || error || !prof.name || prof.name === "미입력") {
-      setSession(sess);
-      setAuthState("needsProfile");
+      await supabase.auth.signOut();
+      setSession(null);
+      setAuthState("unauthenticated");
       return;
     }
 
