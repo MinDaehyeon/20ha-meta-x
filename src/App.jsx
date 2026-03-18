@@ -2793,7 +2793,8 @@ export default function App() {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: sess } }) => {
+    supabase.auth.getSession().then(({ data: { session: sess }, error }) => {
+      if(error) { supabase.auth.signOut(); setAuthState("unauthenticated"); return; }
       if(sess) loadUserData(sess);
       else setAuthState("unauthenticated");
     });
