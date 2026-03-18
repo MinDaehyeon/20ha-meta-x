@@ -1985,7 +1985,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
     });
   },[allProfiles]);
 
-  const normLogs = allLogs.map(l=>({
+  const testUids = new Set(allProfiles.filter(p=>p.is_test).map(p=>p.id));
+  const normLogs = allLogs.filter(l=>!testUids.has(l.uid)).map(l=>({
     ...l, engramIndex:l.engram_index, strategyScore:l.strategy_score,
     efficiencyIndex:l.efficiency_index, metacognitionAccuracy:l.metacognition_accuracy,
     coinFilter:{cc:l.coin_cc,ci:l.coin_ci,ic:l.coin_ic,ii:l.coin_ii},
