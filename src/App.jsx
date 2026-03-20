@@ -1295,7 +1295,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
           <div style={{fontSize:12,color:T.muted,marginTop:8,marginBottom:12}}>이대로 입력하시겠습니까?</div>
           <div style={{display:"flex",gap:8}}>
             <button onClick={doSave} disabled={saving} style={{...css.btnOrange,flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:13}}>
-              {saving?<><Spinner size={14} color="#fff"/>저장 중...</>:"그래도 저장"}
+              {saving?<><Spinner size={14} color="#fff"/>저장 중...</>:"이대로 저장"}
             </button>
             <button onClick={()=>setSaveWarnings([])} style={{...css.btnGhost,flex:1,fontSize:13}}>다시 확인</button>
           </div>
