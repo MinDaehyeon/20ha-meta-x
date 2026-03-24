@@ -905,6 +905,35 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
   const toMin = t=>{if(!t)return 0;const[h,m]=t.split(":").map(Number);return h*60+m;};
   const netTime = Math.max(0,toMin(form.endTime)-toMin(form.startTime)-Number(form.breakTime));
   const breakRatio = Number(form.breakTime)/Math.max(1,toMin(form.endTime)-toMin(form.startTime))*100;
+
+  // 단계별 시간 자동 분배: q값 바뀌면 균등, netTime만 바뀌면 비율 유지
+  const prevQRef = useRef({qBasic:0,qMid:0,qAdv:0});
+  useEffect(()=>{
+    if(!subjectCfg.qLevels) return;
+    const hasB=form.qBasic>0, hasM=form.qMid>0, hasA=form.qAdv>0;
+    const count=[hasB,hasM,hasA].filter(Boolean).length;
+    const qChanged=prevQRef.current.qBasic!==form.qBasic||prevQRef.current.qMid!==form.qMid||prevQRef.current.qAdv!==form.qAdv;
+    prevQRef.current={qBasic:form.qBasic,qMid:form.qMid,qAdv:form.qAdv};
+    if(count===0||netTime===0){setForm(f=>({...f,tBasic:0,tMid:0,tAdv:0}));return;}
+    const distrib=(nt)=>{
+      const each=Math.floor(nt/count), rem=nt%count;
+      let i=0; return [hasB,hasM,hasA].map(a=>a?each+(i++<rem?1:0):0);
+    };
+    if(qChanged){
+      const v=distrib(netTime);
+      setForm(f=>({...f,tBasic:v[0],tMid:v[1],tAdv:v[2]}));
+    } else {
+      setForm(f=>{
+        const sum=(f.tBasic||0)+(f.tMid||0)+(f.tAdv||0);
+        if(sum===netTime) return f;
+        if(sum===0){const v=distrib(netTime);return{...f,tBasic:v[0],tMid:v[1],tAdv:v[2]};}
+        const b=hasB?Math.round((f.tBasic||0)/sum*netTime):0;
+        const m=hasM?Math.round((f.tMid||0)/sum*netTime):0;
+        const a=hasA?netTime-b-m:0;
+        return {...f,tBasic:b,tMid:m,tAdv:Math.max(0,a)};
+      });
+    }
+  },[form.qBasic,form.qMid,form.qAdv,netTime]);
   const metrics = (()=>{
     const aqKeys=subjectCfg.quant.filter(k=>form.quantEnabled[k]);
     const alKeys=subjectCfg.qual.filter(k=>form.qualEnabled[k]);
@@ -1102,7 +1131,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
               return(
                 <div style={{marginTop:16}}>
                   <div style={{fontSize:12,fontWeight:700,color:T.muted,marginBottom:8}}>단계별 풀이 시간
-                    <span style={{fontWeight:400,marginLeft:6,fontSize:11}}>드래그 또는 직접 입력</span>
+                    <span style={{fontWeight:400,marginLeft:6,fontSize:11}}>경계선을 드래그하여 조절 (1분 단위)</span>
                   </div>
                   {/* 드래그 bar */}
                   <div ref={el=>barRef.current=el}
@@ -1121,31 +1150,6 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
                     {activeCount>=2&&<div style={{position:"absolute",left:`${h1pct}%`,top:0,bottom:0,width:3,background:"rgba(255,255,255,0.9)",transform:"translateX(-50%)",boxShadow:"0 0 4px rgba(0,0,0,0.4)",borderRadius:2}}/>}
                     {activeCount===3&&<div style={{position:"absolute",left:`${h2pct}%`,top:0,bottom:0,width:3,background:"rgba(255,255,255,0.9)",transform:"translateX(-50%)",boxShadow:"0 0 4px rgba(0,0,0,0.4)",borderRadius:2}}/>}
                   </div>
-                  {/* 직접 입력 */}
-                  <div style={{display:"flex",gap:12,marginTop:10,flexWrap:"wrap"}}>
-                    {hasB&&<div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{fontSize:12,fontWeight:700,color:T.navy}}>기본</span>
-                      <input type="number" min={0} max={netTime} value={tB}
-                        onChange={e=>setForm(f=>({...f,tBasic:Math.max(0,Number(e.target.value))}))}
-                        style={{...css.input,width:58,textAlign:"center",padding:"4px 6px",fontSize:13}}/>
-                      <span style={{fontSize:12,color:T.muted}}>분</span>
-                    </div>}
-                    {hasM&&<div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{fontSize:12,fontWeight:700,color:T.orange}}>응용</span>
-                      <input type="number" min={0} max={netTime} value={tM}
-                        onChange={e=>setForm(f=>({...f,tMid:Math.max(0,Number(e.target.value))}))}
-                        style={{...css.input,width:58,textAlign:"center",padding:"4px 6px",fontSize:13}}/>
-                      <span style={{fontSize:12,color:T.muted}}>분</span>
-                    </div>}
-                    {hasA&&<div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{fontSize:12,fontWeight:700,color:"#7C3AED"}}>심화</span>
-                      <input type="number" min={0} max={netTime} value={tA}
-                        onChange={e=>setForm(f=>({...f,tAdv:Math.max(0,Number(e.target.value))}))}
-                        style={{...css.input,width:58,textAlign:"center",padding:"4px 6px",fontSize:13}}/>
-                      <span style={{fontSize:12,color:T.muted}}>분</span>
-                    </div>}
-                  </div>
-                  {allocated!==netTime&&<div style={{fontSize:11,color:T.muted,marginTop:4}}>합계 {allocated}분 / 순수 풀이 {netTime}분</div>}
                 </div>
               );
             })()}
