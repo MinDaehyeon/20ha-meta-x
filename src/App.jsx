@@ -893,7 +893,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
     date:new Date().toISOString().slice(0,10), subject:"수학", bookLevel:1,
     startTime:"", endTime:"", breakTime:0, questionCount:20,
     qBasic:0, qMid:0, qAdv:0,
-    timeRatio1:50, timeRatio2:80,
+    tBasic:0, tMid:0, tAdv:0,
     quant:Object.fromEntries(QUANT_ITEMS.map(k=>[k,80])),
     qual:Object.fromEntries(QUAL_ITEMS.map(k=>[k,3])),
     quantEnabled:{}, qualEnabled:{},
@@ -913,17 +913,10 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
     const denom=(aqKeys.length*100*1.0+alKeys.length*100*0.5)/100;
     const strategyScore=denom>0?(qT*1.0+qlT*0.5)/denom:0;
     const qB=form.qBasic||0, qM=form.qMid||0, qA=form.qAdv||0;
-    // 단계별 시간 - 활성 구간 기준으로 rawB/rawM/rawA 계산 (띠그래프와 동일 로직)
-    const h1m=form.timeRatio1||50, h2m=form.timeRatio2||80;
-    const acM=[qB>0,qM>0,qA>0].filter(Boolean).length;
-    let rawBm=0,rawMm=0,rawAm=0;
-    if(acM===1){rawBm=qB>0?100:0;rawMm=qM>0?100:0;rawAm=qA>0?100:0;}
-    else if(acM===2){
-      if(qB>0&&qM>0){rawBm=h1m;rawMm=100-h1m;}
-      else if(qB>0&&qA>0){rawBm=h1m;rawAm=100-h1m;}
-      else{rawMm=h1m;rawAm=100-h1m;}
-    } else {rawBm=h1m;rawMm=h2m-h1m;rawAm=100-h2m;}
-    const bTime=netTime*rawBm/100, mTime=netTime*rawMm/100, aTime=netTime*rawAm/100;
+    // 단계별 시간 - 직접 입력값 사용 (수학), 비수학은 전체 시간을 basic으로
+    const bTime=subjectCfg.qLevels?(form.tBasic||0):netTime;
+    const mTime=subjectCfg.qLevels?(form.tMid||0):0;
+    const aTime=subjectCfg.qLevels?(form.tAdv||0):0;
     // 단계별 문항당 소요시간(초)으로 효율성 계산
     const spB=qB>0?bTime*60/qB:0, spM=qM>0?mTime*60/qM:0, spA=qA>0?aTime*60/qA:0;
     let efficiencyIndex;
@@ -968,19 +961,18 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
   const save = async()=>{
     if(!form.date){setErr("⚠️ 날짜를 입력해주세요.");return;}
     if(!form.subject){setErr("⚠️ 과목을 선택해주세요.");return;}
-    const totalQCheck=subjectCfg.qLevels?(form.qBasic||0)+(form.qMid||0)+(form.qAdv||0):(form.qBasic||0);
-    if(totalQCheck===0){setErr("⚠️ 문항 수를 하나 이상 입력해주세요.");return;}
     if(!form.startTime||!form.endTime){setErr("⚠️ 시작 시간과 종료 시간을 입력해주세요.");return;}
     if(toMin(form.endTime)<=toMin(form.startTime)){setErr("⚠️ 종료 시간이 시작 시간보다 빠릅니다.");return;}
     if(breakRatio>50){setErr("⚠️ 쉬는 시간이 전체 학습 시간의 50%를 초과했습니다.");return;}
-    const coinSum=Object.values(form.coinFilter).reduce((s,v)=>s+v,0);
-    if(coinSum===0){setErr("⚠️ CO-IN Filter를 입력해주세요.");return;}
-    // 문항 수 불일치 경고 검사
-    const warns=[];
     const totalQ=(form.qBasic||0)+(form.qMid||0)+(form.qAdv||0);
+    const coinSum=Object.values(form.coinFilter).reduce((s,v)=>s+v,0);
+    // 문제 풀이가 있는 경우에만 CO-IN 입력 필수
+    if(totalQ>0&&coinSum===0){setErr("⚠️ CO-IN Filter를 입력해주세요.");return;}
+    // 문항 수 불일치 경고 검사 (문제 풀이가 있는 경우에만)
+    const warns=[];
     const{cc,ci,ic,ii}=form.coinFilter; const coinTotal=cc+ci+ic+ii;
-    if(coinTotal!==totalQ) warns.push(`CO-IN 합계(${coinTotal}문항)가 총 문항 수(${totalQ}문항)와 다릅니다.`);
-    if(subjectCfg.showQM){
+    if(totalQ>0&&coinTotal!==totalQ) warns.push(`CO-IN 합계(${coinTotal}문항)가 총 문항 수(${totalQ}문항)와 다릅니다.`);
+    if(subjectCfg.showQM&&totalQ>0){
       const qmTotal=Object.values(form.errorAnalysis).reduce((s,v)=>s+v,0);
       const wrongCount=ci+ii;
       if(qmTotal!==wrongCount) warns.push(`QM 오답 합계(${qmTotal}문항)가 오답 수 [C-I], [I-I] 합계(${wrongCount}문항)와 다릅니다.`);
@@ -1065,84 +1057,41 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
             <input type="range" min={0} max={60} value={form.breakTime} onChange={e=>setForm(f=>({...f,breakTime:Number(e.target.value)}))} style={sliderFill(form.breakTime,0,60,T.orange)}/>
             {breakRatio>50&&<div style={{fontSize:12,color:T.danger,marginTop:4}}>⚠️ 쉬는 시간 50% 초과</div>}
 
-            {/* 단계별 시간 분배 - 수학만 표시 */}
-            {netTime>0&&subjectCfg.qLevels&&(()=>{
-              const hasB=form.qBasic>0, hasM=form.qMid>0, hasA=form.qAdv>0;
-              const activeCount=[hasB,hasM,hasA].filter(Boolean).length;
-              // 활성 구간별 비율 계산
-              // handle1: 첫번째 경계(%), handle2: 두번째 경계(%) - 항상 handle1<handle2
-              const h1=form.timeRatio1, h2=form.timeRatio2;
-              // 구간 배분
-              let rawB=0,rawM=0,rawA=0;
-              if(activeCount===1){rawB=hasB?100:0;rawM=hasM?100:0;rawA=hasA?100:0;}
-              else if(activeCount===2){
-                if(hasB&&hasM){rawB=h1;rawM=100-h1;}
-                else if(hasB&&hasA){rawB=h1;rawA=100-h1;}
-                else{rawM=h1;rawA=100-h1;}
-              } else {
-                rawB=h1; rawM=h2-h1; rawA=100-h2;
-              }
-              const bMin=Math.round(netTime*rawB/100);
-              const mMin=Math.round(netTime*rawM/100);
-              const aMin=netTime-bMin-mMin;
-              // 드래그 핸들러
-              const onBarDrag=(e,barRef)=>{
-                if(!barRef.current)return;
-                const rect=barRef.current.getBoundingClientRect();
-                const getP=(clientX)=>Math.round(Math.min(95,Math.max(5,(clientX-rect.left)/rect.width*100))/5)*5;
-                const move=(ev)=>{
-                  const clientX=ev.touches?ev.touches[0].clientX:ev.clientX;
-                  const p=getP(clientX);
-                  if(activeCount===2){
-                    setForm(f=>({...f,timeRatio1:p}));
-                  } else {
-                    // 3개: 어느 핸들 드래그인지 판단
-                    setForm(f=>{
-                      const distH1=Math.abs(p-f.timeRatio1), distH2=Math.abs(p-f.timeRatio2);
-                      if(distH1<=distH2) return{...f,timeRatio1:Math.min(p,f.timeRatio2-5)};
-                      else return{...f,timeRatio2:Math.max(p,f.timeRatio1+5)};
-                    });
-                  }
-                };
-                const up=()=>{window.removeEventListener("mousemove",move);window.removeEventListener("mouseup",up);window.removeEventListener("touchmove",move);window.removeEventListener("touchend",up);};
-                window.addEventListener("mousemove",move);
-                window.addEventListener("mouseup",up);
-                window.addEventListener("touchmove",move,{passive:false});
-                window.addEventListener("touchend",up);
-                e.preventDefault();
-              };
-              const barRef={current:null};
-              return(
-                <div style={{marginTop:16}}>
-                  <div style={{fontSize:12,fontWeight:700,color:T.muted,marginBottom:8}}>단계별 풀이 시간 분배
-                    <span style={{fontWeight:400,marginLeft:6,fontSize:11,color:T.muted}}>경계선을 드래그하여 조절</span>
-                  </div>
-                  {/* 드래그 가능한 띠 그래프 */}
-                  <div ref={el=>barRef.current=el}
-                    style={{position:"relative",height:36,borderRadius:8,overflow:"hidden",display:"flex",cursor:"ew-resize",userSelect:"none"}}
-                    onMouseDown={e=>onBarDrag(e,barRef)}
-                    onTouchStart={e=>onBarDrag(e,barRef)}
-                  >
-                    {hasB&&rawB>0&&<div style={{width:`${rawB}%`,background:T.navy,display:"flex",alignItems:"center",justifyContent:"center",transition:"width 0.05s",overflow:"hidden"}}>
-                      {rawB>=14&&<span style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.9)",whiteSpace:"nowrap"}}>기본 {bMin}분</span>}
-                    </div>}
-                    {hasM&&rawM>0&&<div style={{width:`${rawM}%`,background:T.orange,display:"flex",alignItems:"center",justifyContent:"center",transition:"width 0.05s",overflow:"hidden"}}>
-                      {rawM>=14&&<span style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.9)",whiteSpace:"nowrap"}}>응용 {mMin}분</span>}
-                    </div>}
-                    {hasA&&rawA>0&&<div style={{flex:1,background:"#7C3AED",display:"flex",alignItems:"center",justifyContent:"center",transition:"width 0.05s",overflow:"hidden"}}>
-                      {rawA>=14&&<span style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.9)",whiteSpace:"nowrap"}}>심화 {aMin}분</span>}
-                    </div>}
-                    {/* 경계 핸들 */}
-                    {activeCount>=2&&(()=>{
-                      const handles=activeCount===2?[h1]:[h1,h2];
-                      return handles.map((p,i)=>(
-                        <div key={i} style={{position:"absolute",left:`${p}%`,top:0,bottom:0,width:4,background:"rgba(255,255,255,0.9)",transform:"translateX(-50%)",boxShadow:"0 0 6px rgba(0,0,0,0.4)",borderRadius:2}}/>
-                      ));
-                    })()}
-                  </div>
+            {/* 단계별 풀이 시간 - 수학만 표시, 문항 수 입력 시 해당 칸 표시 */}
+            {subjectCfg.qLevels&&(form.qBasic>0||form.qMid>0||form.qAdv>0)&&(
+              <div style={{marginTop:16}}>
+                <div style={{fontSize:12,fontWeight:700,color:T.muted,marginBottom:10}}>단계별 풀이 시간</div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {form.qBasic>0&&(
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:13,fontWeight:700,color:T.navy,width:36}}>기본</span>
+                      <input type="number" min={0} max={999} value={form.tBasic||0}
+                        onChange={e=>setForm(f=>({...f,tBasic:Math.max(0,Number(e.target.value))}))}
+                        style={{...css.input,width:72,textAlign:"center",padding:"6px 8px"}}/>
+                      <span style={{fontSize:13,color:T.muted}}>분</span>
+                    </div>
+                  )}
+                  {form.qMid>0&&(
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:13,fontWeight:700,color:T.orange,width:36}}>응용</span>
+                      <input type="number" min={0} max={999} value={form.tMid||0}
+                        onChange={e=>setForm(f=>({...f,tMid:Math.max(0,Number(e.target.value))}))}
+                        style={{...css.input,width:72,textAlign:"center",padding:"6px 8px"}}/>
+                      <span style={{fontSize:13,color:T.muted}}>분</span>
+                    </div>
+                  )}
+                  {form.qAdv>0&&(
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:13,fontWeight:700,color:"#7C3AED",width:36}}>심화</span>
+                      <input type="number" min={0} max={999} value={form.tAdv||0}
+                        onChange={e=>setForm(f=>({...f,tAdv:Math.max(0,Number(e.target.value))}))}
+                        style={{...css.input,width:72,textAlign:"center",padding:"6px 8px"}}/>
+                      <span style={{fontSize:13,color:T.muted}}>분</span>
+                    </div>
+                  )}
                 </div>
-              );
-            })()}
+              </div>
+            )}
           </Card>
         </div>
       )}
