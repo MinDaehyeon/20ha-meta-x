@@ -26,8 +26,12 @@ CRAWL_DAYS     = int(os.environ.get("CRAWL_DAYS", "30"))
 
 KST = timezone(timedelta(hours=9))
 
-# 인증글 양식 패턴 (예: "1주차 수", "3주차 일", "20주차 수요일" 등)
-VALID_TITLE_PATTERN = re.compile(r"\d+주차\s*(수|일|수요일|일요일)", re.IGNORECASE)
+# 인증글 양식 패턴: [N주차/수] 이름/학년/번호 or [N주차/일] ...
+# 띄어쓰기 무시, 수=수요일, 일=일요일
+VALID_TITLE_PATTERN = re.compile(
+    r"\[?\s*\d+\s*주차\s*/\s*(수|일)\s*\]",
+    re.IGNORECASE
+)
 
 
 # ── 로그인 ─────────────────────────────────────────────────────────────────
