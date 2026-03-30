@@ -47,11 +47,10 @@ def make_session():
 
 
 def check_login(session):
-    r = session.get("https://cafe.naver.com", timeout=10)
-    if "로그아웃" in r.text or "NID_AUT" in session.cookies:
-        print("[session] 쿠키 인증 성공")
+    if NAVER_NID_AUT and NAVER_NID_SES:
+        print("[session] 쿠키 인증 준비 완료")
         return True
-    print("[session] 쿠키 만료됨 — NID_AUT/NID_SES 갱신 필요")
+    print("[session] NID_AUT/NID_SES 시크릿이 비어 있음")
     return False
 
 
