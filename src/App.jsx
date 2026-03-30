@@ -2015,6 +2015,17 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const [certStatusFilter, setCertStatusFilter] = useState("all");
   const [certEditRecord, setCertEditRecord] = useState(null); // 편집 중인 행 {id,...}
   const [crawlRunning, setCrawlRunning] = useState(false);
+  const [certStudents, setCertStudents] = useState([]);
+  const [attendanceCerts, setAttendanceCerts] = useState([]);
+  const [attendanceFrom, setAttendanceFrom] = useState(()=>{
+    const d = new Date(); d.setDate(d.getDate()-28); d.setHours(0,0,0,0); return d;
+  });
+  const [attendanceTo, setAttendanceTo] = useState(()=>{
+    const d = new Date(); d.setHours(23,59,59,999); return d;
+  });
+  const [rosterEditRow, setRosterEditRow] = useState(null);
+  const [rosterAddMode, setRosterAddMode] = useState(false);
+  const [assignPopup, setAssignPopup] = useState(null); // {studentId, date, certs[]}
   const isMobile = useMobile();
 
   // 학부모-자녀 연결 로드
@@ -2051,15 +2062,11 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   };
 
   useEffect(()=>{
-    if(adminTab==="cert"){
-      if(certSubTab==="weekly"){
-        loadCertData(certWeekOffset);
-        supabase.rpc("get_invalid_certs",{p_limit:100}).then(({data})=>setInvalidCerts(data||[]));
-      } else {
-        loadCertRecords(certStatusFilter);
-      }
-    }
-  },[adminTab, certWeekOffset, certSubTab, certStatusFilter]);
+    if(adminTab!=="cert") return;
+    if(certSubTab==="attendance"||certSubTab==="roster") loadCertStudents();
+    if(certSubTab==="attendance") loadAttendanceCerts(attendanceFrom, attendanceTo);
+    if(certSubTab==="records") loadCertRecords(certStatusFilter);
+  },[adminTab, certSubTab, certStatusFilter, attendanceFrom, attendanceTo]);
 
   const saveNickname = async (profileId, nickname) => {
     await supabase.rpc("update_naver_nickname", {p_profile_id: profileId, p_nickname: nickname.trim()||null});
@@ -2106,6 +2113,41 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
       else alert("실행 실패: " + r.status);
     } catch(e){ alert("오류: "+e.message); }
     setCrawlRunning(false);
+  };
+
+  const loadCertStudents = async () => {
+    const {data} = await supabase.rpc("get_cert_students");
+    setCertStudents(data||[]);
+  };
+
+  const loadAttendanceCerts = async (from, to) => {
+    const {data} = await supabase.rpc("get_attendance_certs", {
+      p_from: from.toISOString(), p_to: to.toISOString()
+    });
+    setAttendanceCerts(data||[]);
+  };
+
+  const upsertCertStudent = async (row) => {
+    await supabase.rpc("upsert_cert_student", {
+      p_id: row.id||null, p_name: row.name,
+      p_grade: row.grade||null, p_naver_nickname: row.naver_nickname||null
+    });
+    setRosterEditRow(null); setRosterAddMode(false);
+    loadCertStudents();
+  };
+
+  const deleteCertStudent = async (id) => {
+    if(!window.confirm("명단에서 삭제할까요?")) return;
+    await supabase.rpc("delete_cert_student", {p_id: id});
+    loadCertStudents();
+  };
+
+  const assignCert = async (certId, studentId) => {
+    await supabase.rpc("assign_cert_to_student", {
+      p_cert_id: certId, p_student_id: studentId||null
+    });
+    setAssignPopup(null);
+    loadAttendanceCerts(attendanceFrom, attendanceTo);
   };
 
   const testUids = new Set(allProfiles.filter(p=>p.is_test).map(p=>p.id));
@@ -2332,23 +2374,58 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
       {/* ── 진단 센터 탭 ── */}
       {/* ── 인증 현황 탭 ── */}
       {adminTab==="cert"&&(()=>{
+        // ── 공통 헬퍼 ──
+        const KST_OFFSET = 9*60*60*1000;
+        const toKSTDate = d => new Date(new Date(d).getTime() + KST_OFFSET);
+        const fmtDate = d => { const k=toKSTDate(d); return `${k.getUTCMonth()+1}/${k.getUTCDate()}`; };
+        const fmtDateFull = d => { const k=toKSTDate(d); return `${k.getUTCMonth()+1}/${k.getUTCDate()}(${["일","월","화","수","목","금","토"][k.getUTCDay()]})`; };
+        const isSameKSTDay = (d1, d2) => {
+          const a=toKSTDate(d1), b=toKSTDate(d2);
+          return a.getUTCFullYear()===b.getUTCFullYear() && a.getUTCMonth()===b.getUTCMonth() && a.getUTCDate()===b.getUTCDate();
+        };
+        // 기간 내 수/일 날짜 배열 생성
+        const genDates = (from, to) => {
+          const dates=[]; const cur=new Date(from);
+          while(cur<=to){
+            const d=cur.getDay();
+            if(d===3||d===0) dates.push(new Date(cur));
+            cur.setDate(cur.getDate()+1);
+          }
+          return dates;
+        };
+        const attendanceDates = genDates(attendanceFrom, attendanceTo);
+
+        // 인증글 관리 헬퍼
         const STATUS_LABELS = {all:"전체",matched:"✅ 매칭됨",no_profile:"❓ 프로필없음",parse_failed:"⚠️ 파싱실패",name_mismatch:"🔴 이름불일치",grade_mismatch:"🟡 학년불일치",unchecked:"⬜ 미확인"};
         const STATUS_COLORS = {matched:"#D1FAE5",no_profile:"#E0E7FF",parse_failed:"#FEF3C7",name_mismatch:"#FEE2E2",grade_mismatch:"#FFF7CD",unchecked:"#F3F4F6"};
-        const now = new Date();
-        const dow = now.getDay();
-        const mon = new Date(now); mon.setDate(now.getDate()+(dow===0?-6:1-dow)+certWeekOffset*7); mon.setHours(0,0,0,0);
-        const sun = new Date(mon); sun.setDate(mon.getDate()+6);
-        const fmt = d=>`${d.getMonth()+1}/${d.getDate()}`;
-        const weekLabel = certWeekOffset===0?"이번 주":certWeekOffset===-1?"지난 주":`${Math.abs(certWeekOffset)}주 전`;
-        const hasDow = (dates,dow2)=>(dates||[]).some(d=>new Date(d).getDay()===dow2);
-        const otherDates = dates=>(dates||[]).filter(d=>![0,3].includes(new Date(d).getDay()));
-        const filtered = certStatusFilter==="all"?certRecords:certRecords.filter(r=>r.title_match_status===certStatusFilter);
+        const filteredRec = certStatusFilter==="all"?certRecords:certRecords.filter(r=>r.title_match_status===certStatusFilter);
         const statusCounts = Object.fromEntries(Object.keys(STATUS_LABELS).map(k=>[k,k==="all"?certRecords.length:certRecords.filter(r=>r.title_match_status===k).length]));
+
+        // 셀 상태 계산
+        const getCellInfo = (student, date) => {
+          const certsOnDay = attendanceCerts.filter(c => isSameKSTDay(c.posted_at, date));
+          const matched = certsOnDay.filter(c =>
+            c.assigned_student_id===student.id ||
+            (c.naver_nickname===student.naver_nickname && student.naver_nickname && c.title_match_status==="matched")
+          );
+          const ambiguous = certsOnDay.filter(c =>
+            !c.assigned_student_id && student.naver_nickname &&
+            c.naver_nickname===student.naver_nickname && c.title_match_status!=="matched"
+          );
+          return {matched, ambiguous};
+        };
+
+        // 미배정 인증글: assigned_student_id 없고 어떤 cert_student에도 닉네임 매칭 안 됨
+        const knownNicks = new Set(certStudents.map(s=>s.naver_nickname).filter(Boolean));
+        const unassigned = attendanceCerts.filter(c =>
+          !c.assigned_student_id && c.title_match_status!=="matched" && !knownNicks.has(c.naver_nickname)
+        );
+
         return (
           <div>
             {/* 서브탭 + 크롤링 버튼 */}
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-              {[{k:"weekly",l:"📊 주차 현황"},{k:"records",l:"📝 인증글 관리"}].map(({k,l})=>(
+              {[{k:"attendance",l:"📋 출석표"},{k:"records",l:"📝 인증글 관리"},{k:"roster",l:"👥 명단 관리"}].map(({k,l})=>(
                 <button key={k} onClick={()=>setCertSubTab(k)}
                   style={{...certSubTab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>{l}</button>
               ))}
@@ -2359,6 +2436,132 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                 </button>
               </div>
             </div>
+
+            {/* ── 출석표 서브탭 ── */}
+            {certSubTab==="attendance"&&(
+              <div>
+                {/* 날짜 범위 선택 */}
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+                  <label style={{fontSize:12,color:T.muted,fontWeight:700}}>기간</label>
+                  <input type="date" value={attendanceFrom.toISOString().slice(0,10)}
+                    onChange={e=>{const d=new Date(e.target.value);d.setHours(0,0,0,0);setAttendanceFrom(d);}}
+                    style={{...css.input,padding:"5px 8px",fontSize:12,width:140}}/>
+                  <span style={{fontSize:12,color:T.muted}}>~</span>
+                  <input type="date" value={attendanceTo.toISOString().slice(0,10)}
+                    onChange={e=>{const d=new Date(e.target.value);d.setHours(23,59,59,999);setAttendanceTo(d);}}
+                    style={{...css.input,padding:"5px 8px",fontSize:12,width:140}}/>
+                  <button onClick={()=>loadAttendanceCerts(attendanceFrom,attendanceTo)}
+                    style={{...css.btnOrange,padding:"5px 14px",fontSize:12}}>새로고침</button>
+                  <span style={{fontSize:11,color:T.muted}}>수/일 {attendanceDates.length}회</span>
+                </div>
+
+                {/* 출석표 그리드 */}
+                {certStudents.length===0?(
+                  <div style={{textAlign:"center",padding:40,color:T.muted,fontSize:13}}>
+                    👥 먼저 "명단 관리" 탭에서 학생을 추가해주세요.
+                  </div>
+                ):(
+                  <div style={{overflowX:"auto"}}>
+                    <div style={{minWidth: 200 + attendanceDates.length*68}}>
+                      {/* 헤더 */}
+                      <div style={{display:"grid",gridTemplateColumns:`140px 60px repeat(${attendanceDates.length}, 64px)`,background:T.navy,padding:"8px 10px",gap:2,alignItems:"center"}}>
+                        <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)"}}>이름</div>
+                        <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:"center"}}>학년</div>
+                        {attendanceDates.map(d=>(
+                          <div key={d.toISOString()} style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:"center",lineHeight:1.3}}>
+                            {fmtDate(d)}<br/><span style={{opacity:0.7}}>{["일","월","화","수","목","금","토"][d.getDay()]}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {/* 학생 행 */}
+                      {certStudents.map((s,i)=>(
+                        <div key={s.id} style={{display:"grid",gridTemplateColumns:`140px 60px repeat(${attendanceDates.length}, 64px)`,
+                          padding:"7px 10px",gap:2,borderTop:`1px solid ${T.border}`,
+                          background:i%2===0?T.white:"#F9FAFB",alignItems:"center"}}>
+                          <div style={{fontSize:12,fontWeight:700,color:T.navy,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</div>
+                          <div style={{fontSize:11,color:T.muted,textAlign:"center"}}>{s.grade||"-"}</div>
+                          {attendanceDates.map(date=>{
+                            const {matched,ambiguous}=getCellInfo(s,date);
+                            const hasMatched=matched.length>0;
+                            const hasAmb=ambiguous.length>0;
+                            return (
+                              <div key={date.toISOString()} style={{textAlign:"center"}}>
+                                {!s.naver_nickname?(
+                                  <span style={{fontSize:13,color:T.muted}}>－</span>
+                                ):hasMatched?(
+                                  <span style={{fontSize:16}}>✅</span>
+                                ):hasAmb?(
+                                  <button onClick={()=>setAssignPopup({studentId:s.id,studentName:s.name,date,certs:ambiguous})}
+                                    style={{background:"none",border:"none",cursor:"pointer",fontSize:16,padding:0}}>⚠️</button>
+                                ):(
+                                  <span style={{fontSize:16}}>❌</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 미배정 인증글 */}
+                {unassigned.length>0&&(
+                  <Card style={{marginTop:16}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#B45309",marginBottom:10}}>
+                      📌 미배정 인증글 ({unassigned.length}건) — 어떤 학생에도 닉네임이 매핑되지 않은 글
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {unassigned.map(c=>(
+                        <div key={c.id} style={{display:"flex",gap:8,alignItems:"center",padding:"8px 10px",borderRadius:8,
+                          background:"#FFFBEB",border:"1px solid #FDE68A",flexWrap:"wrap"}}>
+                          <span style={{fontSize:11,color:T.muted,minWidth:70}}>{fmtDateFull(c.posted_at)}</span>
+                          <span style={{fontSize:12,fontWeight:700,color:T.navy}}>{c.naver_nickname}</span>
+                          <a href={c.post_url} target="_blank" rel="noreferrer"
+                            style={{fontSize:11,color:T.orange,flex:1,textDecoration:"none",wordBreak:"break-all"}}>{c.post_title}</a>
+                          <select defaultValue="" onChange={e=>e.target.value&&assignCert(c.id,parseInt(e.target.value))}
+                            style={{...css.input,fontSize:11,padding:"3px 6px",width:110}}>
+                            <option value="">학생 배정...</option>
+                            {certStudents.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* ⚠️ 셀 클릭 팝업 */}
+                {assignPopup&&(
+                  <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}
+                    onClick={()=>setAssignPopup(null)}>
+                    <div style={{background:T.white,borderRadius:16,padding:24,maxWidth:480,width:"90%",boxShadow:"0 8px 32px rgba(0,0,0,0.18)"}}
+                      onClick={e=>e.stopPropagation()}>
+                      <div style={{fontWeight:800,fontSize:15,color:T.navy,marginBottom:4}}>⚠️ 미매칭 인증글</div>
+                      <div style={{fontSize:12,color:T.muted,marginBottom:14}}>
+                        {assignPopup.studentName} · {fmtDateFull(assignPopup.date)}
+                      </div>
+                      <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+                        {assignPopup.certs.map(c=>(
+                          <div key={c.id} style={{padding:"10px 12px",borderRadius:8,background:"#F9FAFB",border:`1px solid ${T.border}`}}>
+                            <div style={{fontSize:12,color:T.navy,marginBottom:4,wordBreak:"break-all"}}>
+                              <a href={c.post_url} target="_blank" rel="noreferrer" style={{color:T.navy}}>{c.post_title}</a>
+                            </div>
+                            <div style={{fontSize:11,color:T.muted,marginBottom:8}}>
+                              상태: {STATUS_LABELS[c.title_match_status]||c.title_match_status}
+                            </div>
+                            <button onClick={()=>assignCert(c.id, assignPopup.studentId)}
+                              style={{...css.btnOrange,padding:"5px 14px",fontSize:12}}>
+                              이 학생 것으로 확정
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button onClick={()=>setAssignPopup(null)} style={{...css.btnOutline,padding:"6px 16px",fontSize:12}}>닫기</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* ── 인증글 관리 서브탭 ── */}
             {certSubTab==="records"&&(
@@ -2382,8 +2585,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                         <div key={h} style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:"center"}}>{h}</div>
                       ))}
                     </div>
-                    {filtered.length===0&&<div style={{padding:24,textAlign:"center",color:T.muted,fontSize:13}}>해당 데이터 없음</div>}
-                    {filtered.map((rec,i)=>{
+                    {filteredRec.length===0&&<div style={{padding:24,textAlign:"center",color:T.muted,fontSize:13}}>해당 데이터 없음</div>}
+                    {filteredRec.map((rec,i)=>{
                       const isEd = certEditRecord?.id===rec.id;
                       const bg = STATUS_COLORS[rec.title_match_status]||"#fff";
                       return (
@@ -2453,85 +2656,83 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
               </div>
             )}
 
-            {/* ── 주차 현황 서브탭 ── */}
-            {certSubTab==="weekly"&&(
+            {/* ── 명단 관리 서브탭 ── */}
+            {certSubTab==="roster"&&(
               <div>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-                  <button onClick={()=>setCertWeekOffset(p=>p-1)} style={{...css.btnOutline,padding:"6px 12px",fontSize:12}}>◀ 이전 주</button>
-                  <span style={{fontWeight:700,color:T.navy,fontSize:14}}>{weekLabel} ({fmt(mon)} ~ {fmt(sun)})</span>
-                  <button onClick={()=>setCertWeekOffset(p=>Math.min(0,p+1))} disabled={certWeekOffset===0}
-                    style={{...css.btnOutline,padding:"6px 12px",fontSize:12,opacity:certWeekOffset===0?0.4:1}}>다음 주 ▶</button>
-                  <button onClick={()=>loadCertData(certWeekOffset)} style={{...css.btnOrange,padding:"6px 14px",fontSize:12,marginLeft:4}}>새로고침</button>
+                <div style={{marginBottom:12}}>
+                  <button onClick={()=>{setRosterAddMode(true);setRosterEditRow(null);}}
+                    style={{...css.btnOrange,padding:"7px 16px",fontSize:13}}>+ 학생 추가</button>
                 </div>
-                {certLoading?(
-                  <div style={{textAlign:"center",padding:40,color:T.muted}}>불러오는 중...</div>
-                ):(
-                  <>
-                    <Card style={{padding:0,overflow:"hidden",marginBottom:16}}>
-                      <div style={{display:"grid",gridTemplateColumns:"2fr 0.8fr 0.8fr 0.8fr 2fr",background:T.navy,padding:"10px 16px",gap:8}}>
-                        {["이름/학년","수요일","일요일","기타 요일","네이버 닉네임"].map(h=>(
-                          <div key={h} style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:"center"}}>{h}</div>
-                        ))}
-                      </div>
-                      {certData.length===0&&<div style={{padding:24,textAlign:"center",color:T.muted,fontSize:13}}>학생 데이터 없음</div>}
-                      {certData.map((s,i)=>{
-                        const wedOk=hasDow(s.cert_dates,3),sunOk=hasDow(s.cert_dates,0),others=otherDates(s.cert_dates),noNick=!s.naver_nickname,isEd2=certNickEdit[s.profile_id]!==undefined;
-                        return (
-                          <div key={s.profile_id} style={{display:"grid",gridTemplateColumns:"2fr 0.8fr 0.8fr 0.8fr 2fr",padding:"10px 16px",gap:8,borderTop:`1px solid ${T.border}`,background:i%2===0?T.white:T.surfaceAlt,alignItems:"center"}}>
-                            <div><div style={{fontWeight:700,fontSize:13,color:T.navy}}>{s.name}</div><div style={{fontSize:11,color:T.muted}}>{s.grade}</div></div>
-                            <div style={{textAlign:"center",fontSize:18}}>{noNick?"－":wedOk?"✅":"❌"}</div>
-                            <div style={{textAlign:"center",fontSize:18}}>{noNick?"－":sunOk?"✅":"❌"}</div>
-                            <div style={{textAlign:"center"}}>
-                              {others.length>0
-                                ?<span title={others.map(d=>new Date(d).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric",weekday:"short"})).join(", ")} style={{fontSize:16,cursor:"help"}}>⚠️</span>
-                                :<span style={{color:T.muted,fontSize:13}}>－</span>}
-                            </div>
-                            <div style={{display:"flex",alignItems:"center",gap:6}}>
-                              {isEd2?(
-                                <>
-                                  <input autoFocus value={certNickEdit[s.profile_id]}
-                                    onChange={e=>setCertNickEdit(p=>({...p,[s.profile_id]:e.target.value}))}
-                                    onKeyDown={e=>{if(e.key==="Enter")saveNickname(s.profile_id,certNickEdit[s.profile_id]);if(e.key==="Escape")setCertNickEdit(p=>({...p,[s.profile_id]:undefined}));}}
-                                    style={{...css.input,flex:1,padding:"4px 8px",fontSize:12}}/>
-                                  <button onClick={()=>saveNickname(s.profile_id,certNickEdit[s.profile_id])} style={{...css.btnOrange,padding:"4px 10px",fontSize:11}}>저장</button>
-                                  <button onClick={()=>setCertNickEdit(p=>({...p,[s.profile_id]:undefined}))} style={{...css.btnOutline,padding:"4px 8px",fontSize:11}}>취소</button>
-                                </>
-                              ):(
-                                <div onClick={()=>setCertNickEdit(p=>({...p,[s.profile_id]:s.naver_nickname||""}))}
-                                  style={{cursor:"pointer",flex:1,fontSize:12,color:noNick?T.muted:T.navy,padding:"4px 8px",borderRadius:6,border:`1px dashed ${T.border}`,minWidth:60}}>
-                                  {noNick?"클릭하여 설정":s.naver_nickname}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </Card>
-                    <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-                      {[{label:"수요일 인증",count:certData.filter(s=>s.naver_nickname&&hasDow(s.cert_dates,3)).length,color:T.navy},{label:"일요일 인증",count:certData.filter(s=>s.naver_nickname&&hasDow(s.cert_dates,0)).length,color:T.orange},{label:"기타 요일",count:certData.filter(s=>otherDates(s.cert_dates).length>0).length,color:"#F59E0B"},{label:"미인증",count:certData.filter(s=>s.naver_nickname&&!hasDow(s.cert_dates,3)&&!hasDow(s.cert_dates,0)).length,color:T.danger},{label:"닉네임 미설정",count:certData.filter(s=>!s.naver_nickname).length,color:T.muted}].map(({label,count,color})=>(
-                        <div key={label} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 16px",display:"flex",flexDirection:"column",gap:2}}>
-                          <div style={{fontSize:11,color:T.muted}}>{label}</div>
-                          <div style={{fontSize:22,fontWeight:800,color}}>{count}</div>
-                        </div>
-                      ))}
-                    </div>
-                    {invalidCerts.length>0&&(
-                      <Card style={{marginTop:16}}>
-                        <div style={{fontSize:13,fontWeight:700,color:"#B45309",marginBottom:12}}>⚠️ 양식 미준수 글 ({invalidCerts.length}건)</div>
-                        <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                          {invalidCerts.map(c=>(
-                            <div key={c.id} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 10px",borderRadius:8,background:"#FFFBEB",border:"1px solid #FDE68A",flexWrap:"wrap"}}>
-                              <span style={{fontSize:12,color:T.muted,minWidth:80}}>{new Date(c.posted_at).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric",weekday:"short"})}</span>
-                              <span style={{fontSize:12,fontWeight:700,color:T.navy,minWidth:80}}>{c.naver_nickname}</span>
-                              <a href={c.post_url} target="_blank" rel="noreferrer" style={{fontSize:12,color:T.orange,flex:1,textDecoration:"none",wordBreak:"break-all"}}>{c.post_title}</a>
-                              {c.matched_profile_name&&<Pill color={T.navy} style={{fontSize:10}}>{c.matched_profile_name}</Pill>}
+                {/* 추가 폼 */}
+                {rosterAddMode&&(
+                  <Card style={{marginBottom:12,background:"#F0FDF4",border:`1px solid #86EFAC`}}>
+                    <div style={{fontWeight:700,fontSize:13,color:T.navy,marginBottom:10}}>새 학생 추가</div>
+                    {(()=>{
+                      const emptyRow = {name:"",grade:"",naver_nickname:""};
+                      if(!rosterEditRow||rosterEditRow.id) setRosterEditRow(emptyRow);
+                      const row = rosterEditRow&&!rosterEditRow.id ? rosterEditRow : emptyRow;
+                      return (
+                        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
+                          {[{key:"name",label:"이름*",w:100},{key:"grade",label:"학년",w:80},{key:"naver_nickname",label:"네이버 닉네임",w:160}].map(({key,label,w})=>(
+                            <div key={key} style={{display:"flex",flexDirection:"column",gap:3}}>
+                              <label style={{fontSize:10,color:T.muted,fontWeight:700}}>{label}</label>
+                              <input value={row[key]||""} onChange={e=>setRosterEditRow(p=>({...p,[key]:e.target.value}))}
+                                style={{...css.input,width:w,padding:"5px 8px",fontSize:12}}/>
                             </div>
                           ))}
+                          <button onClick={()=>rosterEditRow?.name&&upsertCertStudent(rosterEditRow)}
+                            style={{...css.btnOrange,padding:"6px 16px",fontSize:12}}>저장</button>
+                          <button onClick={()=>{setRosterAddMode(false);setRosterEditRow(null);}}
+                            style={{...css.btnOutline,padding:"6px 12px",fontSize:12}}>취소</button>
                         </div>
-                      </Card>
-                    )}
-                  </>
+                      );
+                    })()}
+                  </Card>
                 )}
+                <Card style={{padding:0,overflow:"hidden"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 0.7fr 1.2fr 0.9fr",background:T.navy,padding:"10px 14px",gap:8}}>
+                    {["이름","학년","네이버 닉네임","작업"].map(h=>(
+                      <div key={h} style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)"}}>{h}</div>
+                    ))}
+                  </div>
+                  {certStudents.length===0&&<div style={{padding:24,textAlign:"center",color:T.muted,fontSize:13}}>학생 없음 — 위에서 추가해주세요</div>}
+                  {certStudents.map((s,i)=>{
+                    const isEd = rosterEditRow?.id===s.id;
+                    return (
+                      <div key={s.id} style={{borderTop:`1px solid ${T.border}`,background:i%2===0?T.white:"#F9FAFB"}}>
+                        {isEd?(
+                          <div style={{padding:"10px 14px",display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end",background:"#EFF6FF"}}>
+                            {[{key:"name",label:"이름*",w:100},{key:"grade",label:"학년",w:80},{key:"naver_nickname",label:"네이버 닉네임",w:160}].map(({key,label,w})=>(
+                              <div key={key} style={{display:"flex",flexDirection:"column",gap:3}}>
+                                <label style={{fontSize:10,color:T.muted,fontWeight:700}}>{label}</label>
+                                <input value={rosterEditRow[key]||""} onChange={e=>setRosterEditRow(p=>({...p,[key]:e.target.value}))}
+                                  style={{...css.input,width:w,padding:"4px 8px",fontSize:12}}/>
+                              </div>
+                            ))}
+                            <button onClick={()=>rosterEditRow.name&&upsertCertStudent(rosterEditRow)}
+                              style={{...css.btnOrange,padding:"5px 14px",fontSize:12}}>저장</button>
+                            <button onClick={()=>setRosterEditRow(null)}
+                              style={{...css.btnOutline,padding:"5px 10px",fontSize:12}}>취소</button>
+                          </div>
+                        ):(
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 0.7fr 1.2fr 0.9fr",padding:"10px 14px",gap:8,alignItems:"center"}}>
+                            <div style={{fontSize:13,fontWeight:700,color:T.navy}}>{s.name}</div>
+                            <div style={{fontSize:12,color:T.muted}}>{s.grade||"-"}</div>
+                            <div style={{fontSize:12,color:s.naver_nickname?T.navy:T.muted}}>
+                              {s.naver_nickname||"(미설정)"}
+                            </div>
+                            <div style={{display:"flex",gap:6}}>
+                              <button onClick={()=>setRosterEditRow({id:s.id,name:s.name,grade:s.grade||"",naver_nickname:s.naver_nickname||""})}
+                                style={{...css.btnOutline,padding:"3px 10px",fontSize:11}}>수정</button>
+                              <button onClick={()=>deleteCertStudent(s.id)}
+                                style={{...css.btnOutline,padding:"3px 10px",fontSize:11,color:T.danger,borderColor:T.danger}}>삭제</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </Card>
               </div>
             )}
           </div>
