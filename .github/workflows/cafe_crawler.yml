@@ -18,6 +18,16 @@ jobs:
       - name: 패키지 설치
         run: pip install -r requirements.txt
 
+      - name: 시크릿 설정 확인
+        run: |
+          echo "NAVER_NID_AUT 길이: ${#NAVER_NID_AUT}"
+          echo "NAVER_NID_SES 길이: ${#NAVER_NID_SES}"
+          echo "SUPABASE_URL 설정: $([ -n "$SUPABASE_URL" ] && echo '있음' || echo '없음')"
+        env:
+          NAVER_NID_AUT: ${{ secrets.NAVER_NID_AUT }}
+          NAVER_NID_SES: ${{ secrets.NAVER_NID_SES }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+
       - name: 크롤링 실행
         run: python tools/naver_cafe_crawler.py
         env:
