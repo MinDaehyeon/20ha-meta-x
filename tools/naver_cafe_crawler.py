@@ -111,10 +111,19 @@ def crawl_board(session, existing_urls):
         r = session.get(url, timeout=15)
         time.sleep(0.8)
 
+        print(f"[crawl] 페이지 {page}: HTTP {r.status_code}, 응답 {len(r.text)}바이트")
+        if page == 1:
+            # 첫 페이지 HTML 앞부분 출력 (셀렉터 디버그용)
+            print(f"[crawl] HTML 앞부분:\n{r.text[:1500]}")
+
         soup = BeautifulSoup(r.text, "html.parser")
         rows = soup.select("tr.board-list")
+        print(f"[crawl] tr.board-list 개수: {len(rows)}")
 
         if not rows:
+            # 대안 셀렉터 시도
+            alt = soup.select("li.board-list, .article-board tbody tr, .BoardList li")
+            print(f"[crawl] 대안 셀렉터 결과: {len(alt)}개")
             print(f"[crawl] 페이지 {page}: 행 없음 — 종료")
             break
 
