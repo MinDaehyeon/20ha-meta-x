@@ -2009,6 +2009,12 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const [certWeekOffset, setCertWeekOffset] = useState(0); // 0=이번주, -1=지난주 ...
   const [certNickEdit, setCertNickEdit] = useState({}); // {profile_id: editing_value}
   const [invalidCerts, setInvalidCerts] = useState([]);
+  const [certSubTab, setCertSubTab] = useState("weekly"); // "weekly" | "records"
+  const [certRecords, setCertRecords] = useState([]);
+  const [certRecordsLoading, setCertRecordsLoading] = useState(false);
+  const [certStatusFilter, setCertStatusFilter] = useState("all");
+  const [certEditRecord, setCertEditRecord] = useState(null); // 편집 중인 행 {id,...}
+  const [crawlRunning, setCrawlRunning] = useState(false);
   const isMobile = useMobile();
 
   // 학부모-자녀 연결 로드
@@ -2046,16 +2052,60 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
 
   useEffect(()=>{
     if(adminTab==="cert"){
-      loadCertData(certWeekOffset);
-      supabase.rpc("get_invalid_certs",{p_limit:100}).then(({data})=>setInvalidCerts(data||[]));
+      if(certSubTab==="weekly"){
+        loadCertData(certWeekOffset);
+        supabase.rpc("get_invalid_certs",{p_limit:100}).then(({data})=>setInvalidCerts(data||[]));
+      } else {
+        loadCertRecords(certStatusFilter);
+      }
     }
-  },[adminTab, certWeekOffset]);
+  },[adminTab, certWeekOffset, certSubTab, certStatusFilter]);
 
   const saveNickname = async (profileId, nickname) => {
     await supabase.rpc("update_naver_nickname", {p_profile_id: profileId, p_nickname: nickname.trim()||null});
     setCertNickEdit(p=>({...p,[profileId]:undefined}));
     loadCertData(certWeekOffset);
     onRefresh();
+  };
+
+  const loadCertRecords = async (status="all") => {
+    setCertRecordsLoading(true);
+    const {data} = await supabase.rpc("get_cert_records", {
+      p_status: status==="all" ? null : status,
+      p_limit: 300,
+    });
+    setCertRecords(data||[]);
+    setCertRecordsLoading(false);
+  };
+
+  const updateCertRecord = async (id, updates) => {
+    await supabase.rpc("update_cert_record", {
+      p_id: id,
+      p_parsed_name: updates.parsed_name||null,
+      p_parsed_grade: updates.parsed_grade||null,
+      p_parsed_code: updates.parsed_code||null,
+      p_title_match_status: updates.title_match_status||null,
+      p_is_valid_format: updates.is_valid_format??null,
+    });
+    setCertEditRecord(null);
+    loadCertRecords(certStatusFilter);
+  };
+
+  const triggerCrawl = async () => {
+    const token = process.env.REACT_APP_GITHUB_TOKEN;
+    if(!token){ alert("REACT_APP_GITHUB_TOKEN 환경변수가 설정되지 않았습니다."); return; }
+    setCrawlRunning(true);
+    try {
+      const r = await fetch(
+        "https://api.github.com/repos/MinDaehyeon/20ha-meta-x/actions/workflows/cafe_crawler.yml/dispatches",
+        { method:"POST",
+          headers:{"Authorization":`Bearer ${token}`,"Accept":"application/vnd.github+json","Content-Type":"application/json"},
+          body: JSON.stringify({ref:"main"}) }
+      );
+      if(r.status===204) alert("크롤링 시작됐습니다!\n약 1분 후 새로고침 하면 데이터가 업데이트됩니다.");
+      else alert("실행 실패: " + r.status);
+    } catch(e){ alert("오류: "+e.message); }
+    setCrawlRunning(false);
   };
 
   const testUids = new Set(allProfiles.filter(p=>p.is_test).map(p=>p.id));
@@ -2282,136 +2332,207 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
       {/* ── 진단 센터 탭 ── */}
       {/* ── 인증 현황 탭 ── */}
       {adminTab==="cert"&&(()=>{
-        // 주차 범위 계산
+        const STATUS_LABELS = {all:"전체",matched:"✅ 매칭됨",no_profile:"❓ 프로필없음",parse_failed:"⚠️ 파싱실패",name_mismatch:"🔴 이름불일치",grade_mismatch:"🟡 학년불일치",unchecked:"⬜ 미확인"};
+        const STATUS_COLORS = {matched:"#D1FAE5",no_profile:"#E0E7FF",parse_failed:"#FEF3C7",name_mismatch:"#FEE2E2",grade_mismatch:"#FFF7CD",unchecked:"#F3F4F6"};
         const now = new Date();
         const dow = now.getDay();
-        const monOffset = dow === 0 ? -6 : 1 - dow;
-        const mon = new Date(now); mon.setDate(now.getDate() + monOffset + certWeekOffset * 7); mon.setHours(0,0,0,0);
-        const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-        const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
-        const weekLabel = certWeekOffset === 0 ? "이번 주" : certWeekOffset === -1 ? "지난 주" : `${Math.abs(certWeekOffset)}주 전`;
-
-        // 수(3)/일(0)에 인증했는지 확인
-        const hasDow = (dates, targetDow) =>
-          (dates||[]).some(d => new Date(d).getDay() === targetDow);
-        const otherDates = (dates) =>
-          (dates||[]).filter(d => ![0,3].includes(new Date(d).getDay()));
-
-        // 양식 미준수 글 (제목에 "주차"가 없는 것) - certData의 cert_dates로는 알 수 없어서 별도 섹션은 DB 직접 조회로
+        const mon = new Date(now); mon.setDate(now.getDate()+(dow===0?-6:1-dow)+certWeekOffset*7); mon.setHours(0,0,0,0);
+        const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+        const fmt = d=>`${d.getMonth()+1}/${d.getDate()}`;
+        const weekLabel = certWeekOffset===0?"이번 주":certWeekOffset===-1?"지난 주":`${Math.abs(certWeekOffset)}주 전`;
+        const hasDow = (dates,dow2)=>(dates||[]).some(d=>new Date(d).getDay()===dow2);
+        const otherDates = dates=>(dates||[]).filter(d=>![0,3].includes(new Date(d).getDay()));
+        const filtered = certStatusFilter==="all"?certRecords:certRecords.filter(r=>r.title_match_status===certStatusFilter);
+        const statusCounts = Object.fromEntries(Object.keys(STATUS_LABELS).map(k=>[k,k==="all"?certRecords.length:certRecords.filter(r=>r.title_match_status===k).length]));
         return (
           <div>
-            {/* 주차 선택 */}
+            {/* 서브탭 + 크롤링 버튼 */}
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-              <button onClick={()=>setCertWeekOffset(p=>p-1)} style={{...css.btnOutline,padding:"6px 12px",fontSize:12}}>◀ 이전 주</button>
-              <span style={{fontWeight:700,color:T.navy,fontSize:14}}>{weekLabel} ({fmt(mon)} ~ {fmt(sun)})</span>
-              <button onClick={()=>setCertWeekOffset(p=>Math.min(0,p+1))} disabled={certWeekOffset===0}
-                style={{...css.btnOutline,padding:"6px 12px",fontSize:12,opacity:certWeekOffset===0?0.4:1}}>다음 주 ▶</button>
-              <button onClick={()=>loadCertData(certWeekOffset)}
-                style={{...css.btnOrange,padding:"6px 14px",fontSize:12,marginLeft:4}}>새로고침</button>
+              {[{k:"weekly",l:"📊 주차 현황"},{k:"records",l:"📝 인증글 관리"}].map(({k,l})=>(
+                <button key={k} onClick={()=>setCertSubTab(k)}
+                  style={{...certSubTab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>{l}</button>
+              ))}
+              <div style={{marginLeft:"auto"}}>
+                <button onClick={triggerCrawl} disabled={crawlRunning}
+                  style={{...css.btnOrange,padding:"7px 16px",fontSize:13,background:"#059669",opacity:crawlRunning?0.6:1}}>
+                  {crawlRunning?"⏳ 실행 중...":"🔄 지금 크롤링"}
+                </button>
+              </div>
             </div>
 
-            {certLoading ? (
-              <div style={{textAlign:"center",padding:40,color:T.muted}}>불러오는 중...</div>
-            ) : (
-              <>
-                {/* 인증 현황 테이블 */}
-                <Card style={{padding:0,overflow:"hidden",marginBottom:16}}>
-                  {/* 헤더 */}
-                  <div style={{display:"grid",gridTemplateColumns:"2fr 0.8fr 0.8fr 0.8fr 2fr",background:T.navy,padding:"10px 16px",gap:8}}>
-                    {["이름/학년","수요일","일요일","기타 요일","네이버 닉네임"].map(h=>(
-                      <div key={h} style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:"center"}}>{h}</div>
-                    ))}
-                  </div>
-                  {certData.length===0 && (
-                    <div style={{padding:24,textAlign:"center",color:T.muted,fontSize:13}}>학생 데이터 없음</div>
-                  )}
-                  {certData.map((s,i)=>{
-                    const wedOk = hasDow(s.cert_dates, 3);
-                    const sunOk = hasDow(s.cert_dates, 0);
-                    const others = otherDates(s.cert_dates);
-                    const noNick = !s.naver_nickname;
-                    const isEditing = certNickEdit[s.profile_id] !== undefined;
-                    return (
-                      <div key={s.profile_id} style={{display:"grid",gridTemplateColumns:"2fr 0.8fr 0.8fr 0.8fr 2fr",padding:"10px 16px",gap:8,
-                        borderTop:`1px solid ${T.border}`,background:i%2===0?T.white:T.surfaceAlt,alignItems:"center"}}>
-                        {/* 이름 */}
-                        <div>
-                          <div style={{fontWeight:700,fontSize:13,color:T.navy}}>{s.name}</div>
-                          <div style={{fontSize:11,color:T.muted}}>{s.grade}</div>
-                        </div>
-                        {/* 수요일 */}
-                        <div style={{textAlign:"center",fontSize:18}}>{noNick?"－":wedOk?"✅":"❌"}</div>
-                        {/* 일요일 */}
-                        <div style={{textAlign:"center",fontSize:18}}>{noNick?"－":sunOk?"✅":"❌"}</div>
-                        {/* 기타 요일 */}
-                        <div style={{textAlign:"center"}}>
-                          {others.length>0
-                            ? <span title={others.map(d=>new Date(d).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric",weekday:"short"})).join(", ")}
-                                style={{fontSize:16,cursor:"help"}}>⚠️</span>
-                            : <span style={{color:T.muted,fontSize:13}}>－</span>}
-                        </div>
-                        {/* 닉네임 편집 */}
-                        <div style={{display:"flex",alignItems:"center",gap:6}}>
-                          {isEditing ? (
-                            <>
-                              <input autoFocus value={certNickEdit[s.profile_id]}
-                                onChange={e=>setCertNickEdit(p=>({...p,[s.profile_id]:e.target.value}))}
-                                onKeyDown={e=>{if(e.key==="Enter")saveNickname(s.profile_id,certNickEdit[s.profile_id]);if(e.key==="Escape")setCertNickEdit(p=>({...p,[s.profile_id]:undefined}));}}
-                                style={{...css.input,flex:1,padding:"4px 8px",fontSize:12}}/>
-                              <button onClick={()=>saveNickname(s.profile_id,certNickEdit[s.profile_id])}
-                                style={{...css.btnOrange,padding:"4px 10px",fontSize:11}}>저장</button>
-                              <button onClick={()=>setCertNickEdit(p=>({...p,[s.profile_id]:undefined}))}
-                                style={{...css.btnOutline,padding:"4px 8px",fontSize:11}}>취소</button>
-                            </>
-                          ) : (
-                            <div onClick={()=>setCertNickEdit(p=>({...p,[s.profile_id]:s.naver_nickname||""}))}
-                              style={{cursor:"pointer",flex:1,fontSize:12,color:noNick?T.muted:T.navy,
-                                padding:"4px 8px",borderRadius:6,border:`1px dashed ${T.border}`,minWidth:60}}>
-                              {noNick ? "클릭하여 설정" : s.naver_nickname}
+            {/* ── 인증글 관리 서브탭 ── */}
+            {certSubTab==="records"&&(
+              <div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+                  {Object.entries(STATUS_LABELS).map(([k,l])=>(
+                    <button key={k} onClick={()=>setCertStatusFilter(k)}
+                      style={{padding:"5px 12px",fontSize:11,fontWeight:700,borderRadius:20,cursor:"pointer",
+                        border:`2px solid ${certStatusFilter===k?T.orange:T.border}`,
+                        background:certStatusFilter===k?T.orange:"#fff",color:certStatusFilter===k?"#fff":T.navy}}>
+                      {l} {statusCounts[k]||0}
+                    </button>
+                  ))}
+                </div>
+                {certRecordsLoading?(
+                  <div style={{textAlign:"center",padding:40,color:T.muted}}>불러오는 중...</div>
+                ):(
+                  <Card style={{padding:0,overflow:"hidden"}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 0.8fr 1.2fr 0.7fr 0.7fr 0.7fr 1fr 0.6fr",background:T.navy,padding:"10px 12px",gap:6}}>
+                      {["제목","닉네임","매칭 프로필","파싱 이름","파싱 학년","파싱 코드","상태","작성일"].map(h=>(
+                        <div key={h} style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:"center"}}>{h}</div>
+                      ))}
+                    </div>
+                    {filtered.length===0&&<div style={{padding:24,textAlign:"center",color:T.muted,fontSize:13}}>해당 데이터 없음</div>}
+                    {filtered.map((rec,i)=>{
+                      const isEd = certEditRecord?.id===rec.id;
+                      const bg = STATUS_COLORS[rec.title_match_status]||"#fff";
+                      return (
+                        <div key={rec.id}>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 0.8fr 1.2fr 0.7fr 0.7fr 0.7fr 1fr 0.6fr",
+                            padding:"9px 12px",gap:6,borderTop:`1px solid ${T.border}`,background:i%2===0?"#fff":"#F9FAFB",alignItems:"center"}}>
+                            <div style={{fontSize:11,color:T.navy,wordBreak:"break-all"}}>
+                              <a href={rec.post_url} target="_blank" rel="noreferrer" style={{color:T.navy,textDecoration:"none"}}>{rec.post_title}</a>
+                            </div>
+                            <div style={{fontSize:11,color:T.muted,textAlign:"center"}}>{rec.naver_nickname}</div>
+                            <div style={{fontSize:11,textAlign:"center"}}>
+                              {rec.matched_profile_name?<span style={{color:T.navy,fontWeight:700}}>{rec.matched_profile_name} <span style={{color:T.muted,fontWeight:400}}>{rec.matched_profile_grade}</span></span>:<span style={{color:T.muted}}>-</span>}
+                            </div>
+                            <div style={{fontSize:11,textAlign:"center",color:rec.title_match_status==="name_mismatch"?"#DC2626":T.navy}}>{rec.parsed_name||"-"}</div>
+                            <div style={{fontSize:11,textAlign:"center",color:rec.title_match_status==="grade_mismatch"?"#DC2626":T.navy}}>{rec.parsed_grade||"-"}</div>
+                            <div style={{fontSize:11,textAlign:"center",color:T.muted}}>{rec.parsed_code||"-"}</div>
+                            <div style={{textAlign:"center"}}>
+                              <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:10,background:bg,color:T.navy}}>
+                                {STATUS_LABELS[rec.title_match_status]||rec.title_match_status}
+                              </span>
+                            </div>
+                            <div style={{textAlign:"center",fontSize:11,color:T.muted}}>
+                              {new Date(rec.posted_at).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"})}
+                              <div style={{marginTop:3}}>
+                                <button onClick={()=>setCertEditRecord(isEd?null:{id:rec.id,parsed_name:rec.parsed_name||"",parsed_grade:rec.parsed_grade||"",parsed_code:rec.parsed_code||"",title_match_status:rec.title_match_status||"",is_valid_format:rec.is_valid_format})}
+                                  style={{...isEd?css.btnOrange:css.btnOutline,padding:"2px 8px",fontSize:10}}>
+                                  {isEd?"닫기":"수정"}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          {isEd&&(
+                            <div style={{padding:"12px 16px",background:"#F0F9FF",borderTop:`1px dashed ${T.border}`,display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
+                              {[{key:"parsed_name",label:"이름"},{key:"parsed_grade",label:"학년"},{key:"parsed_code",label:"코드"}].map(({key,label})=>(
+                                <div key={key} style={{display:"flex",flexDirection:"column",gap:3}}>
+                                  <label style={{fontSize:10,color:T.muted,fontWeight:700}}>{label}</label>
+                                  <input value={certEditRecord[key]} onChange={e=>setCertEditRecord(p=>({...p,[key]:e.target.value}))}
+                                    style={{...css.input,width:90,padding:"4px 8px",fontSize:12}}/>
+                                </div>
+                              ))}
+                              <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                                <label style={{fontSize:10,color:T.muted,fontWeight:700}}>상태</label>
+                                <select value={certEditRecord.title_match_status} onChange={e=>setCertEditRecord(p=>({...p,title_match_status:e.target.value}))}
+                                  style={{...css.input,width:130,padding:"4px 8px",fontSize:12}}>
+                                  {Object.entries(STATUS_LABELS).filter(([k])=>k!=="all").map(([k,l])=>(
+                                    <option key={k} value={k}>{l}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                                <label style={{fontSize:10,color:T.muted,fontWeight:700}}>양식준수</label>
+                                <select value={String(certEditRecord.is_valid_format)} onChange={e=>setCertEditRecord(p=>({...p,is_valid_format:e.target.value==="true"}))}
+                                  style={{...css.input,width:80,padding:"4px 8px",fontSize:12}}>
+                                  <option value="true">✅ 준수</option>
+                                  <option value="false">❌ 미준수</option>
+                                </select>
+                              </div>
+                              <button onClick={()=>updateCertRecord(certEditRecord.id,certEditRecord)} style={{...css.btnOrange,padding:"6px 16px",fontSize:12}}>저장</button>
+                              <button onClick={()=>setCertEditRecord(null)} style={{...css.btnOutline,padding:"6px 12px",fontSize:12}}>취소</button>
                             </div>
                           )}
                         </div>
-                      </div>
-                    );
-                  })}
-                </Card>
+                      );
+                    })}
+                  </Card>
+                )}
+              </div>
+            )}
 
-                {/* 요약 */}
-                <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-                  {[
-                    {label:"수요일 인증",count:certData.filter(s=>s.naver_nickname&&hasDow(s.cert_dates,3)).length,color:T.navy},
-                    {label:"일요일 인증",count:certData.filter(s=>s.naver_nickname&&hasDow(s.cert_dates,0)).length,color:T.orange},
-                    {label:"기타 요일",count:certData.filter(s=>otherDates(s.cert_dates).length>0).length,color:"#F59E0B"},
-                    {label:"미인증",count:certData.filter(s=>s.naver_nickname&&!hasDow(s.cert_dates,3)&&!hasDow(s.cert_dates,0)).length,color:T.danger},
-                    {label:"닉네임 미설정",count:certData.filter(s=>!s.naver_nickname).length,color:T.muted},
-                  ].map(({label,count,color})=>(
-                    <div key={label} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 16px",display:"flex",flexDirection:"column",gap:2}}>
-                      <div style={{fontSize:11,color:T.muted}}>{label}</div>
-                      <div style={{fontSize:22,fontWeight:800,color}}>{count}</div>
-                    </div>
-                  ))}
+            {/* ── 주차 현황 서브탭 ── */}
+            {certSubTab==="weekly"&&(
+              <div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+                  <button onClick={()=>setCertWeekOffset(p=>p-1)} style={{...css.btnOutline,padding:"6px 12px",fontSize:12}}>◀ 이전 주</button>
+                  <span style={{fontWeight:700,color:T.navy,fontSize:14}}>{weekLabel} ({fmt(mon)} ~ {fmt(sun)})</span>
+                  <button onClick={()=>setCertWeekOffset(p=>Math.min(0,p+1))} disabled={certWeekOffset===0}
+                    style={{...css.btnOutline,padding:"6px 12px",fontSize:12,opacity:certWeekOffset===0?0.4:1}}>다음 주 ▶</button>
+                  <button onClick={()=>loadCertData(certWeekOffset)} style={{...css.btnOrange,padding:"6px 14px",fontSize:12,marginLeft:4}}>새로고침</button>
                 </div>
-
-                {/* 양식 미준수 글 */}
-                {invalidCerts.length>0&&(
-                  <Card style={{marginTop:16}}>
-                    <div style={{fontSize:13,fontWeight:700,color:"#B45309",marginBottom:12}}>
-                      ⚠️ 양식 미준수 글 ({invalidCerts.length}건) — 제목에 "N주차 수/일" 패턴 없음
-                    </div>
-                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                      {invalidCerts.map(c=>(
-                        <div key={c.id} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 10px",borderRadius:8,background:"#FFFBEB",border:"1px solid #FDE68A",flexWrap:"wrap"}}>
-                          <span style={{fontSize:12,color:T.muted,minWidth:80}}>{new Date(c.posted_at).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric",weekday:"short"})}</span>
-                          <span style={{fontSize:12,fontWeight:700,color:T.navy,minWidth:80}}>{c.naver_nickname}</span>
-                          <a href={c.post_url} target="_blank" rel="noreferrer"
-                            style={{fontSize:12,color:T.orange,flex:1,textDecoration:"none",wordBreak:"break-all"}}>{c.post_title}</a>
-                          {c.matched_profile_name&&<Pill color={T.navy} style={{fontSize:10}}>{c.matched_profile_name}</Pill>}
+                {certLoading?(
+                  <div style={{textAlign:"center",padding:40,color:T.muted}}>불러오는 중...</div>
+                ):(
+                  <>
+                    <Card style={{padding:0,overflow:"hidden",marginBottom:16}}>
+                      <div style={{display:"grid",gridTemplateColumns:"2fr 0.8fr 0.8fr 0.8fr 2fr",background:T.navy,padding:"10px 16px",gap:8}}>
+                        {["이름/학년","수요일","일요일","기타 요일","네이버 닉네임"].map(h=>(
+                          <div key={h} style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:"center"}}>{h}</div>
+                        ))}
+                      </div>
+                      {certData.length===0&&<div style={{padding:24,textAlign:"center",color:T.muted,fontSize:13}}>학생 데이터 없음</div>}
+                      {certData.map((s,i)=>{
+                        const wedOk=hasDow(s.cert_dates,3),sunOk=hasDow(s.cert_dates,0),others=otherDates(s.cert_dates),noNick=!s.naver_nickname,isEd2=certNickEdit[s.profile_id]!==undefined;
+                        return (
+                          <div key={s.profile_id} style={{display:"grid",gridTemplateColumns:"2fr 0.8fr 0.8fr 0.8fr 2fr",padding:"10px 16px",gap:8,borderTop:`1px solid ${T.border}`,background:i%2===0?T.white:T.surfaceAlt,alignItems:"center"}}>
+                            <div><div style={{fontWeight:700,fontSize:13,color:T.navy}}>{s.name}</div><div style={{fontSize:11,color:T.muted}}>{s.grade}</div></div>
+                            <div style={{textAlign:"center",fontSize:18}}>{noNick?"－":wedOk?"✅":"❌"}</div>
+                            <div style={{textAlign:"center",fontSize:18}}>{noNick?"－":sunOk?"✅":"❌"}</div>
+                            <div style={{textAlign:"center"}}>
+                              {others.length>0
+                                ?<span title={others.map(d=>new Date(d).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric",weekday:"short"})).join(", ")} style={{fontSize:16,cursor:"help"}}>⚠️</span>
+                                :<span style={{color:T.muted,fontSize:13}}>－</span>}
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:6}}>
+                              {isEd2?(
+                                <>
+                                  <input autoFocus value={certNickEdit[s.profile_id]}
+                                    onChange={e=>setCertNickEdit(p=>({...p,[s.profile_id]:e.target.value}))}
+                                    onKeyDown={e=>{if(e.key==="Enter")saveNickname(s.profile_id,certNickEdit[s.profile_id]);if(e.key==="Escape")setCertNickEdit(p=>({...p,[s.profile_id]:undefined}));}}
+                                    style={{...css.input,flex:1,padding:"4px 8px",fontSize:12}}/>
+                                  <button onClick={()=>saveNickname(s.profile_id,certNickEdit[s.profile_id])} style={{...css.btnOrange,padding:"4px 10px",fontSize:11}}>저장</button>
+                                  <button onClick={()=>setCertNickEdit(p=>({...p,[s.profile_id]:undefined}))} style={{...css.btnOutline,padding:"4px 8px",fontSize:11}}>취소</button>
+                                </>
+                              ):(
+                                <div onClick={()=>setCertNickEdit(p=>({...p,[s.profile_id]:s.naver_nickname||""}))}
+                                  style={{cursor:"pointer",flex:1,fontSize:12,color:noNick?T.muted:T.navy,padding:"4px 8px",borderRadius:6,border:`1px dashed ${T.border}`,minWidth:60}}>
+                                  {noNick?"클릭하여 설정":s.naver_nickname}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </Card>
+                    <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+                      {[{label:"수요일 인증",count:certData.filter(s=>s.naver_nickname&&hasDow(s.cert_dates,3)).length,color:T.navy},{label:"일요일 인증",count:certData.filter(s=>s.naver_nickname&&hasDow(s.cert_dates,0)).length,color:T.orange},{label:"기타 요일",count:certData.filter(s=>otherDates(s.cert_dates).length>0).length,color:"#F59E0B"},{label:"미인증",count:certData.filter(s=>s.naver_nickname&&!hasDow(s.cert_dates,3)&&!hasDow(s.cert_dates,0)).length,color:T.danger},{label:"닉네임 미설정",count:certData.filter(s=>!s.naver_nickname).length,color:T.muted}].map(({label,count,color})=>(
+                        <div key={label} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 16px",display:"flex",flexDirection:"column",gap:2}}>
+                          <div style={{fontSize:11,color:T.muted}}>{label}</div>
+                          <div style={{fontSize:22,fontWeight:800,color}}>{count}</div>
                         </div>
                       ))}
                     </div>
-                  </Card>
+                    {invalidCerts.length>0&&(
+                      <Card style={{marginTop:16}}>
+                        <div style={{fontSize:13,fontWeight:700,color:"#B45309",marginBottom:12}}>⚠️ 양식 미준수 글 ({invalidCerts.length}건)</div>
+                        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                          {invalidCerts.map(c=>(
+                            <div key={c.id} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 10px",borderRadius:8,background:"#FFFBEB",border:"1px solid #FDE68A",flexWrap:"wrap"}}>
+                              <span style={{fontSize:12,color:T.muted,minWidth:80}}>{new Date(c.posted_at).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric",weekday:"short"})}</span>
+                              <span style={{fontSize:12,fontWeight:700,color:T.navy,minWidth:80}}>{c.naver_nickname}</span>
+                              <a href={c.post_url} target="_blank" rel="noreferrer" style={{fontSize:12,color:T.orange,flex:1,textDecoration:"none",wordBreak:"break-all"}}>{c.post_title}</a>
+                              {c.matched_profile_name&&<Pill color={T.navy} style={{fontSize:10}}>{c.matched_profile_name}</Pill>}
+                            </div>
+                          ))}
+                        </div>
+                      </Card>
+                    )}
+                  </>
                 )}
-              </>
+              </div>
             )}
           </div>
         );
