@@ -1,9 +1,9 @@
 """
 네이버 카페 인증글 크롤러
 카페: https://cafe.naver.com/f-e/cafes/31045190/menus/161
-- 제목만 수집 (본문 불필요)
-- 이미 크롤링된 URL은 DB 확인 후 스킵
-- 양식 미준수 글도 수집 (is_valid=false 플래그)
+- NID_AUT / NID_SES 쿠키로 인증 (로그인 불필요)
+- 이미 크롤링된 URL 스킵
+- 양식 미준수 글도 수집 (is_valid_format=false)
 """
 
 import os
@@ -16,8 +16,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-NAVER_ID       = os.environ["NAVER_ID"]
-NAVER_PW       = os.environ["NAVER_PW"]
+NAVER_NID_AUT  = os.environ["NAVER_NID_AUT"]
+NAVER_NID_SES  = os.environ["NAVER_NID_SES"]
 CAFE_CLUB_ID   = os.environ.get("NAVER_CAFE_ID", "31045190")
 BOARD_MENU_ID  = os.environ.get("NAVER_BOARD_ID", "161")
 SUPABASE_URL   = os.environ["SUPABASE_URL"]
@@ -26,15 +26,11 @@ CRAWL_DAYS     = int(os.environ.get("CRAWL_DAYS", "30"))
 
 KST = timezone(timedelta(hours=9))
 
-# 인증글 양식 패턴: [N주차/수] 이름/학년/번호 or [N주차/일] ...
-# 띄어쓰기 무시, 수=수요일, 일=일요일
-VALID_TITLE_PATTERN = re.compile(
-    r"\[?\s*\d+\s*주차\s*/\s*(수|일)\s*\]",
-    re.IGNORECASE
-)
+# 올바른 양식: [N주차/수] or [N주차/일] (띄어쓰기 무시)
+VALID_TITLE_PATTERN = re.compile(r"\[?\s*\d+\s*주차\s*/\s*(수|일)\s*\]", re.IGNORECASE)
 
 
-# ── 로그인 ─────────────────────────────────────────────────────────────────
+# ── 세션 ───────────────────────────────────────────────────────────────────
 
 def make_session():
     s = requests.Session()
@@ -45,39 +41,17 @@ def make_session():
             "Chrome/124.0.0.0 Safari/537.36"
         )
     })
+    s.cookies.set("NID_AUT", NAVER_NID_AUT, domain=".naver.com")
+    s.cookies.set("NID_SES", NAVER_NID_SES, domain=".naver.com")
     return s
 
 
-def login_naver(session):
-    """네이버 로그인. 세션에 인증 쿠키 설정."""
-    # 로그인 페이지 접근 → 필요 쿠키 획득
-    session.get("https://nid.naver.com/nidlogin.login", timeout=10)
-
-    payload = {
-        "id": NAVER_ID,
-        "pw": NAVER_PW,
-        "svctype": "0",
-        "enctp": "1",
-        "smart_LEVEL": "-1",
-        "localechange": "",
-        "locale": "ko_KR",
-    }
-    r = session.post(
-        "https://nid.naver.com/nidlogin.login",
-        data=payload,
-        headers={
-            "Referer": "https://nid.naver.com/nidlogin.login",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        allow_redirects=True,
-        timeout=15,
-    )
-    # 로그인 확인: 카페 접근 시 로그아웃 버튼 있으면 성공
-    check = session.get("https://cafe.naver.com", timeout=10)
-    if "로그아웃" in check.text or "NID_AUT" in session.cookies:
-        print("[login] 성공")
+def check_login(session):
+    r = session.get("https://cafe.naver.com", timeout=10)
+    if "로그아웃" in r.text or "NID_AUT" in session.cookies:
+        print("[session] 쿠키 인증 성공")
         return True
-    print(f"[login] 실패 — 응답 코드: {r.status_code}")
+    print("[session] 쿠키 만료됨 — NID_AUT/NID_SES 갱신 필요")
     return False
 
 
@@ -85,11 +59,9 @@ def login_naver(session):
 
 def parse_naver_date(date_str):
     """
-    네이버 카페 날짜 문자열 → datetime(KST)
-    형식:
-      "2026.03.30." → 해당 날짜 00:00
-      "03.30."      → 올해 해당 날짜
-      "10:35"       → 오늘 (시간 표시 = 오늘 작성)
+    "2026.03.30." → 해당 날짜
+    "03.30."      → 올해 해당 날짜
+    "10:35"       → 오늘 (시간 표시 = 오늘 작성)
     """
     now = datetime.now(KST)
     s = date_str.strip().rstrip(".")
@@ -108,17 +80,12 @@ def parse_naver_date(date_str):
     return None
 
 
-# ── 기존 URL 조회 (중복 방지) ──────────────────────────────────────────────
+# ── 기존 URL 조회 ──────────────────────────────────────────────────────────
 
 def fetch_existing_urls():
-    """Supabase에서 이미 저장된 post_url 집합 반환."""
-    headers = {
-        "apikey": SERVICE_KEY,
-        "Authorization": f"Bearer {SERVICE_KEY}",
-    }
     r = requests.get(
         f"{SUPABASE_URL}/rest/v1/cafe_certifications?select=post_url",
-        headers=headers,
+        headers={"apikey": SERVICE_KEY, "Authorization": f"Bearer {SERVICE_KEY}"},
         timeout=15,
     )
     if r.status_code == 200:
@@ -130,13 +97,11 @@ def fetch_existing_urls():
 # ── 크롤링 ─────────────────────────────────────────────────────────────────
 
 def crawl_board(session, existing_urls):
-    """게시판 목록 페이지 순회 → 신규 글만 수집."""
     cutoff = datetime.now(KST) - timedelta(days=CRAWL_DAYS)
     posts = []
     page = 1
 
     while True:
-        # 네이버 카페 게시글 목록 API (구버전 — iframe 내부 URL)
         url = (
             f"https://cafe.naver.com/ArticleList.nhn"
             f"?search.clubid={CAFE_CLUB_ID}"
@@ -156,26 +121,27 @@ def crawl_board(session, existing_urls):
 
         found_old = False
         for row in rows:
-            # 제목 + URL
             title_el = row.select_one("a.article")
             if not title_el:
                 continue
-            title = title_el.get_text(strip=True)
-            article_id = title_el.get("href", "").strip("/")
-            post_url = f"https://cafe.naver.com/{CAFE_CLUB_ID}/{article_id}" if article_id.isdigit() else title_el.get("href", "")
 
-            # 이미 크롤링된 글 스킵
+            title = title_el.get_text(strip=True)
+            href = title_el.get("href", "").strip()
+            article_id = href.strip("/")
+            post_url = (
+                f"https://cafe.naver.com/{CAFE_CLUB_ID}/{article_id}"
+                if article_id.isdigit()
+                else f"https://cafe.naver.com{href}"
+            )
+
             if post_url in existing_urls:
                 continue
 
-            # 닉네임
             nick_el = row.select_one(".td_name .p-nick a, .p-nick")
-            nickname = nick_el.get_text(strip=True) if nick_el else None
+            nickname = nick_el.get_text(strip=True) if nick_el else "unknown"
 
-            # 날짜
             date_el = row.select_one(".td_date")
-            date_str = date_el.get_text(strip=True) if date_el else ""
-            posted_at = parse_naver_date(date_str)
+            posted_at = parse_naver_date(date_el.get_text(strip=True) if date_el else "")
 
             if not posted_at:
                 continue
@@ -183,16 +149,13 @@ def crawl_board(session, existing_urls):
                 found_old = True
                 continue
 
-            # 양식 준수 여부 체크
-            is_valid = bool(VALID_TITLE_PATTERN.search(title))
-
             posts.append({
-                "naver_nickname": nickname or "unknown",
+                "naver_nickname": nickname,
                 "post_title": title,
                 "post_url": post_url,
                 "post_snippet": None,
                 "posted_at": posted_at.isoformat(),
-                "is_valid_format": is_valid,
+                "is_valid_format": bool(VALID_TITLE_PATTERN.search(title)),
             })
 
         if found_old:
@@ -201,7 +164,7 @@ def crawl_board(session, existing_urls):
         if page > 30:
             break
 
-    print(f"[crawl] 수집 완료: {len(posts)}건")
+    print(f"[crawl] 수집 완료: {len(posts)}건 신규")
     return posts
 
 
@@ -211,16 +174,14 @@ def upsert_to_supabase(posts):
     if not posts:
         print("[supabase] 저장할 신규 데이터 없음")
         return
-
-    headers = {
-        "apikey": SERVICE_KEY,
-        "Authorization": f"Bearer {SERVICE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "resolution=ignore-duplicates",
-    }
     r = requests.post(
         f"{SUPABASE_URL}/rest/v1/cafe_certifications",
-        headers=headers,
+        headers={
+            "apikey": SERVICE_KEY,
+            "Authorization": f"Bearer {SERVICE_KEY}",
+            "Content-Type": "application/json",
+            "Prefer": "resolution=ignore-duplicates",
+        },
         json=posts,
         timeout=30,
     )
@@ -234,11 +195,11 @@ def upsert_to_supabase(posts):
 
 if __name__ == "__main__":
     session = make_session()
-    if not login_naver(session):
-        raise SystemExit("로그인 실패")
+    if not check_login(session):
+        raise SystemExit("쿠키 만료 — GitHub Secret의 NAVER_NID_AUT/NID_SES 갱신 필요")
 
     existing_urls = fetch_existing_urls()
-    print(f"[supabase] 기존 저장 URL: {len(existing_urls)}건")
+    print(f"[supabase] 기존 저장: {len(existing_urls)}건")
 
     posts = crawl_board(session, existing_urls)
     upsert_to_supabase(posts)
