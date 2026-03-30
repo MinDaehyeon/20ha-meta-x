@@ -1,0 +1,30 @@
+name: 네이버 카페 인증글 크롤링
+
+on:
+  schedule:
+    - cron: '0 15 * * *'   # 매일 KST 00:00 (UTC 15:00)
+  workflow_dispatch:        # GitHub Actions 화면에서 수동 실행 가능
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 패키지 설치
+        run: pip install -r requirements.txt
+
+      - name: 크롤링 실행
+        run: python tools/naver_cafe_crawler.py
+        env:
+          NAVER_ID: ${{ secrets.NAVER_ID }}
+          NAVER_PW: ${{ secrets.NAVER_PW }}
+          NAVER_CAFE_ID: ${{ secrets.NAVER_CAFE_ID }}
+          NAVER_BOARD_ID: ${{ secrets.NAVER_BOARD_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CRAWL_DAYS: '14'

@@ -5,3 +5,6 @@ build/
 
 .vercel
 .env.production
+
+# 네이버 크롤러 세션 쿠키
+tools/.naver_cookies.json
