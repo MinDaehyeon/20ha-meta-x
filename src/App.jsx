@@ -2146,9 +2146,24 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   };
 
   const assignCert = async (certId, studentId) => {
-    await supabase.rpc("assign_cert_to_student", {
-      p_cert_id: certId, p_student_id: studentId||null
-    });
+    // 배정 대상 인증글의 닉네임 파악
+    const cert = attendanceCerts.find(c=>c.id===certId);
+    const nick = cert?.naver_nickname;
+
+    // 1) 직접 배정
+    await supabase.rpc("assign_cert_to_student", {p_cert_id: certId, p_student_id: studentId||null});
+
+    // 2) 같은 닉네임의 미배정(assigned_student_id=null) 인증글 자동 배정
+    if(studentId && nick) {
+      const sameNick = attendanceCerts.filter(c =>
+        c.id !== certId && c.naver_nickname === nick && !c.assigned_student_id
+      );
+      await Promise.all(sameNick.map(c =>
+        supabase.rpc("assign_cert_to_student", {p_cert_id: c.id, p_student_id: studentId})
+      ));
+      if(sameNick.length > 0) alert(`✅ "${nick}" 닉네임의 미배정 인증글 ${sameNick.length}건도 자동 배정했습니다.`);
+    }
+
     setAssignPopup(null);
     loadAttendanceCerts(attendanceFrom, attendanceTo);
   };
