@@ -2490,13 +2490,13 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                             const hasAmb=ambiguous.length>0;
                             return (
                               <div key={date.toISOString()} style={{textAlign:"center"}}>
-                                {!s.naver_nickname?(
-                                  <span style={{fontSize:13,color:T.muted}}>－</span>
-                                ):hasMatched?(
+                                {hasMatched?(
                                   <span style={{fontSize:16}}>✅</span>
                                 ):hasAmb?(
                                   <button onClick={()=>setAssignPopup({studentId:s.id,studentName:s.name,date,certs:ambiguous})}
                                     style={{background:"none",border:"none",cursor:"pointer",fontSize:16,padding:0}}>⚠️</button>
+                                ):!s.naver_nickname?(
+                                  <span style={{fontSize:13,color:T.muted}}>－</span>
                                 ):(
                                   <span style={{fontSize:16}}>❌</span>
                                 )}
