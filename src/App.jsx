@@ -2388,7 +2388,27 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
         const fmtDate = d => `${d.getMonth()+1}/${d.getDate()}`;
         const fmtDateFull = d => `${d.getMonth()+1}/${d.getDate()}(${["일","월","화","수","목","금","토"][d.getDay()]})`;
         const fmtTs = ts => { const k=new Date(new Date(ts).getTime()+9*60*60*1000); return `${k.getUTCMonth()+1}/${k.getUTCDate()}(${["일","월","화","수","목","금","토"][k.getUTCDay()]})`; };
-        // 기간 내 수(3)/일(0) 날짜 배열
+        // 퍼지 매칭 헬퍼
+        const lev = (a,b) => {
+          const m=a.length,n=b.length;
+          const dp=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i||j));
+          for(let i=1;i<=m;i++) for(let j=1;j<=n;j++)
+            dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+          return dp[m][n];
+        };
+        const fuzzyStudents = (nick) => {
+          if(!nick) return [];
+          const q=nick.toLowerCase();
+          return certStudents.map(s=>{
+            const sn=(s.naver_nickname||'').toLowerCase();
+            const sm=(s.name||'').toLowerCase();
+            const score=Math.min(lev(q,sn),lev(q,sm));
+            const contains=sn.includes(q)||q.includes(sn)||sm.includes(q)||q.includes(sm);
+            return {s,score,contains};
+          }).filter(x=>x.score<=4||x.contains).sort((a,b)=>a.score-b.score).slice(0,3);
+        };
+
+        // 기간 내 날짜 배열
         const genDates = (from, to) => {
           const dates=[]; const cur=new Date(from);
           while(cur<=to){ dates.push(new Date(cur)); cur.setDate(cur.getDate()+1); }
@@ -2513,20 +2533,39 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                       📌 미배정 인증글 ({unassigned.length}건) — 어떤 학생에도 닉네임이 매핑되지 않은 글
                     </div>
                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                      {unassigned.map(c=>(
-                        <div key={c.id} style={{display:"flex",gap:8,alignItems:"center",padding:"8px 10px",borderRadius:8,
-                          background:"#FFFBEB",border:"1px solid #FDE68A",flexWrap:"wrap"}}>
-                          <span style={{fontSize:11,color:T.muted,minWidth:70}}>{fmtTs(c.posted_at)}</span>
-                          <span style={{fontSize:12,fontWeight:700,color:T.navy}}>{c.naver_nickname}</span>
-                          <a href={c.post_url} target="_blank" rel="noreferrer"
-                            style={{fontSize:11,color:T.orange,flex:1,textDecoration:"none",wordBreak:"break-all"}}>{c.post_title}</a>
-                          <select defaultValue="" onChange={e=>e.target.value&&assignCert(c.id,parseInt(e.target.value))}
-                            style={{...css.input,fontSize:11,padding:"3px 6px",width:110}}>
-                            <option value="">학생 배정...</option>
-                            {certStudents.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-                          </select>
+                      {unassigned.map(c=>{
+                        const suggestions=fuzzyStudents(c.naver_nickname);
+                        return (
+                        <div key={c.id} style={{padding:"8px 10px",borderRadius:8,
+                          background:"#FFFBEB",border:"1px solid #FDE68A"}}>
+                          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:suggestions.length>0?6:0}}>
+                            <span style={{fontSize:11,color:T.muted,minWidth:70}}>{fmtTs(c.posted_at)}</span>
+                            <span style={{fontSize:12,fontWeight:700,color:T.navy}}>{c.naver_nickname}</span>
+                            <a href={c.post_url} target="_blank" rel="noreferrer"
+                              style={{fontSize:11,color:T.orange,flex:1,textDecoration:"none",wordBreak:"break-all"}}>{c.post_title}</a>
+                            <select defaultValue="" onChange={e=>e.target.value&&assignCert(c.id,parseInt(e.target.value))}
+                              style={{...css.input,fontSize:11,padding:"3px 6px",width:110}}>
+                              <option value="">학생 배정...</option>
+                              {certStudents.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                          </div>
+                          {suggestions.length>0&&(
+                            <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                              <span style={{fontSize:10,color:T.muted}}>추천:</span>
+                              {suggestions.map(({s,score})=>(
+                                <button key={s.id} onClick={()=>assignCert(c.id,s.id)}
+                                  style={{fontSize:11,padding:"2px 8px",borderRadius:12,cursor:"pointer",
+                                    background:score===0?"#D1FAE5":score<=2?"#FEF3C7":"#F3F4F6",
+                                    border:`1px solid ${score===0?"#6EE7B7":score<=2?"#FCD34D":"#D1D5DB"}`,
+                                    color:T.navy,fontWeight:600}}>
+                                  {s.name} {s.naver_nickname?`(${s.naver_nickname})`:""}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </Card>
                 )}
