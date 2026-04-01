@@ -2018,7 +2018,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const [certStudents, setCertStudents] = useState([]);
   const [attendanceCerts, setAttendanceCerts] = useState([]);
   const [attendanceFrom, setAttendanceFrom] = useState(()=>{
-    const d = new Date(); d.setDate(d.getDate()-28); d.setHours(0,0,0,0); return d;
+    const d = new Date(); return new Date(d.getFullYear(), 2, 1, 0, 0, 0, 0);
   });
   const [attendanceTo, setAttendanceTo] = useState(()=>{
     const d = new Date(); d.setHours(23,59,59,999); return d;
@@ -2391,10 +2391,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
         // 기간 내 수(3)/일(0) 날짜 배열
         const genDates = (from, to) => {
           const dates=[]; const cur=new Date(from);
-          while(cur<=to){
-            if(cur.getDay()===3||cur.getDay()===0) dates.push(new Date(cur));
-            cur.setDate(cur.getDate()+1);
-          }
+          while(cur<=to){ dates.push(new Date(cur)); cur.setDate(cur.getDate()+1); }
           return dates;
         };
         const attendanceDates = genDates(attendanceFrom, attendanceTo);
@@ -2456,7 +2453,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                     style={{...css.input,padding:"5px 8px",fontSize:12,width:140}}/>
                   <button onClick={()=>loadAttendanceCerts(attendanceFrom,attendanceTo)}
                     style={{...css.btnOrange,padding:"5px 14px",fontSize:12}}>새로고침</button>
-                  <span style={{fontSize:11,color:T.muted}}>수/일 {attendanceDates.length}회</span>
+                  <span style={{fontSize:11,color:T.muted}}>총 {attendanceDates.length}일</span>
                 </div>
 
                 {/* 출석표 그리드 */}
