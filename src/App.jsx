@@ -2099,7 +2099,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   };
 
   const triggerCrawl = async () => {
-    const token = process.env.REACT_APP_GITHUB_TOKEN;
+    const token = (process.env.REACT_APP_GITHUB_TOKEN||"").trim();
     if(!token){ alert("REACT_APP_GITHUB_TOKEN 환경변수가 설정되지 않았습니다."); return; }
     setCrawlRunning(true);
     try {
