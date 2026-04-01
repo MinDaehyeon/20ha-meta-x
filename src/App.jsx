@@ -2380,6 +2380,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
         // attendanceDates는 로컬(KST) Date → getMonth/getDate 직접 사용
         const fmtDate = d => `${d.getMonth()+1}/${d.getDate()}`;
         const fmtDateFull = d => `${d.getMonth()+1}/${d.getDate()}(${["일","월","화","수","목","금","토"][d.getDay()]})`;
+        // DB UTC 타임스탬프 문자열용
+        const fmtTs = ts => { const k=toKSTDate(ts); return `${k.getUTCMonth()+1}/${k.getUTCDate()}(${["일","월","화","수","목","금","토"][k.getUTCDay()]})`; };
         // d1: DB UTC 타임스탬프 문자열, d2: attendanceDates의 로컬(KST) Date 객체
         const isSameKSTDay = (d1, d2) => {
           const kst = toKSTDate(d1); // UTC→KST
@@ -2517,7 +2519,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                       {unassigned.map(c=>(
                         <div key={c.id} style={{display:"flex",gap:8,alignItems:"center",padding:"8px 10px",borderRadius:8,
                           background:"#FFFBEB",border:"1px solid #FDE68A",flexWrap:"wrap"}}>
-                          <span style={{fontSize:11,color:T.muted,minWidth:70}}>{fmtDateFull(c.posted_at)}</span>
+                          <span style={{fontSize:11,color:T.muted,minWidth:70}}>{fmtTs(c.posted_at)}</span>
                           <span style={{fontSize:12,fontWeight:700,color:T.navy}}>{c.naver_nickname}</span>
                           <a href={c.post_url} target="_blank" rel="noreferrer"
                             style={{fontSize:11,color:T.orange,flex:1,textDecoration:"none",wordBreak:"break-all"}}>{c.post_title}</a>
