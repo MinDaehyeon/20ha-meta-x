@@ -2009,7 +2009,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const [certWeekOffset, setCertWeekOffset] = useState(0); // 0=이번주, -1=지난주 ...
   const [certNickEdit, setCertNickEdit] = useState({}); // {profile_id: editing_value}
   const [invalidCerts, setInvalidCerts] = useState([]);
-  const [certSubTab, setCertSubTab] = useState("weekly"); // "weekly" | "records"
+  const [certSubTab, setCertSubTab] = useState("attendance"); // "attendance" | "records" | "roster"
   const [certRecords, setCertRecords] = useState([]);
   const [certRecordsLoading, setCertRecordsLoading] = useState(false);
   const [certStatusFilter, setCertStatusFilter] = useState("all");
@@ -2376,12 +2376,14 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
       {adminTab==="cert"&&(()=>{
         // ── 공통 헬퍼 ──
         const KST_OFFSET = 9*60*60*1000;
-        const toKSTDate = d => new Date(new Date(d).getTime() + KST_OFFSET);
-        const fmtDate = d => { const k=toKSTDate(d); return `${k.getUTCMonth()+1}/${k.getUTCDate()}`; };
-        const fmtDateFull = d => { const k=toKSTDate(d); return `${k.getUTCMonth()+1}/${k.getUTCDate()}(${["일","월","화","수","목","금","토"][k.getUTCDay()]})`; };
+        const toKSTDate = d => new Date(new Date(d).getTime() + KST_OFFSET); // UTC 문자열→KST
+        // attendanceDates는 로컬(KST) Date → getMonth/getDate 직접 사용
+        const fmtDate = d => `${d.getMonth()+1}/${d.getDate()}`;
+        const fmtDateFull = d => `${d.getMonth()+1}/${d.getDate()}(${["일","월","화","수","목","금","토"][d.getDay()]})`;
+        // d1: DB UTC 타임스탬프 문자열, d2: attendanceDates의 로컬(KST) Date 객체
         const isSameKSTDay = (d1, d2) => {
-          const a=toKSTDate(d1), b=toKSTDate(d2);
-          return a.getUTCFullYear()===b.getUTCFullYear() && a.getUTCMonth()===b.getUTCMonth() && a.getUTCDate()===b.getUTCDate();
+          const kst = toKSTDate(d1); // UTC→KST
+          return kst.getUTCFullYear()===d2.getFullYear() && kst.getUTCMonth()===d2.getMonth() && kst.getUTCDate()===d2.getDate();
         };
         // 기간 내 수/일 날짜 배열 생성
         const genDates = (from, to) => {
