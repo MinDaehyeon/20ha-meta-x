@@ -2018,11 +2018,14 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const [certStudents, setCertStudents] = useState([]);
   const [attendanceCerts, setAttendanceCerts] = useState([]);
   const [attendanceFrom, setAttendanceFrom] = useState(()=>{
-    const d = new Date(); return new Date(d.getFullYear(), 2, 1, 0, 0, 0, 0);
+    const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
   });
   const [attendanceTo, setAttendanceTo] = useState(()=>{
-    const d = new Date(); d.setHours(23,59,59,999); return d;
+    const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
   });
+  const [filterName, setFilterName] = useState("");
+  const [filterGrade, setFilterGrade] = useState("");
+  const [filterDates, setFilterDates] = useState("all"); // all | week | hasData
   const [rosterEditRow, setRosterEditRow] = useState(null);
   const [rosterAddMode, setRosterAddMode] = useState(false);
   const [assignPopup, setAssignPopup] = useState(null); // {studentId, date, certs[]}
@@ -2464,12 +2467,14 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                 {/* 날짜 범위 선택 */}
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14,flexWrap:"wrap"}}>
                   <label style={{fontSize:12,color:T.muted,fontWeight:700}}>기간</label>
-                  <input type="date" value={attendanceFrom.toISOString().slice(0,10)}
-                    onChange={e=>{const d=new Date(e.target.value);d.setHours(0,0,0,0);setAttendanceFrom(d);}}
+                  <input type="date"
+                    value={`${attendanceFrom.getFullYear()}-${String(attendanceFrom.getMonth()+1).padStart(2,'0')}-${String(attendanceFrom.getDate()).padStart(2,'0')}`}
+                    onChange={e=>{const [y,m,d]=e.target.value.split('-').map(Number);setAttendanceFrom(new Date(y,m-1,d,0,0,0,0));}}
                     style={{...css.input,padding:"5px 8px",fontSize:12,width:140}}/>
                   <span style={{fontSize:12,color:T.muted}}>~</span>
-                  <input type="date" value={attendanceTo.toISOString().slice(0,10)}
-                    onChange={e=>{const d=new Date(e.target.value);d.setHours(23,59,59,999);setAttendanceTo(d);}}
+                  <input type="date"
+                    value={`${attendanceTo.getFullYear()}-${String(attendanceTo.getMonth()+1).padStart(2,'0')}-${String(attendanceTo.getDate()).padStart(2,'0')}`}
+                    onChange={e=>{const [y,m,d]=e.target.value.split('-').map(Number);setAttendanceTo(new Date(y,m-1,d,23,59,59,999));}}
                     style={{...css.input,padding:"5px 8px",fontSize:12,width:140}}/>
                   <button onClick={()=>loadAttendanceCerts(attendanceFrom,attendanceTo)}
                     style={{...css.btnOrange,padding:"5px 14px",fontSize:12}}>새로고침</button>
@@ -2481,50 +2486,97 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                   <div style={{textAlign:"center",padding:40,color:T.muted,fontSize:13}}>
                     👥 먼저 "명단 관리" 탭에서 학생을 추가해주세요.
                   </div>
-                ):(
-                  <div style={{overflowX:"auto"}}>
-                    <div style={{minWidth: 200 + attendanceDates.length*68}}>
-                      {/* 헤더 */}
-                      <div style={{display:"grid",gridTemplateColumns:`140px 60px repeat(${attendanceDates.length}, 64px)`,background:T.navy,padding:"8px 10px",gap:2,alignItems:"center"}}>
-                        <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)"}}>이름</div>
-                        <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:"center"}}>학년</div>
-                        {attendanceDates.map(d=>(
-                          <div key={d.toISOString()} style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:"center",lineHeight:1.3}}>
-                            {fmtDate(d)}<br/><span style={{opacity:0.7}}>{["일","월","화","수","목","금","토"][d.getDay()]}</span>
-                          </div>
-                        ))}
+                ):( ()=>{
+                  // 필터 적용
+                  const grades = [...new Set(certStudents.map(s=>s.grade).filter(Boolean))].sort();
+                  const filteredStudents = certStudents.filter(s=>
+                    (!filterName || s.name.includes(filterName)) &&
+                    (!filterGrade || s.grade===filterGrade)
+                  );
+                  const visibleDates = attendanceDates.filter(date=>{
+                    if(filterDates==="week") return date.getDay()===3||date.getDay()===0;
+                    if(filterDates==="hasData") return attendanceCerts.some(c=>isSameKSTDay(c.posted_at,date));
+                    return true;
+                  });
+                  const cols = `140px 60px repeat(${visibleDates.length}, 64px)`;
+                  const minW = 200 + visibleDates.length*68;
+                  return (
+                    <div>
+                      {/* 필터 행 */}
+                      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10,alignItems:"center"}}>
+                        <input placeholder="이름 검색" value={filterName} onChange={e=>setFilterName(e.target.value)}
+                          style={{...css.input,padding:"5px 8px",fontSize:12,width:100}}/>
+                        <select value={filterGrade} onChange={e=>setFilterGrade(e.target.value)}
+                          style={{...css.input,padding:"5px 8px",fontSize:12,width:90}}>
+                          <option value="">학년 전체</option>
+                          {grades.map(g=><option key={g} value={g}>{g}</option>)}
+                        </select>
+                        <select value={filterDates} onChange={e=>setFilterDates(e.target.value)}
+                          style={{...css.input,padding:"5px 8px",fontSize:12,width:120}}>
+                          <option value="all">날짜 전체</option>
+                          <option value="week">수/일만</option>
+                          <option value="hasData">인증글 있는 날</option>
+                        </select>
+                        <span style={{fontSize:11,color:T.muted}}>{filteredStudents.length}명 / {visibleDates.length}일</span>
+                        {(filterName||filterGrade||filterDates!=="all")&&(
+                          <button onClick={()=>{setFilterName("");setFilterGrade("");setFilterDates("all");}}
+                            style={{...css.btnOutline,padding:"3px 10px",fontSize:11}}>초기화</button>
+                        )}
                       </div>
-                      {/* 학생 행 */}
-                      {certStudents.map((s,i)=>(
-                        <div key={s.id} style={{display:"grid",gridTemplateColumns:`140px 60px repeat(${attendanceDates.length}, 64px)`,
-                          padding:"7px 10px",gap:2,borderTop:`1px solid ${T.border}`,
-                          background:i%2===0?T.white:"#F9FAFB",alignItems:"center"}}>
-                          <div style={{fontSize:12,fontWeight:700,color:T.navy,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</div>
-                          <div style={{fontSize:11,color:T.muted,textAlign:"center"}}>{s.grade||"-"}</div>
-                          {attendanceDates.map(date=>{
-                            const {matched,ambiguous}=getCellInfo(s,date);
-                            const hasMatched=matched.length>0;
-                            const hasAmb=ambiguous.length>0;
-                            return (
-                              <div key={date.toISOString()} style={{textAlign:"center"}}>
-                                {hasMatched?(
-                                  <span style={{fontSize:16}}>✅</span>
-                                ):hasAmb?(
-                                  <button onClick={()=>setAssignPopup({studentId:s.id,studentName:s.name,date,certs:ambiguous})}
-                                    style={{background:"none",border:"none",cursor:"pointer",fontSize:16,padding:0}}>⚠️</button>
-                                ):!s.naver_nickname?(
-                                  <span style={{fontSize:13,color:T.muted}}>－</span>
-                                ):(
-                                  <span style={{fontSize:16}}>❌</span>
-                                )}
+                      {/* 상단 스크롤바 */}
+                      <div style={{overflowX:"auto",overflowY:"hidden",height:18,marginBottom:2}}
+                        ref={el=>{if(el){el.onscroll=()=>{const g=el.nextSibling;if(g)g.scrollLeft=el.scrollLeft;}}}}
+                      >
+                        <div style={{minWidth:minW,height:1}}/>
+                      </div>
+                      {/* 그리드 본체 */}
+                      <div style={{overflowX:"auto"}}
+                        ref={el=>{if(el){el.onscroll=()=>{const t=el.previousSibling;if(t)t.scrollLeft=el.scrollLeft;}}}}
+                      >
+                        <div style={{minWidth:minW}}>
+                          {/* 헤더 */}
+                          <div style={{display:"grid",gridTemplateColumns:cols,background:T.navy,padding:"8px 10px",gap:2,alignItems:"center"}}>
+                            <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)"}}>이름</div>
+                            <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:"center"}}>학년</div>
+                            {visibleDates.map(d=>(
+                              <div key={d.toISOString()} style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:"center",lineHeight:1.3}}>
+                                {fmtDate(d)}<br/><span style={{opacity:0.7,fontSize:9}}>{["일","월","화","수","목","금","토"][d.getDay()]}</span>
                               </div>
-                            );
-                          })}
+                            ))}
+                          </div>
+                          {/* 학생 행 */}
+                          {filteredStudents.map((s,i)=>(
+                            <div key={s.id} style={{display:"grid",gridTemplateColumns:cols,
+                              padding:"7px 10px",gap:2,borderTop:`1px solid ${T.border}`,
+                              background:i%2===0?T.white:"#F9FAFB",alignItems:"center"}}>
+                              <div style={{fontSize:12,fontWeight:700,color:T.navy,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</div>
+                              <div style={{fontSize:11,color:T.muted,textAlign:"center"}}>{s.grade||"-"}</div>
+                              {visibleDates.map(date=>{
+                                const {matched,ambiguous}=getCellInfo(s,date);
+                                const hasMatched=matched.length>0;
+                                const hasAmb=ambiguous.length>0;
+                                return (
+                                  <div key={date.toISOString()} style={{textAlign:"center"}}>
+                                    {hasMatched?(
+                                      <span style={{fontSize:16}}>✅</span>
+                                    ):hasAmb?(
+                                      <button onClick={()=>setAssignPopup({studentId:s.id,studentName:s.name,date,certs:ambiguous})}
+                                        style={{background:"none",border:"none",cursor:"pointer",fontSize:16,padding:0}}>⚠️</button>
+                                    ):!s.naver_nickname?(
+                                      <span style={{fontSize:13,color:T.muted}}>－</span>
+                                    ):(
+                                      <span style={{fontSize:16}}>❌</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* 미배정 인증글 */}
                 {unassigned.length>0&&(
