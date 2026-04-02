@@ -2068,8 +2068,12 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
     if(adminTab!=="cert") return;
     if(certSubTab==="attendance"||certSubTab==="roster") loadCertStudents();
     if(certSubTab==="attendance") loadAttendanceCerts(attendanceFrom, attendanceTo);
-    if(certSubTab==="records") loadCertRecords(certStatusFilter);
-  },[adminTab, certSubTab, certStatusFilter, attendanceFrom, attendanceTo]);
+  },[adminTab, certSubTab, attendanceFrom, attendanceTo]);
+
+  useEffect(()=>{
+    if(adminTab!=="cert") return;
+    loadCertRecords(certStatusFilter);
+  },[adminTab, certStatusFilter]);
 
   const saveNickname = async (profileId, nickname) => {
     await supabase.rpc("update_naver_nickname", {p_profile_id: profileId, p_nickname: nickname.trim()||null});
