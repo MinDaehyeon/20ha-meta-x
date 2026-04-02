@@ -2097,6 +2097,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
       p_title_match_status: updates.title_match_status||null,
       p_is_valid_format: updates.is_valid_format??null,
     });
+    if(updates.assigned_student_id) {
+      await supabase.rpc("assign_cert_to_student", {p_cert_id: id, p_student_id: updates.assigned_student_id});
+    }
     setCertEditRecord(null);
     loadCertRecords(certStatusFilter);
   };
@@ -2718,7 +2721,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                             <div style={{textAlign:"center",fontSize:11,color:T.muted}}>
                               {new Date(rec.posted_at).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"})}
                               <div style={{marginTop:3}}>
-                                <button onClick={()=>setCertEditRecord(isEd?null:{id:rec.id,parsed_name:rec.parsed_name||"",parsed_grade:rec.parsed_grade||"",parsed_code:rec.parsed_code||"",title_match_status:rec.title_match_status||"",is_valid_format:rec.is_valid_format})}
+                                <button onClick={()=>setCertEditRecord(isEd?null:{id:rec.id,parsed_name:rec.parsed_name||"",parsed_grade:rec.parsed_grade||"",parsed_code:rec.parsed_code||"",title_match_status:rec.title_match_status||"",is_valid_format:rec.is_valid_format,assigned_student_id:null})}
                                   style={{...isEd?css.btnOrange:css.btnOutline,padding:"2px 8px",fontSize:10}}>
                                   {isEd?"닫기":"수정"}
                                 </button>
@@ -2727,6 +2730,21 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                           </div>
                           {isEd&&(
                             <div style={{padding:"12px 16px",background:"#F0F9FF",borderTop:`1px dashed ${T.border}`,display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
+                              {/* 학생 배정 — 선택 시 이름·학년 자동 채움 */}
+                              <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                                <label style={{fontSize:10,color:T.muted,fontWeight:700}}>학생 배정</label>
+                                <select value={certEditRecord.assigned_student_id||""} onChange={e=>{
+                                  const sid=parseInt(e.target.value)||null;
+                                  const s=certStudents.find(cs=>cs.id===sid);
+                                  setCertEditRecord(p=>({...p,
+                                    assigned_student_id:sid,
+                                    ...(s?{parsed_name:s.name,parsed_grade:s.grade||"",title_match_status:"matched"}:{})
+                                  }));
+                                }} style={{...css.input,width:120,padding:"4px 8px",fontSize:12}}>
+                                  <option value="">학생 선택...</option>
+                                  {certStudents.map(s=><option key={s.id} value={s.id}>{s.name} {s.grade?`(${s.grade})`:""}</option>)}
+                                </select>
+                              </div>
                               {[{key:"parsed_name",label:"이름"},{key:"parsed_grade",label:"학년"},{key:"parsed_code",label:"코드"}].map(({key,label})=>(
                                 <div key={key} style={{display:"flex",flexDirection:"column",gap:3}}>
                                   <label style={{fontSize:10,color:T.muted,fontWeight:700}}>{label}</label>
