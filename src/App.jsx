@@ -2442,10 +2442,18 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
         const attendanceDates = genDates(attendanceFrom, attendanceTo);
 
         // 인증글 관리 헬퍼
-        const STATUS_LABELS = {all:"전체",matched:"✅ 매칭됨",no_profile:"❓ 프로필없음",parse_failed:"⚠️ 파싱실패",name_mismatch:"🔴 이름불일치",grade_mismatch:"🟡 학년불일치",unchecked:"⬜ 미확인"};
-        const STATUS_COLORS = {matched:"#D1FAE5",no_profile:"#E0E7FF",parse_failed:"#FEF3C7",name_mismatch:"#FEE2E2",grade_mismatch:"#FFF7CD",unchecked:"#F3F4F6"};
-        const filteredRec = certStatusFilter==="all"?certRecords:certRecords.filter(r=>r.title_match_status===certStatusFilter);
-        const statusCounts = Object.fromEntries(Object.keys(STATUS_LABELS).map(k=>[k,k==="all"?certRecords.length:certRecords.filter(r=>r.title_match_status===k).length]));
+        const STATUS_LABELS = {all:"전체",matched:"✅ 매칭됨",name_mismatch:"🔴 이름불일치",manual:"🔧 수동처리필요"};
+        const STATUS_COLORS = {matched:"#D1FAE5",name_mismatch:"#FEE2E2",parse_failed:"#FEF3C7",no_profile:"#FEF3C7",grade_mismatch:"#FEF3C7",unchecked:"#FEF3C7"};
+        const MANUAL_STATUSES = new Set(["parse_failed","no_profile","grade_mismatch","unchecked"]);
+        const filteredRec = certStatusFilter==="all"?certRecords
+          :certStatusFilter==="manual"?certRecords.filter(r=>MANUAL_STATUSES.has(r.title_match_status))
+          :certRecords.filter(r=>r.title_match_status===certStatusFilter);
+        const statusCounts = {
+          all: certRecords.length,
+          matched: certRecords.filter(r=>r.title_match_status==="matched").length,
+          name_mismatch: certRecords.filter(r=>r.title_match_status==="name_mismatch").length,
+          manual: certRecords.filter(r=>MANUAL_STATUSES.has(r.title_match_status)).length,
+        };
 
         // 셀 상태 계산
         const getCellInfo = (student, date) => {
@@ -2760,9 +2768,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                                 <label style={{fontSize:10,color:T.muted,fontWeight:700}}>상태</label>
                                 <select value={certEditRecord.title_match_status} onChange={e=>setCertEditRecord(p=>({...p,title_match_status:e.target.value}))}
                                   style={{...css.input,width:130,padding:"4px 8px",fontSize:12}}>
-                                  {Object.entries(STATUS_LABELS).filter(([k])=>k!=="all").map(([k,l])=>(
-                                    <option key={k} value={k}>{l}</option>
-                                  ))}
+                                  <option value="matched">✅ 매칭됨</option>
+                                  <option value="name_mismatch">🔴 이름불일치</option>
+                                  <option value="parse_failed">🔧 파싱실패</option>
+                                  <option value="unchecked">⬜ 미확인</option>
                                 </select>
                               </div>
                               <div style={{display:"flex",flexDirection:"column",gap:3}}>
