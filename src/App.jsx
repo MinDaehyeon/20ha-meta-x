@@ -3206,7 +3206,15 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
 
             {/* 스프레드시트 테이블 */}
             <Card style={{padding:0,overflow:"hidden"}}>
-              <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+              {/* 상단 스크롤바 */}
+              <div id="r2-top"
+                onScroll={e=>{ const b=document.getElementById('r2-body'); if(b) b.scrollLeft=e.target.scrollLeft; }}
+                style={{overflowX:"auto",overflowY:"hidden",height:14,borderBottom:`1px solid ${T.border}`,cursor:"ew-resize"}}>
+                <div style={{width:2700,height:1}}/>
+              </div>
+              <div id="r2-body"
+                onScroll={e=>{ const t=document.getElementById('r2-top'); if(t) t.scrollLeft=e.target.scrollLeft; }}
+                style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
                 <table style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
                   <thead>
                     {/* 섹션 헤더 행 */}
@@ -3296,12 +3304,11 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                               const checked = getAtt(s.idx, sec.type, key);
                               return (
                                 <td key={`${si}-${di}`}
-                                  onClick={() => toggleAtt(s.idx, sec.type, key)}
                                   style={{
                                     width: CELL_W, minWidth: CELL_W,
                                     height: CELL_H,
                                     textAlign:"center", verticalAlign:"middle",
-                                    cursor:"pointer",
+                                    cursor:"default",
                                     fontSize: 11, fontWeight: checked ? 700 : 400,
                                     color: checked ? sec.color : "transparent",
                                     background: checked ? sec.bg : "transparent",
@@ -3335,9 +3342,6 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                     })}
                   </tbody>
                 </table>
-              </div>
-              <div style={{padding:"8px 14px",background:T.surfaceAlt,borderTop:`1px solid ${T.border}`,fontSize:11,color:T.muted}}>
-                셀을 클릭하면 출석이 토글됩니다. (페이지 새로고침 시 초기화)
               </div>
             </Card>
           </div>
