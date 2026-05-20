@@ -2007,6 +2007,13 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const [filterStatus, setFilterStatus] = useState("all"); // "all"|"pending"|"approved"|"rejected"
   const [filterRole, setFilterRole]   = useState("all"); // "all"|"student"|"parent"
   const [detailStudent, setDetailStudent] = useState(null);
+
+  // 기수 데이터 (회원 관리·2기 명단 공용)
+  const ROSTER2_NAMES = new Set(["강예나","김가흔","김은채","김태준","박재현","손연재","윤준원","최지유","배정윤","심수윤","한설아","강가인","권민유","권순혁","최유주","김도현","김시원","김시윤","김아란","김준범","김지우","김호진","나지성","문지유","박지우","서소윤","서지우","송민건","양소윤","오수연","우정훈","윤서준","이유빈","이홍윤","임다은","정유진","박선율","한채린","오수빈","남희수","김가인","양은정"]);
+  const getCohort = (profile) => {
+    if (ROSTER2_NAMES.has(profile.name)) return "20HA 2기";
+    return "20HA 1기";
+  };
   const [dashColFilter, setDashColFilter] = useState({});
   const [dashFilterOpen, setDashFilterOpen] = useState(null);
   const [parentLinks, setParentLinks] = useState({}); // {parent_id: [{student_id, name, grade}]}
@@ -2359,7 +2366,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
             ):(
               <div style={{overflowX:"auto"}}>
                 <div style={{display:"grid",gridTemplateColumns:isMobile?"1.5fr 1fr 1fr 1.5fr":"2fr 0.8fr 1.2fr 0.9fr 1fr 1.5fr",minWidth:isMobile?480:640}}>
-                  {(isMobile?["이름","학년","상태","관리"]:["이름 / 이메일","학년","상태","가입일","로그","관리"]).map(h=>(
+                  {(isMobile?["이름","기수","상태","관리"]:["이름 / 이메일","기수","상태","가입일","로그","관리"]).map(h=>(
                     <div key={h} style={{padding:"8px 12px",fontSize:11,color:T.muted,fontWeight:700,borderBottom:`2px solid ${T.border}`,letterSpacing:"0.04em"}}>{h}</div>
                   ))}
                   {filteredStudents.map(s=>[
@@ -2380,7 +2387,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                         : <span style={{fontSize:10,color:T.muted,marginTop:2}}>연결된 자녀 없음</span>
                       )}
                     </div>,
-                    <div key={`${s.id}-g`} style={{padding:"12px",fontSize:13,borderBottom:`1px solid ${T.border}`,color:T.textMid,display:"flex",alignItems:"center"}}>{s.grade||"—"}</div>,
+                    <div key={`${s.id}-g`} style={{padding:"8px 12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center"}}>
+                      {(()=>{const cohort=getCohort(s);const is2ki=cohort==="20HA 2기";return(<span style={{fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:20,background:is2ki?"#EEF2FF":"#F0FDF4",color:is2ki?"#4F46E5":"#16A34A",border:`1px solid ${is2ki?"#C7D2FE":"#BBF7D0"}`}}>{cohort}</span>);})()}
+                    </div>,
                     <div key={`${s.id}-st`} style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center"}}>{statusBadge(s.approval_status)}</div>,
                     ...(!isMobile?[<div key={`${s.id}-ca`} style={{padding:"12px",fontSize:12,borderBottom:`1px solid ${T.border}`,color:T.muted,display:"flex",alignItems:"center"}}>{s.created_at?.slice(0,10)||"—"}</div>]:[]),
                     ...(!isMobile?[<div key={`${s.id}-lc`} style={{padding:"12px",fontSize:13,borderBottom:`1px solid ${T.border}`,color:T.muted,display:"flex",alignItems:"center"}}>{normLogs.filter(l=>l.uid===s.id).length}건</div>]:[]),
