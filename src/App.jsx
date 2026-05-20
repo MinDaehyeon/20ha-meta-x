@@ -3208,7 +3208,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
               <div id="r2-top"
                 onScroll={e=>{ const b=document.getElementById('r2-body'); if(b) b.scrollLeft=e.target.scrollLeft; }}
                 style={{overflowX:"auto",overflowY:"hidden",height:14,borderBottom:`1px solid ${T.border}`,cursor:"ew-resize"}}>
-                <div style={{width:2700,height:1}}/>
+                <div style={{width:2820,height:1}}/>
               </div>
               <div id="r2-body"
                 onScroll={e=>{ const t=document.getElementById('r2-top'); if(t) t.scrollLeft=e.target.scrollLeft; }}
@@ -3219,7 +3219,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                     <tr>
                       {/* sticky 고정 헤더 */}
                       <th style={{...stickyHead, width:30, minWidth:30, fontSize:10, color:T.muted, fontWeight:700, textAlign:"center", padding:"4px 2px", borderBottom:`1px solid ${T.border}`}}>#</th>
-                      <th style={{...stickyHead, left:30, width:130, minWidth:130, fontSize:11, color:T.muted, fontWeight:700, padding:"4px 6px", borderBottom:`1px solid ${T.border}`, borderLeft:`1px solid ${T.border}`}}>이름 / 출석</th>
+                      <th style={{...stickyHead, left:30, width:110, minWidth:110, fontSize:11, color:T.muted, fontWeight:700, padding:"4px 6px", borderBottom:`1px solid ${T.border}`, borderLeft:`1px solid ${T.border}`}}>이름</th>
+                      {/* 인증현황 요약 3열 헤더 */}
+                      <th colSpan={3} style={{background:"#F5F3FF", color:"#6D28D9", fontSize:11, fontWeight:800, textAlign:"center", padding:"4px 0", borderBottom:`1px solid ${T.border}`, borderLeft:`2px solid #6D28D9`}}>인증 현황</th>
                       {/* 섹션 헤더 */}
                       {SECS.map((sec, si) => (
                         <th key={si} colSpan={sec.dates.length}
@@ -3237,7 +3239,11 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                     {/* 날짜 헤더 행 */}
                     <tr>
                       <th style={{...stickyHead, width:30, minWidth:30, borderBottom:`2px solid ${T.borderStrong}`}}></th>
-                      <th style={{...stickyHead, left:30, width:130, minWidth:130, borderBottom:`2px solid ${T.borderStrong}`, borderLeft:`1px solid ${T.border}`}}></th>
+                      <th style={{...stickyHead, left:30, width:110, minWidth:110, borderBottom:`2px solid ${T.borderStrong}`, borderLeft:`1px solid ${T.border}`}}></th>
+                      {/* 요약 3열 서브헤더 */}
+                      {[["네이버",SEC.naver.color,SEC.naver.bg],["모닝",SEC.morning.color,SEC.morning.bg],["나잇",SEC.night.color,SEC.night.bg]].map(([lbl,clr,bg],i)=>(
+                        <th key={`sum-${i}`} style={{width:36,minWidth:36,fontSize:9,fontWeight:700,color:clr,background:bg,textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:i===0?`2px solid #6D28D9`:`1px solid ${T.border}`}}>{lbl}</th>
+                      ))}
                       {SECS.map((sec, si) =>
                         sec.dates.map((dt, di) => (
                           <th key={`${si}-${di}`}
@@ -3282,10 +3288,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                             background: rowI%2===0 ? T.surface : T.surfaceAlt,
                             borderBottom:`1px solid ${T.border}`,
                           }}>{s.idx+1}</td>
-                          {/* 고정: 이름+연락처+요약 */}
+                          {/* 고정: 이름+연락처 */}
                           <td style={{
                             ...stickyBase, left:30,
-                            width:130, minWidth:130,
+                            width:110, minWidth:110,
                             padding:"2px 6px",
                             background: rowI%2===0 ? T.surface : T.surfaceAlt,
                             borderBottom:`1px solid ${T.border}`,
@@ -3294,14 +3300,20 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                           }}>
                             <div style={{textAlign:"center",fontSize:12,fontWeight:800,color:T.navy,lineHeight:1.3}}>{s.name}</div>
                             <div style={{textAlign:"center",fontSize:9,color:T.muted,fontFamily:"'DM Mono',monospace",marginTop:1}}>{s.phone}</div>
-                            <div style={{textAlign:"center",fontSize:9,marginTop:2,whiteSpace:"nowrap"}}>
-                              <span style={{color:SEC.naver.color,fontWeight:700}}>N:{nCount}/{SEC.naver.total}</span>
-                              <span style={{color:T.border,margin:"0 2px"}}>·</span>
-                              <span style={{color:SEC.morning.color,fontWeight:700}}>M:{mCount}/{SEC.morning.total}</span>
-                              <span style={{color:T.border,margin:"0 2px"}}>·</span>
-                              <span style={{color:SEC.night.color,fontWeight:700}}>나:{naCount}/{SEC.night.total}</span>
-                            </div>
                           </td>
+                          {/* 요약 3열 */}
+                          {[[nCount,SEC.naver.total,SEC.naver.color,SEC.naver.bg,true],[mCount,SEC.morning.total,SEC.morning.color,SEC.morning.bg,false],[naCount,SEC.night.total,SEC.night.color,SEC.night.bg,false]].map(([cnt,tot,clr,bg,first],i)=>(
+                            <td key={`sum-${i}`} style={{
+                              width:36,minWidth:36,height:CELL_H,
+                              textAlign:"center",verticalAlign:"middle",
+                              fontSize:10,fontWeight:700,
+                              color:cnt>0?clr:T.muted,
+                              background:cnt===tot&&tot>0?bg:"transparent",
+                              borderBottom:`1px solid ${T.border}`,
+                              borderLeft:first?`2px solid #6D28D9`:`1px solid ${T.border}`,
+                              padding:0,whiteSpace:"nowrap",
+                            }}>{cnt}/{tot}</td>
+                          ))}
                           {/* 출석 셀들 */}
                           {SECS.map((sec, si) =>
                             sec.dates.map((dt, di) => {
