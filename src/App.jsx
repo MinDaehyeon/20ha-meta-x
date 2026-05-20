@@ -85,6 +85,31 @@ const calcGrade = (birthYear, birthMonth) => {
   return "졸업";
 };
 
+// 생년월일 입력 공통 컴포넌트 (년/월/일 세 드롭다운)
+// showGrade=true 이면 학년 태그 표시 (학생용)
+const BirthInput = ({year, month, day, onYear, onMonth, onDay, showGrade=false}) => {
+  const grade = showGrade ? calcGrade(year ? Number(year) : null, month ? Number(month) : null) : null;
+  const selStyle = {padding:"9px 6px",borderRadius:8,border:`1px solid ${T.border}`,fontSize:14,fontFamily:"'Noto Sans KR',sans-serif",background:"#fff",cursor:"pointer"};
+  const curYear = new Date().getFullYear();
+  return (
+    <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+      <select value={year||""} onChange={e=>onYear(e.target.value)} style={{...selStyle,flex:"1 1 90px"}}>
+        <option value="">년도</option>
+        {Array.from({length:curYear-1950+1},(_,i)=>curYear-i).map(y=><option key={y} value={y}>{y}년</option>)}
+      </select>
+      <select value={month||""} onChange={e=>onMonth(e.target.value)} style={{...selStyle,flex:"1 1 70px"}}>
+        <option value="">월</option>
+        {Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i+1}월</option>)}
+      </select>
+      <select value={day||""} onChange={e=>onDay(e.target.value)} style={{...selStyle,flex:"1 1 70px"}}>
+        <option value="">일</option>
+        {Array.from({length:31},(_,i)=><option key={i+1} value={i+1}>{i+1}일</option>)}
+      </select>
+      {grade && <span style={{fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>({grade})</span>}
+    </div>
+  );
+};
+
 // ══════════════════════════════════════════════════════
 // DESIGN TOKENS
 // ══════════════════════════════════════════════════════
@@ -334,7 +359,9 @@ const AuthScreen = ({ onLogin }) => {
   const [mode, setMode]       = useState("login"); // "login"|"signup"
   const [suRole, setSuRole]   = useState("student"); // "student" | "parent"
   const [suName, setSuName]   = useState("");
-  const [suBirthYear, setSuBirthYear] = useState("");
+  const [suBirthYear, setSuBirthYear]   = useState("");
+  const [suBirthMonth, setSuBirthMonth] = useState("");
+  const [suBirthDay, setSuBirthDay]     = useState("");
   const [suEmail, setSuEmail] = useState("");
   const [suPw, setSuPw]       = useState("");
   const [suPwC, setSuPwC]     = useState("");
@@ -447,7 +474,7 @@ const AuthScreen = ({ onLogin }) => {
     if(!pwRegex.test(suPw)){ setError("비밀번호는 영문 대소문자, 특수문자를 포함한 8자 이상이어야 합니다."); return; }
     setLoad("signup",true);
     const {data,error:err} = await supabase.auth.updateUser({
-      password:suPw, data:{name:suName, grade:suRole==="student"?calcGrade(Number(suBirthYear),null):"", target_ei:85, role:suRole}
+      password:suPw, data:{name:suName, grade:suRole==="student"?calcGrade(Number(suBirthYear),suBirthMonth?Number(suBirthMonth):null):"", target_ei:85, role:suRole}
     });
     if(err){
       // 세션 유지 — 사용자가 바로 재시도 가능
@@ -459,8 +486,9 @@ const AuthScreen = ({ onLogin }) => {
       const { error:profErr } = await supabase.from("profiles").upsert({
         id:data.user.id, name:suName,
         grade:suRole==="student"?calcGrade(Number(suBirthYear),null):"",
-        birth_year:suRole==="student"&&suBirthYear?Number(suBirthYear):null,
-        birth_month:null, birth_day:null,
+        birth_year:suBirthYear?Number(suBirthYear):null,
+        birth_month:suBirthMonth?Number(suBirthMonth):null,
+        birth_day:suBirthDay?Number(suBirthDay):null,
         target_ei:85, role:suRole, approval_status:"pending"
       });
       if(profErr){
@@ -634,16 +662,12 @@ const handleSocial = async (provider) => {
         </div>
         <div style={{display:"grid",gap:12,marginBottom:12}}>
           <div><label style={css.label}>이름 <span style={{color:"#e53e3e"}}>*</span></label><input value={suName} onChange={e=>setSuName(e.target.value)} placeholder="홍길동" required style={css.input}/></div>
-          {suRole==="student" && (
-            <div>
-              <label style={css.label}>출생연도 <span style={{color:"#e53e3e"}}>*</span></label>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <input type="number" value={suBirthYear} onChange={e=>setSuBirthYear(e.target.value)}
-                  placeholder="예) 2013" min={2000} max={2020} style={{...css.input,flex:1}}/>
-                {suBirthYear && <span style={{fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>({calcGrade(Number(suBirthYear),null)})</span>}
-              </div>
-            </div>
-          )}
+          <div>
+            <label style={css.label}>생년월일 <span style={{color:"#e53e3e"}}>*</span></label>
+            <BirthInput year={suBirthYear} month={suBirthMonth} day={suBirthDay}
+              onYear={setSuBirthYear} onMonth={setSuBirthMonth} onDay={setSuBirthDay}
+              showGrade={suRole==="student"}/>
+          </div>
 
           <div>
             <label style={css.label}>이메일</label>
@@ -757,8 +781,10 @@ const handleSocial = async (provider) => {
 // PROFILE SETUP SCREEN (소셜 로그인 최초 가입)
 // ══════════════════════════════════════════════════════
 const ProfileSetupScreen = ({user, onComplete}) => {
-  const [name, setName]         = useState(user.user_metadata?.full_name||user.user_metadata?.name||"");
-  const [birthYear, setBirthYear] = useState("");
+  const [name, setName]           = useState(user.user_metadata?.full_name||user.user_metadata?.name||"");
+  const [birthYear, setBirthYear]   = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthDay, setBirthDay]     = useState("");
   const [target, setTarget]     = useState(85);
   const [saving, setSaving]     = useState(false);
   const [done, setDone]         = useState(false);
@@ -766,13 +792,13 @@ const ProfileSetupScreen = ({user, onComplete}) => {
 
   const save = async () => {
     if(!name){ setError("이름을 입력해 주세요."); return; }
-    if(!birthYear){ setError("출생연도를 입력해 주세요."); return; }
+    if(!birthYear){ setError("생년월일을 입력해 주세요."); return; }
     setSaving(true);
-    const by = Number(birthYear);
+    const by = Number(birthYear), bm = birthMonth?Number(birthMonth):null, bd = birthDay?Number(birthDay):null;
     await supabase.from("profiles").upsert({
       id:user.id, name,
-      grade: calcGrade(by, null),
-      birth_year: by, birth_month: null, birth_day: null,
+      grade: calcGrade(by, bm),
+      birth_year: by, birth_month: bm, birth_day: bd,
       target_ei:85, role:"student", approval_status:"pending"
     });
     setSaving(false);
@@ -807,12 +833,10 @@ const ProfileSetupScreen = ({user, onComplete}) => {
         <div style={{display:"grid",gap:14,marginBottom:16}}>
           <div><label style={css.label}>이름</label><input value={name} onChange={e=>setName(e.target.value)} placeholder="홍길동" style={css.input}/></div>
           <div>
-            <label style={css.label}>출생연도 <span style={{color:"#e53e3e"}}>*</span></label>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <input type="number" value={birthYear} onChange={e=>setBirthYear(e.target.value)}
-                placeholder="예) 2013" min={2000} max={2020} style={{...css.input,flex:1}}/>
-              {birthYear && <span style={{fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>({calcGrade(Number(birthYear),null)})</span>}
-            </div>
+            <label style={css.label}>생년월일 <span style={{color:"#e53e3e"}}>*</span></label>
+            <BirthInput year={birthYear} month={birthMonth} day={birthDay}
+              onYear={setBirthYear} onMonth={setBirthMonth} onDay={setBirthDay}
+              showGrade={true}/>
           </div>
 
         </div>
@@ -836,9 +860,11 @@ const ProfileSetupScreen = ({user, onComplete}) => {
 // COMPLETE PROFILE SCREEN (가입 미완료 사용자 - 이름/비밀번호 입력)
 // ══════════════════════════════════════════════════════
 const CompleteProfileScreen = ({ session, onDone }) => {
-  const [name, setName]         = useState("");
-  const [role, setRole]         = useState("student");
-  const [birthYear, setBirthYear] = useState("");
+  const [name, setName]           = useState("");
+  const [role, setRole]           = useState("student");
+  const [birthYear, setBirthYear]   = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthDay, setBirthDay]     = useState("");
   const [pw, setPw]             = useState("");
   const [pwC, setPwC]           = useState("");
   const [saving, setSaving]     = useState(false);
@@ -848,17 +874,17 @@ const CompleteProfileScreen = ({ session, onDone }) => {
   const save = async () => {
     setError("");
     if(!name.trim() || name.trim().length < 2){ setError("이름을 2자 이상 입력해주세요."); return; }
-    if(role==="student" && !birthYear){ setError("출생연도를 입력해주세요."); return; }
+    if(!birthYear){ setError("생년월일을 입력해주세요."); return; }
     const pwRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/;
     if(!pwRegex.test(pw)){ setError("비밀번호는 영문 대소문자+특수문자 8자 이상이어야 합니다."); return; }
     if(pw !== pwC){ setError("비밀번호가 일치하지 않습니다."); return; }
     setSaving(true);
     const uid = session?.user?.id;
-    const by = role==="student" ? Number(birthYear) : null;
-    const grd = role==="student" ? calcGrade(by, null) : "";
+    const by = Number(birthYear), bm = birthMonth?Number(birthMonth):null, bd = birthDay?Number(birthDay):null;
+    const grd = role==="student" ? calcGrade(by, bm) : "";
     const { error: ue } = await supabase.auth.updateUser({ password: pw, data: { name, role, grade: grd } });
     if(!ue && uid) {
-      await supabase.from("profiles").upsert({ id: uid, name, grade: grd, birth_year: by, birth_month: null, birth_day: null, role, approval_status:"pending", target_ei:85, is_active:true });
+      await supabase.from("profiles").upsert({ id: uid, name, grade: grd, birth_year: by, birth_month: bm, birth_day: bd, role, approval_status:"pending", target_ei:85, is_active:true });
     }
     setSaving(false);
     if(ue){ setError("오류가 발생했습니다. 다시 시도해주세요."); return; }
@@ -895,14 +921,12 @@ const CompleteProfileScreen = ({ session, onDone }) => {
               ))}
             </div>
           </div>
-          {role==="student"&&<div>
-            <label style={css.label}>출생연도 <span style={{color:"#e53e3e"}}>*</span></label>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <input type="number" value={birthYear} onChange={e=>setBirthYear(e.target.value)}
-                placeholder="예) 2013" min={2000} max={2020} style={{...css.input,flex:1}}/>
-              {birthYear && <span style={{fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>({calcGrade(Number(birthYear),null)})</span>}
-            </div>
-          </div>}
+          <div>
+            <label style={css.label}>생년월일 <span style={{color:"#e53e3e"}}>*</span></label>
+            <BirthInput year={birthYear} month={birthMonth} day={birthDay}
+              onYear={setBirthYear} onMonth={setBirthMonth} onDay={setBirthDay}
+              showGrade={role==="student"}/>
+          </div>
           <div><label style={css.label}>비밀번호 <span style={{fontWeight:400,color:T.muted,fontSize:11}}>(대소문자+특수문자 8자↑)</span></label><input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="••••••••" style={css.input}/></div>
           <div><label style={css.label}>비밀번호 확인</label><input type="password" value={pwC} onChange={e=>setPwC(e.target.value)} placeholder="••••••••" style={css.input}/></div>
         </div>
@@ -2262,8 +2286,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
       p_approval_status: editStudent.approval_status,
     });
     // birth_year는 직접 업데이트 (RPC 파라미터 외)
-    if(!ue && editStudent.birth_year) {
-      await supabase.from("profiles").update({birth_year: editStudent.birth_year, birth_month: null, birth_day: null}).eq("id", editStudent.id);
+    if(!ue) {
+      await supabase.from("profiles").update({birth_year: editStudent.birth_year||null, birth_month: editStudent.birth_month||null, birth_day: editStudent.birth_day||null}).eq("id", editStudent.id);
     }
     if(ue) console.error("update error:", ue.message);
     setSaving(false); setEditStudent(null); onRefresh();
@@ -2361,17 +2385,15 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                       <input type={type==="num"?"number":type} min={min} max={max} value={editStudent[key]||""} onChange={e=>setEditStudent(s=>({...s,[key]:type==="num"?Number(e.target.value):e.target.value}))} style={css.input}/>
                     </div>
                   ))}
-                  {editStudent.role==="student"&&(
-                    <div>
-                      <label style={css.label}>출생연도</label>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <input type="number" value={editStudent.birth_year||""} min={2000} max={2020}
-                          onChange={e=>setEditStudent(s=>({...s,birth_year:Number(e.target.value),grade:calcGrade(Number(e.target.value),null)}))}
-                          style={{...css.input,flex:1}}/>
-                        {editStudent.birth_year && <span style={{fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>({calcGrade(editStudent.birth_year,null)})</span>}
-                      </div>
-                    </div>
-                  )}
+                  <div>
+                    <label style={css.label}>생년월일</label>
+                    <BirthInput
+                      year={editStudent.birth_year||""} month={editStudent.birth_month||""} day={editStudent.birth_day||""}
+                      onYear={v=>setEditStudent(s=>({...s,birth_year:Number(v),grade:calcGrade(Number(v),s.birth_month||null)}))}
+                      onMonth={v=>setEditStudent(s=>({...s,birth_month:Number(v),grade:calcGrade(s.birth_year||null,Number(v))}))}
+                      onDay={v=>setEditStudent(s=>({...s,birth_day:Number(v)}))}
+                      showGrade={editStudent.role==="student"}/>
+                  </div>
                   <div>
                     <label style={css.label}>승인 상태</label>
                     <select value={editStudent.approval_status} onChange={e=>setEditStudent(s=>({...s,approval_status:e.target.value}))} style={css.select}>
@@ -3678,8 +3700,10 @@ const EISetupModal = ({profile, logs=[], onSave}) => {
 // PROFILE MODAL
 // ══════════════════════════════════════════════════════
 const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
-  const [name, setName]           = useState(profile.name||"");
-  const [birthYear, setBirthYear] = useState(profile.birth_year ? String(profile.birth_year) : "");
+  const [name, setName]             = useState(profile.name||"");
+  const [birthYear, setBirthYear]   = useState(profile.birth_year ? String(profile.birth_year) : "");
+  const [birthMonth, setBirthMonth] = useState(profile.birth_month ? String(profile.birth_month) : "");
+  const [birthDay, setBirthDay]     = useState(profile.birth_day ? String(profile.birth_day) : "");
   const [target, setTarget]       = useState(gradeInfo(profile.target_ei||85).g);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url||"");
   const [uploading, setUploading] = useState(false);
@@ -3744,8 +3768,8 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
     }
     setSaving(true);
     const targetEI = GRADE_MIN[target]||85;
-    const by = birthYear ? Number(birthYear) : null;
-    await supabase.from("profiles").update({name, grade: calcGrade(by, null)||profile.grade, birth_year:by, birth_month:null, birth_day:null, target_ei:targetEI, avatar_url:avatarUrl, updated_at:new Date().toISOString()}).eq("id", profile.id);
+    const by = birthYear?Number(birthYear):null, bm = birthMonth?Number(birthMonth):null, bd = birthDay?Number(birthDay):null;
+    await supabase.from("profiles").update({name, grade: calcGrade(by, bm)||profile.grade, birth_year:by, birth_month:bm, birth_day:bd, target_ei:targetEI, avatar_url:avatarUrl, updated_at:new Date().toISOString()}).eq("id", profile.id);
     if(newPw){
       const {error:pwErr} = await supabase.auth.updateUser({password:newPw});
       if(pwErr){
@@ -3817,12 +3841,10 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
           </div>
           {profile.role==="student"&&<>
             <div>
-              <label style={css.label}>출생연도</label>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <input type="number" value={birthYear} onChange={e=>setBirthYear(e.target.value)}
-                  placeholder="예) 2013" min={2000} max={2020} style={{...css.input,flex:1}}/>
-                {birthYear && <span style={{fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>({calcGrade(Number(birthYear),null)})</span>}
-              </div>
+              <label style={css.label}>생년월일</label>
+              <BirthInput year={birthYear} month={birthMonth} day={birthDay}
+                onYear={setBirthYear} onMonth={setBirthMonth} onDay={setBirthDay}
+                showGrade={true}/>
             </div>
             <div>
               <label style={css.label}>목표 등급</label>
