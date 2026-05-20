@@ -1443,7 +1443,11 @@ const LearningCalendar = ({logs}) => {
         })}
       </div>
       {tooltip && (
-        <div style={{position:"fixed",left:tooltip.x,top:tooltip.y-8,transform:"translate(-50%,-100%)",
+        <div style={{position:"fixed",
+          left:tooltip.x+80>window.innerWidth?"auto":tooltip.x,
+          right:tooltip.x+80>window.innerWidth?8:"auto",
+          top:tooltip.y-8,
+          transform:tooltip.x+80>window.innerWidth?"translateY(-100%)":"translate(-50%,-100%)",
           background:T.navy,color:T.white,borderRadius:10,padding:"10px 14px",fontSize:12,
           zIndex:9999,pointerEvents:"none",boxShadow:"0 4px 16px rgba(0,0,0,0.2)",minWidth:140,whiteSpace:"nowrap"}}>
           <strong>{tooltip.dateStr}</strong> — {tooltip.dayLogs.length}건 학습
