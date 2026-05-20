@@ -2000,7 +2000,7 @@ const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChild
 const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const [adminTab, setAdminTab] = useState("users"); // "users" | "dashboard" | "cert" | "roster2"
   const [rosterSearch, setRosterSearch] = useState("");
-  const [attendance2, setAttendance2] = useState({"36-나-2026-05-17":true,"27-나-2026-05-17":true,"4-나-2026-05-17":true,"9-나-2026-05-17":true,"0-나-2026-05-17":true,"6-나-2026-05-17":true,"19-나-2026-05-17":true,"3-나-2026-05-17":true,"5-나-2026-05-17":true,"37-나-2026-05-17":true,"31-나-2026-05-17":true,"7-나-2026-05-17":true,"13-나-2026-05-17":true,"8-나-2026-05-17":true,"15-나-2026-05-17":true,"33-나-2026-05-17":true,"1-나-2026-05-17":true,"10-나-2026-05-17":true,"25-나-2026-05-17":true,"29-나-2026-05-17":true,"32-나-2026-05-17":true,"11-나-2026-05-17":true,"12-나-2026-05-17":true,"28-나-2026-05-17":true,"26-나-2026-05-17":true,"22-나-2026-05-17":true,"30-나-2026-05-17":true,"24-나-2026-05-17":true,"38-나-2026-05-17":true,"17-나-2026-05-17":true,"2-나-2026-05-17":true,"16-나-2026-05-17":true,"23-나-2026-05-17":true,"35-나-2026-05-17":true,"4-M-2026-05-18":true,"6-M-2026-05-18":true,"23-M-2026-05-18":true,"17-M-2026-05-18":true,"36-M-2026-05-18":true,"39-M-2026-05-18":true,"10-M-2026-05-18":true,"8-M-2026-05-18":true,"33-M-2026-05-18":true,"27-M-2026-05-18":true,"24-M-2026-05-18":true,"19-M-2026-05-18":true,"20-M-2026-05-18":true,"2-M-2026-05-18":true,"3-M-2026-05-18":true,"22-M-2026-05-18":true,"26-M-2026-05-18":true,"34-M-2026-05-18":true,"12-M-2026-05-18":true,"25-M-2026-05-18":true,"28-M-2026-05-18":true,"18-M-2026-05-18":true,"31-M-2026-05-18":true,"9-M-2026-05-18":true,"16-M-2026-05-18":true,"0-M-2026-05-18":true,"32-M-2026-05-18":true,"30-M-2026-05-18":true,"1-M-2026-05-18":true,"29-M-2026-05-18":true,"15-M-2026-05-18":true,"18-나-2026-05-18":true,"36-나-2026-05-18":true,"23-나-2026-05-18":true,"32-나-2026-05-18":true,"35-나-2026-05-18":true,"4-나-2026-05-18":true,"10-나-2026-05-18":true,"3-나-2026-05-18":true,"12-나-2026-05-18":true,"16-나-2026-05-18":true,"2-나-2026-05-18":true,"11-나-2026-05-18":true,"0-나-2026-05-18":true,"8-나-2026-05-18":true,"19-나-2026-05-18":true,"7-나-2026-05-18":true,"31-나-2026-05-18":true,"17-나-2026-05-18":true,"20-나-2026-05-18":true,"9-나-2026-05-18":true,"13-나-2026-05-18":true,"33-나-2026-05-18":true,"25-나-2026-05-18":true,"30-나-2026-05-18":true,"1-나-2026-05-18":true,"39-나-2026-05-18":true,"28-나-2026-05-18":true,"15-나-2026-05-18":true,"22-나-2026-05-18":true,"37-나-2026-05-18":true,"21-나-2026-05-18":true,"38-나-2026-05-18":true,"34-나-2026-05-18":true,"27-나-2026-05-18":true,"6-나-2026-05-18":true,"14-나-2026-05-18":true,"24-나-2026-05-18":true,"26-나-2026-05-18":true,"5-나-2026-05-18":true,"36-나-2026-05-19":true,"23-나-2026-05-19":true,"32-나-2026-05-19":true,"37-나-2026-05-19":true,"0-나-2026-05-19":true,"17-나-2026-05-19":true,"9-나-2026-05-19":true,"25-나-2026-05-19":true,"2-나-2026-05-19":true,"33-나-2026-05-19":true,"35-나-2026-05-19":true,"14-나-2026-05-19":true,"21-나-2026-05-19":true,"4-나-2026-05-19":true,"1-나-2026-05-19":true,"24-나-2026-05-19":true,"15-나-2026-05-19":true,"20-나-2026-05-19":true,"39-나-2026-05-19":true,"8-나-2026-05-19":true,"34-나-2026-05-19":true,"29-나-2026-05-19":true,"5-나-2026-05-19":true,"13-나-2026-05-19":true,"10-나-2026-05-19":true,"19-나-2026-05-19":true,"30-나-2026-05-19":true,"6-나-2026-05-19":true,"28-나-2026-05-19":true,"11-나-2026-05-19":true,"3-나-2026-05-19":true,"18-나-2026-05-19":true,"7-나-2026-05-19":true,"26-나-2026-05-19":true,"12-나-2026-05-19":true,"10-M-2026-05-20":true,"36-M-2026-05-20":true,"8-M-2026-05-20":true,"23-M-2026-05-20":true,"6-M-2026-05-20":true,"3-M-2026-05-20":true,"12-M-2026-05-20":true,"35-M-2026-05-20":true,"4-M-2026-05-20":true,"19-M-2026-05-20":true,"21-M-2026-05-20":true,"9-M-2026-05-20":true,"18-M-2026-05-20":true,"33-M-2026-05-20":true,"24-M-2026-05-20":true,"0-M-2026-05-20":true,"2-M-2026-05-20":true,"39-M-2026-05-20":true,"15-M-2026-05-20":true,"16-M-2026-05-20":true,"20-M-2026-05-20":true,"1-M-2026-05-20":true,"31-M-2026-05-20":true,"14-M-2026-05-20":true,"37-M-2026-05-20":true,"30-M-2026-05-20":true,"26-M-2026-05-20":true,"28-M-2026-05-20":true,"38-M-2026-05-20":true,"34-M-2026-05-20":true,"22-M-2026-05-20":true});
+  const [attendance2, setAttendance2] = useState({"36-나-2026-05-17":true,"27-나-2026-05-17":true,"4-나-2026-05-17":true,"9-나-2026-05-17":true,"0-나-2026-05-17":true,"6-나-2026-05-17":true,"19-나-2026-05-17":true,"3-나-2026-05-17":true,"5-나-2026-05-17":true,"37-나-2026-05-17":true,"31-나-2026-05-17":true,"7-나-2026-05-17":true,"13-나-2026-05-17":true,"8-나-2026-05-17":true,"15-나-2026-05-17":true,"33-나-2026-05-17":true,"1-나-2026-05-17":true,"10-나-2026-05-17":true,"25-나-2026-05-17":true,"29-나-2026-05-17":true,"32-나-2026-05-17":true,"11-나-2026-05-17":true,"12-나-2026-05-17":true,"28-나-2026-05-17":true,"26-나-2026-05-17":true,"22-나-2026-05-17":true,"30-나-2026-05-17":true,"24-나-2026-05-17":true,"38-나-2026-05-17":true,"17-나-2026-05-17":true,"2-나-2026-05-17":true,"16-나-2026-05-17":true,"23-나-2026-05-17":true,"35-나-2026-05-17":true,"4-M-2026-05-18":true,"11-M-2026-05-18":true,"6-M-2026-05-18":true,"23-M-2026-05-18":true,"17-M-2026-05-18":true,"36-M-2026-05-18":true,"39-M-2026-05-18":true,"10-M-2026-05-18":true,"8-M-2026-05-18":true,"33-M-2026-05-18":true,"27-M-2026-05-18":true,"24-M-2026-05-18":true,"19-M-2026-05-18":true,"20-M-2026-05-18":true,"2-M-2026-05-18":true,"3-M-2026-05-18":true,"22-M-2026-05-18":true,"26-M-2026-05-18":true,"34-M-2026-05-18":true,"12-M-2026-05-18":true,"25-M-2026-05-18":true,"28-M-2026-05-18":true,"18-M-2026-05-18":true,"31-M-2026-05-18":true,"9-M-2026-05-18":true,"16-M-2026-05-18":true,"0-M-2026-05-18":true,"32-M-2026-05-18":true,"30-M-2026-05-18":true,"1-M-2026-05-18":true,"29-M-2026-05-18":true,"15-M-2026-05-18":true,"18-나-2026-05-18":true,"36-나-2026-05-18":true,"23-나-2026-05-18":true,"32-나-2026-05-18":true,"35-나-2026-05-18":true,"4-나-2026-05-18":true,"10-나-2026-05-18":true,"3-나-2026-05-18":true,"12-나-2026-05-18":true,"16-나-2026-05-18":true,"2-나-2026-05-18":true,"11-나-2026-05-18":true,"0-나-2026-05-18":true,"8-나-2026-05-18":true,"19-나-2026-05-18":true,"7-나-2026-05-18":true,"31-나-2026-05-18":true,"17-나-2026-05-18":true,"20-나-2026-05-18":true,"9-나-2026-05-18":true,"13-나-2026-05-18":true,"33-나-2026-05-18":true,"25-나-2026-05-18":true,"30-나-2026-05-18":true,"1-나-2026-05-18":true,"39-나-2026-05-18":true,"28-나-2026-05-18":true,"15-나-2026-05-18":true,"22-나-2026-05-18":true,"37-나-2026-05-18":true,"21-나-2026-05-18":true,"38-나-2026-05-18":true,"34-나-2026-05-18":true,"27-나-2026-05-18":true,"6-나-2026-05-18":true,"14-나-2026-05-18":true,"24-나-2026-05-18":true,"26-나-2026-05-18":true,"5-나-2026-05-18":true,"36-나-2026-05-19":true,"23-나-2026-05-19":true,"32-나-2026-05-19":true,"37-나-2026-05-19":true,"0-나-2026-05-19":true,"17-나-2026-05-19":true,"9-나-2026-05-19":true,"25-나-2026-05-19":true,"2-나-2026-05-19":true,"33-나-2026-05-19":true,"35-나-2026-05-19":true,"14-나-2026-05-19":true,"21-나-2026-05-19":true,"4-나-2026-05-19":true,"1-나-2026-05-19":true,"24-나-2026-05-19":true,"15-나-2026-05-19":true,"20-나-2026-05-19":true,"39-나-2026-05-19":true,"8-나-2026-05-19":true,"34-나-2026-05-19":true,"29-나-2026-05-19":true,"5-나-2026-05-19":true,"13-나-2026-05-19":true,"10-나-2026-05-19":true,"19-나-2026-05-19":true,"30-나-2026-05-19":true,"6-나-2026-05-19":true,"28-나-2026-05-19":true,"11-나-2026-05-19":true,"3-나-2026-05-19":true,"18-나-2026-05-19":true,"7-나-2026-05-19":true,"26-나-2026-05-19":true,"12-나-2026-05-19":true,"22-나-2026-05-19":true,"10-M-2026-05-20":true,"36-M-2026-05-20":true,"8-M-2026-05-20":true,"23-M-2026-05-20":true,"6-M-2026-05-20":true,"3-M-2026-05-20":true,"12-M-2026-05-20":true,"35-M-2026-05-20":true,"4-M-2026-05-20":true,"19-M-2026-05-20":true,"21-M-2026-05-20":true,"9-M-2026-05-20":true,"18-M-2026-05-20":true,"33-M-2026-05-20":true,"24-M-2026-05-20":true,"0-M-2026-05-20":true,"2-M-2026-05-20":true,"39-M-2026-05-20":true,"15-M-2026-05-20":true,"16-M-2026-05-20":true,"20-M-2026-05-20":true,"1-M-2026-05-20":true,"31-M-2026-05-20":true,"14-M-2026-05-20":true,"37-M-2026-05-20":true,"30-M-2026-05-20":true,"26-M-2026-05-20":true,"28-M-2026-05-20":true,"38-M-2026-05-20":true,"34-M-2026-05-20":true,"22-M-2026-05-20":true});
   const [sel, setSel]           = useState("전체");
   const [editStudent, setEditStudent] = useState(null);
   const [saving, setSaving]     = useState(false);
@@ -2276,8 +2276,6 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
       <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
         {[
           {key:"users",label:"👥 회원 관리",badge:pendingCount},
-          {key:"dashboard",label:"📊 진단 센터"},
-          {key:"cert",label:"📋 인증 현황"},
           {key:"roster2",label:"📝 2기 명단"},
         ].map(t=>(
           <button key={t.key} onClick={()=>setAdminTab(t.key)}
@@ -3221,7 +3219,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                     <tr>
                       {/* sticky 고정 헤더 */}
                       <th style={{...stickyHead, width:30, minWidth:30, fontSize:10, color:T.muted, fontWeight:700, textAlign:"center", padding:"4px 2px", borderBottom:`1px solid ${T.border}`}}>#</th>
-                      <th style={{...stickyHead, left:30, width:70, minWidth:70, fontSize:11, color:T.muted, fontWeight:700, padding:"4px 6px", borderBottom:`1px solid ${T.border}`, borderLeft:`1px solid ${T.border}`}}>이름</th>
+                      <th style={{...stickyHead, left:30, width:130, minWidth:130, fontSize:11, color:T.muted, fontWeight:700, padding:"4px 6px", borderBottom:`1px solid ${T.border}`, borderLeft:`1px solid ${T.border}`}}>이름 / 출석</th>
                       {/* 섹션 헤더 */}
                       {SECS.map((sec, si) => (
                         <th key={si} colSpan={sec.dates.length}
@@ -3235,13 +3233,11 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                           {sec.label}
                         </th>
                       ))}
-                      {/* 요약 헤더 */}
-                      <th style={{background:T.surfaceAlt,fontSize:10,color:T.muted,fontWeight:700,textAlign:"center",padding:"4px 6px",borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,whiteSpace:"nowrap",minWidth:90}}>요약</th>
                     </tr>
                     {/* 날짜 헤더 행 */}
                     <tr>
                       <th style={{...stickyHead, width:30, minWidth:30, borderBottom:`2px solid ${T.borderStrong}`}}></th>
-                      <th style={{...stickyHead, left:30, width:70, minWidth:70, borderBottom:`2px solid ${T.borderStrong}`, borderLeft:`1px solid ${T.border}`}}></th>
+                      <th style={{...stickyHead, left:30, width:130, minWidth:130, borderBottom:`2px solid ${T.borderStrong}`, borderLeft:`1px solid ${T.border}`}}></th>
                       {SECS.map((sec, si) =>
                         sec.dates.map((dt, di) => (
                           <th key={`${si}-${di}`}
@@ -3286,17 +3282,26 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                             background: rowI%2===0 ? T.surface : T.surfaceAlt,
                             borderBottom:`1px solid ${T.border}`,
                           }}>{s.idx+1}</td>
-                          {/* 고정: 이름 */}
+                          {/* 고정: 이름+연락처+요약 */}
                           <td style={{
                             ...stickyBase, left:30,
-                            width:70, minWidth:70,
-                            fontSize:12, fontWeight:700, color:T.text,
-                            padding:"0 6px", height:CELL_H,
+                            width:130, minWidth:130,
+                            padding:"2px 6px",
                             background: rowI%2===0 ? T.surface : T.surfaceAlt,
                             borderBottom:`1px solid ${T.border}`,
                             borderLeft:`1px solid ${T.border}`,
-                            whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
-                          }}>{s.name}</td>
+                            verticalAlign:"middle",
+                          }}>
+                            <div style={{textAlign:"center",fontSize:12,fontWeight:800,color:T.navy,lineHeight:1.3}}>{s.name}</div>
+                            <div style={{textAlign:"center",fontSize:9,color:T.muted,fontFamily:"'DM Mono',monospace",marginTop:1}}>{s.phone}</div>
+                            <div style={{textAlign:"center",fontSize:9,marginTop:2,whiteSpace:"nowrap"}}>
+                              <span style={{color:SEC.naver.color,fontWeight:700}}>N:{nCount}/{SEC.naver.total}</span>
+                              <span style={{color:T.border,margin:"0 2px"}}>·</span>
+                              <span style={{color:SEC.morning.color,fontWeight:700}}>M:{mCount}/{SEC.morning.total}</span>
+                              <span style={{color:T.border,margin:"0 2px"}}>·</span>
+                              <span style={{color:SEC.night.color,fontWeight:700}}>나:{naCount}/{SEC.night.total}</span>
+                            </div>
+                          </td>
                           {/* 출석 셀들 */}
                           {SECS.map((sec, si) =>
                             sec.dates.map((dt, di) => {
@@ -3322,21 +3327,6 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                               );
                             })
                           )}
-                          {/* 요약 */}
-                          <td style={{
-                            fontSize:10, color:T.textMid, fontWeight:600,
-                            padding:"0 6px", height:CELL_H,
-                            borderBottom:`1px solid ${T.border}`,
-                            borderLeft:`1px solid ${T.border}`,
-                            whiteSpace:"nowrap", textAlign:"center",
-                            background: rowI%2===0 ? T.surface : T.surfaceAlt,
-                          }}>
-                            <span style={{color:SEC.naver.color}}>N:{nCount}/{SEC.naver.total}</span>
-                            {" "}
-                            <span style={{color:SEC.morning.color}}>M:{mCount}/{SEC.morning.total}</span>
-                            {" "}
-                            <span style={{color:SEC.night.color}}>나:{naCount}/{SEC.night.total}</span>
-                          </td>
                         </tr>
                       );
                     })}
