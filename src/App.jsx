@@ -1998,7 +1998,8 @@ const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChild
 // ADMIN DASHBOARD (진단 + 회원 관리)
 // ══════════════════════════════════════════════════════
 const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
-  const [adminTab, setAdminTab] = useState("users"); // "users" | "dashboard" | "cert"
+  const [adminTab, setAdminTab] = useState("users"); // "users" | "dashboard" | "cert" | "roster2"
+  const [rosterSearch, setRosterSearch] = useState("");
   const [sel, setSel]           = useState("전체");
   const [editStudent, setEditStudent] = useState(null);
   const [saving, setSaving]     = useState(false);
@@ -2276,6 +2277,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
           {key:"users",label:"👥 회원 관리",badge:pendingCount},
           {key:"dashboard",label:"📊 진단 센터"},
           {key:"cert",label:"📋 인증 현황"},
+          {key:"roster2",label:"📝 2기 명단"},
         ].map(t=>(
           <button key={t.key} onClick={()=>setAdminTab(t.key)}
             style={{padding:"9px 20px",borderRadius:10,border:`1px solid ${adminTab===t.key?T.navy:T.border}`,cursor:"pointer",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:8,
@@ -3086,6 +3088,123 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
           )}
         </div>
       )}
+
+      {/* ── 2기 명단 탭 ── */}
+      {adminTab==="roster2"&&(()=>{
+        const ROSTER2 = [
+          {no:1,  name:"강예나", phone:"010-5463-7565"},
+          {no:2,  name:"김가흔", phone:"010-7277-4530"},
+          {no:3,  name:"김은채", phone:"010-2565-9756"},
+          {no:4,  name:"김태준", phone:"010-7282-5241"},
+          {no:5,  name:"박재현", phone:"010-3889-4881"},
+          {no:6,  name:"손연재", phone:"010-2658-1189"},
+          {no:7,  name:"윤준원", phone:"010-3560-4433"},
+          {no:8,  name:"최지유", phone:"010-5913-3385"},
+          {no:9,  name:"배정윤", phone:"010-6686-6462"},
+          {no:10, name:"심수윤", phone:"010-2079-0009"},
+          {no:11, name:"한설아", phone:"010-3288-1931"},
+          {no:12, name:"강가인", phone:"010-3952-3253"},
+          {no:13, name:"권민유", phone:"010-4355-2933"},
+          {no:14, name:"권순혁", phone:"010-6220-0745"},
+          {no:15, name:"최유주", phone:"010-7928-0050"},
+          {no:16, name:"김도현", phone:"010-2265-9013"},
+          {no:17, name:"김시원", phone:"010-9289-4397"},
+          {no:18, name:"김시윤", phone:"010-3788-2478"},
+          {no:19, name:"김아란", phone:"010-5410-8405"},
+          {no:20, name:"김준범", phone:"010-2797-3039"},
+          {no:21, name:"김지우", phone:"010-9458-2447"},
+          {no:22, name:"김호진", phone:"010-4528-8226"},
+          {no:23, name:"나지성", phone:"010-9625-1379"},
+          {no:24, name:"문지유", phone:"010-6496-1389"},
+          {no:25, name:"박지우", phone:"010-8330-6779"},
+          {no:26, name:"서소윤", phone:"010-9996-9761"},
+          {no:27, name:"서지우", phone:"010-9269-1336"},
+          {no:28, name:"송민건", phone:"010-9004-2926"},
+          {no:29, name:"양소윤", phone:"010-9111-3700"},
+          {no:30, name:"오수연", phone:"010-3286-6880"},
+          {no:31, name:"우정훈", phone:"010-3833-8315"},
+          {no:32, name:"윤서준", phone:"010-9283-9400"},
+          {no:33, name:"이유빈", phone:"010-6451-9510"},
+          {no:34, name:"이홍윤", phone:"010-8504-9798"},
+          {no:35, name:"임다은", phone:"010-8183-9283"},
+          {no:36, name:"정유진", phone:"010-8880-7759"},
+          {no:37, name:"박선율", phone:"010-2776-9111"},
+          {no:38, name:"한채린", phone:"010-5298-7970"},
+          {no:39, name:"오수빈", phone:"010-3286-6880"},
+          {no:40, name:"남희수", phone:"010-8965-5948"},
+        ];
+        const keyword = rosterSearch.trim();
+        const filtered2 = keyword
+          ? ROSTER2.filter(r=>r.name.includes(keyword)||r.phone.includes(keyword))
+          : ROSTER2;
+        const colW = isMobile
+          ? {no:"28px",name:"60px",phone:"120px",account:"auto",status:"54px"}
+          : {no:"40px",name:"80px",phone:"148px",account:"auto",status:"70px"};
+        const cellStyle = {padding:isMobile?"8px 6px":"10px 12px",borderBottom:`1px solid ${T.border}`,fontSize:isMobile?12:13,color:T.text,verticalAlign:"middle"};
+        const headStyle = {...cellStyle,fontSize:11,color:T.muted,fontWeight:700,background:T.surfaceAlt,letterSpacing:"0.04em"};
+        return (
+          <div>
+            {/* 헤더 + 검색 */}
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+              <div style={{fontSize:15,fontWeight:800,color:T.navy,whiteSpace:"nowrap"}}>20HA 2기 학생 명단</div>
+              <Pill color={T.navy}>{ROSTER2.length}명</Pill>
+              <div style={{flex:1,minWidth:160,maxWidth:260,marginLeft:"auto"}}>
+                <input
+                  type="text"
+                  placeholder="이름·전화번호 검색"
+                  value={rosterSearch}
+                  onChange={e=>setRosterSearch(e.target.value)}
+                  style={{...css.input,padding:"8px 12px",fontSize:13}}
+                />
+              </div>
+            </div>
+
+            {/* 테이블 */}
+            <Card style={{padding:0,overflow:"hidden"}}>
+              <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",minWidth:360}}>
+                  <thead>
+                    <tr>
+                      <th style={{...headStyle,width:colW.no,textAlign:"center"}}>#</th>
+                      <th style={{...headStyle,width:colW.name}}>이름</th>
+                      <th style={{...headStyle,width:colW.phone}}>전화번호</th>
+                      <th style={{...headStyle,width:colW.account}}>연결된 계정</th>
+                      <th style={{...headStyle,width:colW.status,textAlign:"center"}}>인증상태</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered2.length===0?(
+                      <tr>
+                        <td colSpan={5} style={{...cellStyle,textAlign:"center",color:T.muted,padding:"40px 20px"}}>
+                          검색 결과가 없습니다.
+                        </td>
+                      </tr>
+                    ):filtered2.map(row=>(
+                      <tr key={row.no} style={{background:row.no%2===0?T.surfaceAlt:T.surface}}>
+                        <td style={{...cellStyle,textAlign:"center",color:T.muted,fontWeight:700,fontSize:11}}>{row.no}</td>
+                        <td style={{...cellStyle,fontWeight:700}}>{row.name}</td>
+                        <td style={{...cellStyle,fontFamily:"'DM Mono','Courier New',monospace",fontSize:isMobile?11:13,color:T.textMid}}>{row.phone}</td>
+                        <td style={{...cellStyle}}>
+                          <span style={{fontSize:11,color:T.muted,background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:6,padding:"2px 8px"}}>
+                            미연결
+                          </span>
+                        </td>
+                        <td style={{...cellStyle,textAlign:"center"}}>
+                          <span style={{fontSize:13,color:T.muted}}>—</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* 하단 안내 */}
+              <div style={{padding:"10px 16px",background:T.surfaceAlt,borderTop:`1px solid ${T.border}`,fontSize:11,color:T.muted}}>
+                계정 연결 기능은 준비 중입니다.
+              </div>
+            </Card>
+          </div>
+        );
+      })()}
     </div>
   );
 };
