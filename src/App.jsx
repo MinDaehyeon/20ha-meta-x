@@ -2013,6 +2013,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const ROSTER2_NAMES = new Set(["강예나","김가흔","김은채","김태준","박재현","손연재","윤준원","최지유","배정윤","심수윤","한설아","강가인","권민유","권순혁","최유주","김도현","김시원","김시윤","김아란","김준범","김지우","김호진","나지성","문지유","박지우","서소윤","서지우","송민건","양소윤","오수연","우정훈","윤서준","이유빈","이홍윤","임다은","정유진","박선율","한채린","오수빈","남희수","김가인","양은정"]);
   // 다중 기수 지원: DB 학생은 1기 기본, 2기 명단 포함 시 둘 다
   const getCohorts = (profile) => {
+    if (profile.role !== "student") return [];
     const tags = ["20HA 1기"];
     if (ROSTER2_NAMES.has(profile.name)) tags.push("20HA 2기");
     return tags;
