@@ -85,31 +85,6 @@ const calcGrade = (birthYear, birthMonth) => {
   return "졸업";
 };
 
-// 생년월일 입력 공통 컴포넌트 (년/월/일 세 드롭다운)
-// showGrade=true 이면 학년 태그 표시 (학생용)
-const BirthInput = ({year, month, day, onYear, onMonth, onDay, showGrade=false}) => {
-  const grade = showGrade ? calcGrade(year ? Number(year) : null, month ? Number(month) : null) : null;
-  const selStyle = {padding:"9px 6px",borderRadius:8,border:`1px solid ${T.border}`,fontSize:14,fontFamily:"'Noto Sans KR',sans-serif",background:"#fff",cursor:"pointer"};
-  const curYear = new Date().getFullYear();
-  return (
-    <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-      <select value={year||""} onChange={e=>onYear(e.target.value)} style={{...selStyle,flex:"1 1 90px"}}>
-        <option value="">년도</option>
-        {Array.from({length:curYear-1950+1},(_,i)=>curYear-i).map(y=><option key={y} value={y}>{y}년</option>)}
-      </select>
-      <select value={month||""} onChange={e=>onMonth(e.target.value)} style={{...selStyle,flex:"1 1 70px"}}>
-        <option value="">월</option>
-        {Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i+1}월</option>)}
-      </select>
-      <select value={day||""} onChange={e=>onDay(e.target.value)} style={{...selStyle,flex:"1 1 70px"}}>
-        <option value="">일</option>
-        {Array.from({length:31},(_,i)=><option key={i+1} value={i+1}>{i+1}일</option>)}
-      </select>
-      {grade && <span style={{fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>({grade})</span>}
-    </div>
-  );
-};
-
 // ══════════════════════════════════════════════════════
 // DESIGN TOKENS
 // ══════════════════════════════════════════════════════
@@ -214,9 +189,35 @@ const css = {
   input:  {width:"100%",background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:10,padding:"11px 14px",color:T.text,fontSize:14,boxSizing:"border-box",outline:"none"},
   select: {width:"100%",background:"#ffffff",border:`1px solid ${T.border}`,borderRadius:10,padding:"11px 14px",color:"#1a1a2e",fontSize:14,colorScheme:"light"},
   label:  {fontSize:12,color:T.muted,marginBottom:6,display:"block",letterSpacing:"0.04em",fontWeight:700},
-  btnPrimary: {background:T.grad,border:"none",borderRadius:10,padding:"12px 28px",color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"},
-  btnOrange:  {background:T.gradOrange,border:"none",borderRadius:10,padding:"12px 28px",color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"},
-  btnGhost:   {background:"transparent",border:`1px solid ${T.border}`,borderRadius:10,padding:"11px 20px",color:T.textMid,fontSize:13,cursor:"pointer"},
+  btnPrimary:  {background:T.grad,border:"none",borderRadius:10,padding:"12px 28px",color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"},
+  btnOrange:   {background:T.gradOrange,border:"none",borderRadius:10,padding:"12px 28px",color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"},
+  btnGhost:    {background:"transparent",border:`1px solid ${T.border}`,borderRadius:10,padding:"11px 20px",color:T.textMid,fontSize:13,cursor:"pointer"},
+  btnOutline:  {background:"transparent",border:`1px solid ${T.border}`,borderRadius:8,padding:"7px 14px",color:T.textMid,fontSize:12,cursor:"pointer"},
+};
+
+// 생년월일 입력 공통 컴포넌트 (년/월/일 세 드롭다운) — T 선언 이후에 위치해야 함
+// showGrade=true 이면 학년 태그 표시 (학생용)
+const BirthInput = ({year, month, day, onYear, onMonth, onDay, showGrade=false}) => {
+  const grade = showGrade ? calcGrade(year ? Number(year) : null, month ? Number(month) : null) : null;
+  const selStyle = {padding:"9px 6px",borderRadius:8,border:`1px solid ${T.border}`,fontSize:14,fontFamily:"'Noto Sans KR',sans-serif",background:"#fff",cursor:"pointer"};
+  const curYear = new Date().getFullYear();
+  return (
+    <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+      <select value={year||""} onChange={e=>onYear(e.target.value)} style={{...selStyle,flex:"1 1 90px"}}>
+        <option value="">년도</option>
+        {Array.from({length:curYear-1950+1},(_,i)=>curYear-i).map(y=><option key={y} value={y}>{y}년</option>)}
+      </select>
+      <select value={month||""} onChange={e=>onMonth(e.target.value)} style={{...selStyle,flex:"1 1 70px"}}>
+        <option value="">월</option>
+        {Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i+1}월</option>)}
+      </select>
+      <select value={day||""} onChange={e=>onDay(e.target.value)} style={{...selStyle,flex:"1 1 70px"}}>
+        <option value="">일</option>
+        {Array.from({length:31},(_,i)=><option key={i+1} value={i+1}>{i+1}일</option>)}
+      </select>
+      {grade && <span style={{fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>({grade})</span>}
+    </div>
+  );
 };
 
 // ══════════════════════════════════════════════════════
@@ -531,7 +532,6 @@ const handleSocial = async (provider) => {
 
   const fillDemo = async (type) => {
     if(type==="student") await handleLogin("test@20ha.kr","test1234!");
-    else                  await handleLogin("mdhyun1324@gmail.com","alseo1324!");
   };
 
   const brandPanel = (
@@ -1719,14 +1719,14 @@ ${subjectCoIn}`;
 const StudentDashboard = ({logs, profile, isAdminView=false}) => {
   const [subjectFilter, setSubjectFilter] = useState("전체");
   const isMobile = useMobile();
-  const normLogs = logs.map(l=>({
+  const normLogs = useMemo(() => logs.map(l=>({
     ...l, engramIndex:l.engram_index, strategyScore:l.strategy_score,
     efficiencyIndex:l.efficiency_index, metacognitionAccuracy:l.metacognition_accuracy,
     coinFilter:{cc:l.coin_cc,ci:l.coin_ci,ic:l.coin_ic,ii:l.coin_ii},
     errorAnalysis:{Q1:l.err_q1,Q2:l.err_q2,Q3:l.err_q3,M1:l.err_m1,M2:l.err_m2,M3:l.err_m3},
     subject:l.subject, bookLevel:l.book_level, netTime:l.net_time, questionCount:l.question_count,
     qBasic:l.q_basic||0, qMid:l.q_mid||0, qAdv:l.q_adv||0,
-  }));
+  })), [logs]);
   const allSubjects=["전체",...new Set(normLogs.map(l=>l.subject))];
   const filtered=subjectFilter==="전체"?normLogs:normLogs.filter(l=>l.subject===subjectFilter);
   const ninetyDaysAgo=new Date(); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate()-90);
@@ -2055,6 +2055,46 @@ const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChild
 
 // ══════════════════════════════════════════════════════
 // ADMIN DASHBOARD (진단 + 회원 관리)
+// ── 2기 명단 상수 (렌더마다 재생성 방지) ──────────────
+const ROSTER2 = [
+  {name:"강예나",  phone:"010-5463-7565"}, {name:"김가흔",  phone:"010-7277-4530"},
+  {name:"김은채",  phone:"010-2565-9756"}, {name:"김태준",  phone:"010-7282-5241"},
+  {name:"박재현",  phone:"010-3889-4881"}, {name:"손연재",  phone:"010-2658-1189"},
+  {name:"윤준원",  phone:"010-3560-4433"}, {name:"최지유",  phone:"010-5913-3385"},
+  {name:"배정윤",  phone:"010-6686-6462"}, {name:"심수윤",  phone:"010-2079-0009"},
+  {name:"한설아",  phone:"010-3288-1931"}, {name:"강가인",  phone:"010-3952-3253"},
+  {name:"권민유",  phone:"010-4355-2933"}, {name:"권순혁",  phone:"010-6220-0745"},
+  {name:"최유주",  phone:"010-7928-0050"}, {name:"김도현",  phone:"010-2265-9013"},
+  {name:"김시원",  phone:"010-9289-4397"}, {name:"김시윤",  phone:"010-3788-2478"},
+  {name:"김아란",  phone:"010-5410-8405"}, {name:"김준범",  phone:"010-2797-3039"},
+  {name:"김지우",  phone:"010-9458-2447"}, {name:"김호진",  phone:"010-4528-8226"},
+  {name:"나지성",  phone:"010-9625-1379"}, {name:"문지유",  phone:"010-6496-1389"},
+  {name:"박지우",  phone:"010-8330-6779"}, {name:"서소윤",  phone:"010-9996-9761"},
+  {name:"서지우",  phone:"010-9269-1336"}, {name:"송민건",  phone:"010-9004-2926"},
+  {name:"양소윤",  phone:"010-9111-3700"}, {name:"오수연",  phone:"010-3286-6880"},
+  {name:"우정훈",  phone:"010-3833-8315"}, {name:"윤서준",  phone:"010-9283-9400"},
+  {name:"이유빈",  phone:"010-6451-9510"}, {name:"이홍윤",  phone:"010-8504-9798"},
+  {name:"임다은",  phone:"010-8183-9283"}, {name:"정유진",  phone:"010-8880-7759"},
+  {name:"박선율",  phone:"010-2776-9111"}, {name:"한채린",  phone:"010-5298-7970"},
+  {name:"오수빈",  phone:"010-3286-6880"}, {name:"남희수",  phone:"010-8965-5948"},
+  {name:"김가인",  phone:"010-4549-0142"}, {name:"양은정",  phone:"010-7232-0795"},
+];
+const _genDates = (days) => {
+  const result = [];
+  for (let w = 0; w < 8; w++)
+    for (let d = 0; d < 7; d++) {
+      const dt = new Date(2026, 4, 17 + w*7 + d);
+      if (days.includes(dt.getDay())) result.push(dt);
+    }
+  return result;
+};
+const ROSTER2_NAVER_DATES   = _genDates([0, 3]);
+const ROSTER2_MORNING_DATES = _genDates([1, 3, 5]);
+const ROSTER2_NIGHT_DATES   = _genDates([0, 1, 2, 4, 5, 6]);
+const ROSTER2_DAY_KO        = ['일','월','화','수','목','금','토'];
+const roster2FmtKey = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+const roster2Fmt    = (dt) => `${dt.getMonth()+1}/${dt.getDate()}`;
+
 // ══════════════════════════════════════════════════════
 const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const [adminTab, setAdminTab] = useState("users"); // "users" | "dashboard" | "cert" | "roster2"
@@ -3225,69 +3265,13 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
 
       {/* ── 2기 명단 탭 ── */}
       {adminTab==="roster2"&&(()=>{
-        const ROSTER2 = [
-          {name:"강예나",  phone:"010-5463-7565"},
-          {name:"김가흔",  phone:"010-7277-4530"},
-          {name:"김은채",  phone:"010-2565-9756"},
-          {name:"김태준",  phone:"010-7282-5241"},
-          {name:"박재현",  phone:"010-3889-4881"},
-          {name:"손연재",  phone:"010-2658-1189"},
-          {name:"윤준원",  phone:"010-3560-4433"},
-          {name:"최지유",  phone:"010-5913-3385"},
-          {name:"배정윤",  phone:"010-6686-6462"},
-          {name:"심수윤",  phone:"010-2079-0009"},
-          {name:"한설아",  phone:"010-3288-1931"},
-          {name:"강가인",  phone:"010-3952-3253"},
-          {name:"권민유",  phone:"010-4355-2933"},
-          {name:"권순혁",  phone:"010-6220-0745"},
-          {name:"최유주",  phone:"010-7928-0050"},
-          {name:"김도현",  phone:"010-2265-9013"},
-          {name:"김시원",  phone:"010-9289-4397"},
-          {name:"김시윤",  phone:"010-3788-2478"},
-          {name:"김아란",  phone:"010-5410-8405"},
-          {name:"김준범",  phone:"010-2797-3039"},
-          {name:"김지우",  phone:"010-9458-2447"},
-          {name:"김호진",  phone:"010-4528-8226"},
-          {name:"나지성",  phone:"010-9625-1379"},
-          {name:"문지유",  phone:"010-6496-1389"},
-          {name:"박지우",  phone:"010-8330-6779"},
-          {name:"서소윤",  phone:"010-9996-9761"},
-          {name:"서지우",  phone:"010-9269-1336"},
-          {name:"송민건",  phone:"010-9004-2926"},
-          {name:"양소윤",  phone:"010-9111-3700"},
-          {name:"오수연",  phone:"010-3286-6880"},
-          {name:"우정훈",  phone:"010-3833-8315"},
-          {name:"윤서준",  phone:"010-9283-9400"},
-          {name:"이유빈",  phone:"010-6451-9510"},
-          {name:"이홍윤",  phone:"010-8504-9798"},
-          {name:"임다은",  phone:"010-8183-9283"},
-          {name:"정유진",  phone:"010-8880-7759"},
-          {name:"박선율",  phone:"010-2776-9111"},
-          {name:"한채린",  phone:"010-5298-7970"},
-          {name:"오수빈",  phone:"010-3286-6880"},
-          {name:"남희수",  phone:"010-8965-5948"},
-          {name:"김가인",  phone:"010-4549-0142"},
-          {name:"양은정",  phone:"010-7232-0795"},
-        ];
-
-        // 날짜 생성 (2026-05-17 시작, 8주)
-        const genDates = (days) => {
-          const result = [];
-          for (let w = 0; w < 8; w++) {
-            for (let d = 0; d < 7; d++) {
-              const dt = new Date(2026, 4, 17 + w*7 + d);
-              if (days.includes(dt.getDay())) result.push(dt);
-            }
-          }
-          return result;
-        };
-        const fmt    = (dt) => `${dt.getMonth()+1}/${dt.getDate()}`;
-        const fmtKey = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-        const DAY_KO = ['일','월','화','수','목','금','토'];
-
-        const naverDates   = genDates([0, 3]);           // 일, 수  → 16회
-        const morningDates = genDates([1, 3, 5]);        // 월, 수, 금 → 24회
-        const nightDates   = genDates([0, 1, 2, 4, 5, 6]); // 일월화목금토 → 48회
+        // ROSTER2, 날짜 배열은 컴포넌트 외부 상수 사용 (렌더마다 재생성 방지)
+        const naverDates   = ROSTER2_NAVER_DATES;
+        const morningDates = ROSTER2_MORNING_DATES;
+        const nightDates   = ROSTER2_NIGHT_DATES;
+        const fmt    = roster2Fmt;
+        const fmtKey = roster2FmtKey;
+        const DAY_KO = ROSTER2_DAY_KO;
 
         // 출석 토글/조회
         const toggleAtt = (studentIdx, type, dateKey) => {
@@ -3769,7 +3753,8 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
     setSaving(true);
     const targetEI = GRADE_MIN[target]||85;
     const by = birthYear?Number(birthYear):null, bm = birthMonth?Number(birthMonth):null, bd = birthDay?Number(birthDay):null;
-    await supabase.from("profiles").update({name, grade: calcGrade(by, bm)||profile.grade, birth_year:by, birth_month:bm, birth_day:bd, target_ei:targetEI, avatar_url:avatarUrl, updated_at:new Date().toISOString()}).eq("id", profile.id);
+    const newGrade = calcGrade(by, bm) || profile.grade;
+    await supabase.from("profiles").update({name, grade: newGrade, birth_year:by, birth_month:bm, birth_day:bd, target_ei:targetEI, avatar_url:avatarUrl, updated_at:new Date().toISOString()}).eq("id", profile.id);
     if(newPw){
       const {error:pwErr} = await supabase.auth.updateUser({password:newPw});
       if(pwErr){
@@ -3782,7 +3767,7 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
     }
     setSaving(false);
     setDone(true);
-    setTimeout(()=>onSave({...profile,name,grade,target_ei:GRADE_MIN[target]||85,avatar_url:avatarUrl}), 800);
+    setTimeout(()=>onSave({...profile,name,grade:newGrade,birth_year:by,birth_month:bm,birth_day:bd,target_ei:GRADE_MIN[target]||85,avatar_url:avatarUrl}), 800);
   };
 
   return (
