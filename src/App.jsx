@@ -2000,6 +2000,7 @@ const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChild
 const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const [adminTab, setAdminTab] = useState("users"); // "users" | "dashboard" | "cert" | "roster2"
   const [rosterSearch, setRosterSearch] = useState("");
+  const [attendance2, setAttendance2] = useState({});
   const [sel, setSel]           = useState("전체");
   const [editStudent, setEditStudent] = useState(null);
   const [saving, setSaving]     = useState(false);
@@ -3092,114 +3093,251 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
       {/* ── 2기 명단 탭 ── */}
       {adminTab==="roster2"&&(()=>{
         const ROSTER2 = [
-          {no:1,  name:"강예나", phone:"010-5463-7565"},
-          {no:2,  name:"김가흔", phone:"010-7277-4530"},
-          {no:3,  name:"김은채", phone:"010-2565-9756"},
-          {no:4,  name:"김태준", phone:"010-7282-5241"},
-          {no:5,  name:"박재현", phone:"010-3889-4881"},
-          {no:6,  name:"손연재", phone:"010-2658-1189"},
-          {no:7,  name:"윤준원", phone:"010-3560-4433"},
-          {no:8,  name:"최지유", phone:"010-5913-3385"},
-          {no:9,  name:"배정윤", phone:"010-6686-6462"},
-          {no:10, name:"심수윤", phone:"010-2079-0009"},
-          {no:11, name:"한설아", phone:"010-3288-1931"},
-          {no:12, name:"강가인", phone:"010-3952-3253"},
-          {no:13, name:"권민유", phone:"010-4355-2933"},
-          {no:14, name:"권순혁", phone:"010-6220-0745"},
-          {no:15, name:"최유주", phone:"010-7928-0050"},
-          {no:16, name:"김도현", phone:"010-2265-9013"},
-          {no:17, name:"김시원", phone:"010-9289-4397"},
-          {no:18, name:"김시윤", phone:"010-3788-2478"},
-          {no:19, name:"김아란", phone:"010-5410-8405"},
-          {no:20, name:"김준범", phone:"010-2797-3039"},
-          {no:21, name:"김지우", phone:"010-9458-2447"},
-          {no:22, name:"김호진", phone:"010-4528-8226"},
-          {no:23, name:"나지성", phone:"010-9625-1379"},
-          {no:24, name:"문지유", phone:"010-6496-1389"},
-          {no:25, name:"박지우", phone:"010-8330-6779"},
-          {no:26, name:"서소윤", phone:"010-9996-9761"},
-          {no:27, name:"서지우", phone:"010-9269-1336"},
-          {no:28, name:"송민건", phone:"010-9004-2926"},
-          {no:29, name:"양소윤", phone:"010-9111-3700"},
-          {no:30, name:"오수연", phone:"010-3286-6880"},
-          {no:31, name:"우정훈", phone:"010-3833-8315"},
-          {no:32, name:"윤서준", phone:"010-9283-9400"},
-          {no:33, name:"이유빈", phone:"010-6451-9510"},
-          {no:34, name:"이홍윤", phone:"010-8504-9798"},
-          {no:35, name:"임다은", phone:"010-8183-9283"},
-          {no:36, name:"정유진", phone:"010-8880-7759"},
-          {no:37, name:"박선율", phone:"010-2776-9111"},
-          {no:38, name:"한채린", phone:"010-5298-7970"},
-          {no:39, name:"오수빈", phone:"010-3286-6880"},
-          {no:40, name:"남희수", phone:"010-8965-5948"},
+          {name:"강예나",  phone:"010-5463-7565"},
+          {name:"김가흔",  phone:"010-7277-4530"},
+          {name:"김은채",  phone:"010-2565-9756"},
+          {name:"김태준",  phone:"010-7282-5241"},
+          {name:"박재현",  phone:"010-3889-4881"},
+          {name:"손연재",  phone:"010-2658-1189"},
+          {name:"윤준원",  phone:"010-3560-4433"},
+          {name:"최지유",  phone:"010-5913-3385"},
+          {name:"배정윤",  phone:"010-6686-6462"},
+          {name:"심수윤",  phone:"010-2079-0009"},
+          {name:"한설아",  phone:"010-3288-1931"},
+          {name:"강가인",  phone:"010-3952-3253"},
+          {name:"권민유",  phone:"010-4355-2933"},
+          {name:"권순혁",  phone:"010-6220-0745"},
+          {name:"최유주",  phone:"010-7928-0050"},
+          {name:"김도현",  phone:"010-2265-9013"},
+          {name:"김시원",  phone:"010-9289-4397"},
+          {name:"김시윤",  phone:"010-3788-2478"},
+          {name:"김아란",  phone:"010-5410-8405"},
+          {name:"김준범",  phone:"010-2797-3039"},
+          {name:"김지우",  phone:"010-9458-2447"},
+          {name:"김호진",  phone:"010-4528-8226"},
+          {name:"나지성",  phone:"010-9625-1379"},
+          {name:"문지유",  phone:"010-6496-1389"},
+          {name:"박지우",  phone:"010-8330-6779"},
+          {name:"서소윤",  phone:"010-9996-9761"},
+          {name:"서지우",  phone:"010-9269-1336"},
+          {name:"송민건",  phone:"010-9004-2926"},
+          {name:"양소윤",  phone:"010-9111-3700"},
+          {name:"오수연",  phone:"010-3286-6880"},
+          {name:"우정훈",  phone:"010-3833-8315"},
+          {name:"윤서준",  phone:"010-9283-9400"},
+          {name:"이유빈",  phone:"010-6451-9510"},
+          {name:"이홍윤",  phone:"010-8504-9798"},
+          {name:"임다은",  phone:"010-8183-9283"},
+          {name:"정유진",  phone:"010-8880-7759"},
+          {name:"박선율",  phone:"010-2776-9111"},
+          {name:"한채린",  phone:"010-5298-7970"},
+          {name:"오수빈",  phone:"010-3286-6880"},
+          {name:"남희수",  phone:"010-8965-5948"},
         ];
-        const keyword = rosterSearch.trim();
-        const filtered2 = keyword
-          ? ROSTER2.filter(r=>r.name.includes(keyword)||r.phone.includes(keyword))
-          : ROSTER2;
-        const colW = isMobile
-          ? {no:"28px",name:"60px",phone:"120px",account:"auto",status:"54px"}
-          : {no:"40px",name:"80px",phone:"148px",account:"auto",status:"70px"};
-        const cellStyle = {padding:isMobile?"8px 6px":"10px 12px",borderBottom:`1px solid ${T.border}`,fontSize:isMobile?12:13,color:T.text,verticalAlign:"middle"};
-        const headStyle = {...cellStyle,fontSize:11,color:T.muted,fontWeight:700,background:T.surfaceAlt,letterSpacing:"0.04em"};
+
+        // 날짜 생성 (2026-05-17 시작, 8주)
+        const genDates = (days) => {
+          const result = [];
+          for (let w = 0; w < 8; w++) {
+            for (let d = 0; d < 7; d++) {
+              const dt = new Date(2026, 4, 17 + w*7 + d);
+              if (days.includes(dt.getDay())) result.push(dt);
+            }
+          }
+          return result;
+        };
+        const fmt    = (dt) => `${dt.getMonth()+1}/${dt.getDate()}`;
+        const fmtKey = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+        const DAY_KO = ['일','월','화','수','목','금','토'];
+
+        const naverDates   = genDates([0, 3]);           // 일, 수  → 16회
+        const morningDates = genDates([1, 3, 5]);        // 월, 수, 금 → 24회
+        const nightDates   = genDates([0, 1, 2, 4, 5, 6]); // 일월화목금토 → 48회
+
+        // 출석 토글/조회
+        const toggleAtt = (studentIdx, type, dateKey) => {
+          const k = `${studentIdx}-${type}-${dateKey}`;
+          setAttendance2(prev => ({...prev, [k]: !prev[k]}));
+        };
+        const getAtt = (studentIdx, type, dateKey) => {
+          return attendance2[`${studentIdx}-${type}-${dateKey}`] || false;
+        };
+
+        // 검색 필터
+        const filtered = ROSTER2
+          .map((s, i) => ({...s, idx: i}))
+          .filter(s => s.name.includes(rosterSearch) || s.phone.includes(rosterSearch));
+
+        // 섹션 스타일 정의
+        const SEC = {
+          naver:   { bg:"#EEF2FF", color:"#4F46E5", label:"네이버 인증",  dates: naverDates,   type:"N", total: naverDates.length },
+          morning: { bg:"#FFF7ED", color:"#EA580C", label:"미라클모닝",   dates: morningDates, type:"M", total: morningDates.length },
+          night:   { bg:"#F0FDF4", color:"#16A34A", label:"미라클나이트", dates: nightDates,   type:"나", total: nightDates.length },
+        };
+        const SECS = [SEC.naver, SEC.morning, SEC.night];
+
+        // 고정 컬럼 공통 스타일
+        const stickyBase = {
+          position:"sticky", left:0, zIndex:2,
+          background:T.surface, borderRight:`1px solid ${T.border}`,
+        };
+        const stickyHead = {...stickyBase, background:T.surfaceAlt};
+
+        const CELL_W = 26;
+        const CELL_H = 26;
+
         return (
           <div>
-            {/* 헤더 + 검색 */}
+            {/* 상단: 제목 + 검색 */}
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
-              <div style={{fontSize:15,fontWeight:800,color:T.navy,whiteSpace:"nowrap"}}>20HA 2기 학생 명단</div>
-              <Pill color={T.navy}>{ROSTER2.length}명</Pill>
-              <div style={{flex:1,minWidth:160,maxWidth:260,marginLeft:"auto"}}>
+              <div style={{fontSize:15,fontWeight:800,color:T.navy,whiteSpace:"nowrap"}}>
+                20HA 2기 학생 명단 {ROSTER2.length}명
+              </div>
+              <div style={{flex:1,minWidth:140,maxWidth:240,marginLeft:"auto"}}>
                 <input
                   type="text"
                   placeholder="이름·전화번호 검색"
                   value={rosterSearch}
                   onChange={e=>setRosterSearch(e.target.value)}
-                  style={{...css.input,padding:"8px 12px",fontSize:13}}
+                  style={{...css.input,padding:"7px 11px",fontSize:13}}
                 />
               </div>
             </div>
 
-            {/* 테이블 */}
+            {/* 스프레드시트 테이블 */}
             <Card style={{padding:0,overflow:"hidden"}}>
               <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",minWidth:360}}>
+                <table style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
                   <thead>
+                    {/* 섹션 헤더 행 */}
                     <tr>
-                      <th style={{...headStyle,width:colW.no,textAlign:"center"}}>#</th>
-                      <th style={{...headStyle,width:colW.name}}>이름</th>
-                      <th style={{...headStyle,width:colW.phone}}>전화번호</th>
-                      <th style={{...headStyle,width:colW.account}}>연결된 계정</th>
-                      <th style={{...headStyle,width:colW.status,textAlign:"center"}}>인증상태</th>
+                      {/* sticky 고정 헤더 */}
+                      <th style={{...stickyHead, width:30, minWidth:30, fontSize:10, color:T.muted, fontWeight:700, textAlign:"center", padding:"4px 2px", borderBottom:`1px solid ${T.border}`}}>#</th>
+                      <th style={{...stickyHead, left:30, width:70, minWidth:70, fontSize:11, color:T.muted, fontWeight:700, padding:"4px 6px", borderBottom:`1px solid ${T.border}`, borderLeft:`1px solid ${T.border}`}}>이름</th>
+                      {/* 섹션 헤더 */}
+                      {SECS.map((sec, si) => (
+                        <th key={si} colSpan={sec.dates.length}
+                          style={{
+                            background: sec.bg, color: sec.color,
+                            fontSize: 11, fontWeight: 800,
+                            textAlign:"center", padding:"4px 0",
+                            borderBottom:`1px solid ${T.border}`,
+                            borderLeft:`2px solid ${sec.color}`,
+                          }}>
+                          {sec.label}
+                        </th>
+                      ))}
+                      {/* 요약 헤더 */}
+                      <th style={{background:T.surfaceAlt,fontSize:10,color:T.muted,fontWeight:700,textAlign:"center",padding:"4px 6px",borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,whiteSpace:"nowrap",minWidth:90}}>요약</th>
+                    </tr>
+                    {/* 날짜 헤더 행 */}
+                    <tr>
+                      <th style={{...stickyHead, width:30, minWidth:30, borderBottom:`2px solid ${T.borderStrong}`}}></th>
+                      <th style={{...stickyHead, left:30, width:70, minWidth:70, borderBottom:`2px solid ${T.borderStrong}`, borderLeft:`1px solid ${T.border}`}}></th>
+                      {SECS.map((sec, si) =>
+                        sec.dates.map((dt, di) => (
+                          <th key={`${si}-${di}`}
+                            style={{
+                              width: CELL_W, minWidth: CELL_W,
+                              fontSize: 8, fontWeight: 600,
+                              color: sec.color, textAlign:"center",
+                              padding:"2px 0", verticalAlign:"middle",
+                              borderBottom:`2px solid ${T.borderStrong}`,
+                              borderLeft: di===0 ? `2px solid ${sec.color}` : `1px solid ${T.border}`,
+                              background: sec.bg,
+                              whiteSpace:"nowrap", lineHeight:"1.2",
+                            }}>
+                            <div>{fmt(dt)}</div>
+                            <div>{DAY_KO[dt.getDay()]}</div>
+                          </th>
+                        ))
+                      )}
+                      <th style={{background:T.surfaceAlt,borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,minWidth:90}}></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered2.length===0?(
+                    {filtered.length === 0 ? (
                       <tr>
-                        <td colSpan={5} style={{...cellStyle,textAlign:"center",color:T.muted,padding:"40px 20px"}}>
+                        <td colSpan={2 + naverDates.length + morningDates.length + nightDates.length + 1}
+                          style={{textAlign:"center",color:T.muted,padding:"40px 20px",fontSize:13}}>
                           검색 결과가 없습니다.
                         </td>
                       </tr>
-                    ):filtered2.map(row=>(
-                      <tr key={row.no} style={{background:row.no%2===0?T.surfaceAlt:T.surface}}>
-                        <td style={{...cellStyle,textAlign:"center",color:T.muted,fontWeight:700,fontSize:11}}>{row.no}</td>
-                        <td style={{...cellStyle,fontWeight:700}}>{row.name}</td>
-                        <td style={{...cellStyle,fontFamily:"'DM Mono','Courier New',monospace",fontSize:isMobile?11:13,color:T.textMid}}>{row.phone}</td>
-                        <td style={{...cellStyle}}>
-                          <span style={{fontSize:11,color:T.muted,background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:6,padding:"2px 8px"}}>
-                            미연결
-                          </span>
-                        </td>
-                        <td style={{...cellStyle,textAlign:"center"}}>
-                          <span style={{fontSize:13,color:T.muted}}>—</span>
-                        </td>
-                      </tr>
-                    ))}
+                    ) : filtered.map((s, rowI) => {
+                      const nCount = naverDates.filter(dt => getAtt(s.idx,"N",fmtKey(dt))).length;
+                      const mCount = morningDates.filter(dt => getAtt(s.idx,"M",fmtKey(dt))).length;
+                      const naCount = nightDates.filter(dt => getAtt(s.idx,"나",fmtKey(dt))).length;
+                      return (
+                        <tr key={s.idx} style={{background: rowI%2===0 ? T.surface : T.surfaceAlt}}>
+                          {/* 고정: 번호 */}
+                          <td style={{
+                            ...stickyBase,
+                            width:30, minWidth:30,
+                            textAlign:"center", fontSize:10, color:T.muted, fontWeight:700,
+                            padding:"0", height:CELL_H,
+                            background: rowI%2===0 ? T.surface : T.surfaceAlt,
+                            borderBottom:`1px solid ${T.border}`,
+                          }}>{s.idx+1}</td>
+                          {/* 고정: 이름 */}
+                          <td style={{
+                            ...stickyBase, left:30,
+                            width:70, minWidth:70,
+                            fontSize:12, fontWeight:700, color:T.text,
+                            padding:"0 6px", height:CELL_H,
+                            background: rowI%2===0 ? T.surface : T.surfaceAlt,
+                            borderBottom:`1px solid ${T.border}`,
+                            borderLeft:`1px solid ${T.border}`,
+                            whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
+                          }}>{s.name}</td>
+                          {/* 출석 셀들 */}
+                          {SECS.map((sec, si) =>
+                            sec.dates.map((dt, di) => {
+                              const key = fmtKey(dt);
+                              const checked = getAtt(s.idx, sec.type, key);
+                              return (
+                                <td key={`${si}-${di}`}
+                                  onClick={() => toggleAtt(s.idx, sec.type, key)}
+                                  style={{
+                                    width: CELL_W, minWidth: CELL_W,
+                                    height: CELL_H,
+                                    textAlign:"center", verticalAlign:"middle",
+                                    cursor:"pointer",
+                                    fontSize: 11, fontWeight: checked ? 700 : 400,
+                                    color: checked ? sec.color : "transparent",
+                                    background: checked ? sec.bg : "transparent",
+                                    borderBottom:`1px solid ${T.border}`,
+                                    borderLeft: di===0 ? `2px solid ${sec.color}` : `1px solid ${T.border}`,
+                                    userSelect:"none",
+                                    padding:0,
+                                  }}>
+                                  {checked ? "✓" : ""}
+                                </td>
+                              );
+                            })
+                          )}
+                          {/* 요약 */}
+                          <td style={{
+                            fontSize:10, color:T.textMid, fontWeight:600,
+                            padding:"0 6px", height:CELL_H,
+                            borderBottom:`1px solid ${T.border}`,
+                            borderLeft:`1px solid ${T.border}`,
+                            whiteSpace:"nowrap", textAlign:"center",
+                            background: rowI%2===0 ? T.surface : T.surfaceAlt,
+                          }}>
+                            <span style={{color:SEC.naver.color}}>N:{nCount}/{SEC.naver.total}</span>
+                            {" "}
+                            <span style={{color:SEC.morning.color}}>M:{mCount}/{SEC.morning.total}</span>
+                            {" "}
+                            <span style={{color:SEC.night.color}}>나:{naCount}/{SEC.night.total}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-              {/* 하단 안내 */}
-              <div style={{padding:"10px 16px",background:T.surfaceAlt,borderTop:`1px solid ${T.border}`,fontSize:11,color:T.muted}}>
-                계정 연결 기능은 준비 중입니다.
+              <div style={{padding:"8px 14px",background:T.surfaceAlt,borderTop:`1px solid ${T.border}`,fontSize:11,color:T.muted}}>
+                셀을 클릭하면 출석이 토글됩니다. (페이지 새로고침 시 초기화)
               </div>
             </Card>
           </div>
