@@ -3163,10 +3163,19 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
           return attendance2[`${studentIdx}-${type}-${dateKey}`] || false;
         };
 
-        // 검색 필터
+        // Group A ↔ Group B 매칭 (이름 또는 전화 마지막4자리)
+        const phone4 = (ph) => ph.replace(/-/g,'').slice(-4);
+        const matchedProfile = (s) =>
+          (allProfiles||[]).find(p =>
+            (p.role==="student"||p.role==="parent") &&
+            (p.name===s.name || phone4(p.phone||"")===phone4(s.phone))
+          );
+
+        // ㄱㄴㄷ 정렬 + 검색 필터
         const filtered = ROSTER2
-          .map((s, i) => ({...s, idx: i}))
-          .filter(s => s.name.includes(rosterSearch) || s.phone.includes(rosterSearch));
+          .map((s, i) => ({...s, idx: i, profile: matchedProfile(s)}))
+          .filter(s => s.name.includes(rosterSearch) || s.phone.includes(rosterSearch) || (s.profile?.email||"").includes(rosterSearch))
+          .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
         // 섹션 스타일 정의
         const SEC = {
@@ -3222,6 +3231,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                       {/* sticky 고정 헤더 */}
                       <th style={{...stickyHead, width:30, minWidth:30, fontSize:10, color:T.muted, fontWeight:700, textAlign:"center", padding:"4px 2px", borderBottom:`1px solid ${T.border}`}}>#</th>
                       <th style={{...stickyHead, left:30, width:110, minWidth:110, fontSize:11, color:T.muted, fontWeight:700, padding:"4px 6px", borderBottom:`1px solid ${T.border}`, borderLeft:`1px solid ${T.border}`}}>이름</th>
+                      {/* 이메일(ID연동) 헤더 */}
+                      <th style={{fontSize:11, color:T.muted, fontWeight:700, padding:"4px 8px", borderBottom:`1px solid ${T.border}`, borderLeft:`1px solid ${T.border}`, minWidth:160, whiteSpace:"nowrap"}}>이메일 (ID연동)</th>
                       {/* 인증현황 요약 3열 헤더 */}
                       <th colSpan={3} style={{background:"#F5F3FF", color:"#6D28D9", fontSize:11, fontWeight:800, textAlign:"center", padding:"4px 0", borderBottom:`1px solid ${T.border}`, borderLeft:`2px solid #6D28D9`}}>인증 현황</th>
                       {/* 섹션 헤더 */}
@@ -3242,6 +3253,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                     <tr>
                       <th style={{...stickyHead, width:30, minWidth:30, borderBottom:`2px solid ${T.borderStrong}`}}></th>
                       <th style={{...stickyHead, left:30, width:110, minWidth:110, borderBottom:`2px solid ${T.borderStrong}`, borderLeft:`1px solid ${T.border}`}}></th>
+                      <th style={{minWidth:160, borderBottom:`2px solid ${T.borderStrong}`, borderLeft:`1px solid ${T.border}`, background:T.surfaceAlt}}></th>
                       {/* 요약 3열 서브헤더 */}
                       {[["네이버",SEC.naver.color,SEC.naver.bg],["모닝",SEC.morning.color,SEC.morning.bg],["나잇",SEC.night.color,SEC.night.bg]].map(([lbl,clr,bg],i)=>(
                         <th key={`sum-${i}`} style={{width:36,minWidth:36,fontSize:9,fontWeight:700,color:clr,background:bg,textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:i===0?`2px solid #6D28D9`:`1px solid ${T.border}`}}>{lbl}</th>
@@ -3270,7 +3282,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                   <tbody>
                     {filtered.length === 0 ? (
                       <tr>
-                        <td colSpan={2 + naverDates.length + morningDates.length + nightDates.length + 1}
+                        <td colSpan={3 + 3 + naverDates.length + morningDates.length + nightDates.length}
                           style={{textAlign:"center",color:T.muted,padding:"40px 20px",fontSize:13}}>
                           검색 결과가 없습니다.
                         </td>
@@ -3302,6 +3314,20 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                           }}>
                             <div style={{textAlign:"center",fontSize:12,fontWeight:800,color:T.navy,lineHeight:1.3}}>{s.name}</div>
                             <div style={{textAlign:"center",fontSize:9,color:T.muted,fontFamily:"'DM Mono',monospace",marginTop:1}}>{s.phone}</div>
+                          </td>
+                          {/* 이메일(ID연동) */}
+                          <td style={{
+                            minWidth:160, height:CELL_H,
+                            padding:"0 8px", fontSize:11,
+                            borderBottom:`1px solid ${T.border}`,
+                            borderLeft:`1px solid ${T.border}`,
+                            background: rowI%2===0 ? T.surface : T.surfaceAlt,
+                            verticalAlign:"middle",
+                          }}>
+                            {s.profile
+                              ? <span style={{color:T.navy, fontWeight:600}}>{s.profile.email}</span>
+                              : <span style={{color:T.muted, fontSize:10}}>미가입</span>
+                            }
                           </td>
                           {/* 요약 3열 */}
                           {[[nCount,SEC.naver.total,SEC.naver.color,SEC.naver.bg,true],[mCount,SEC.morning.total,SEC.morning.color,SEC.morning.bg,false],[naCount,SEC.night.total,SEC.night.color,SEC.night.bg,false]].map(([cnt,tot,clr,bg,first],i)=>(
