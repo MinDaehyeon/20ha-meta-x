@@ -2000,6 +2000,7 @@ const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChild
 const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const [adminTab, setAdminTab] = useState("users"); // "users" | "dashboard" | "cert" | "roster2"
   const [rosterSearch, setRosterSearch] = useState("");
+  const [rosterSort, setRosterSort] = useState({by:"name",dir:"asc"});
   const [attendance2, setAttendance2] = useState({"36-나-2026-05-17":true,"27-나-2026-05-17":true,"4-나-2026-05-17":true,"9-나-2026-05-17":true,"0-나-2026-05-17":true,"6-나-2026-05-17":true,"19-나-2026-05-17":true,"3-나-2026-05-17":true,"5-나-2026-05-17":true,"37-나-2026-05-17":true,"31-나-2026-05-17":true,"7-나-2026-05-17":true,"13-나-2026-05-17":true,"8-나-2026-05-17":true,"15-나-2026-05-17":true,"33-나-2026-05-17":true,"1-나-2026-05-17":true,"10-나-2026-05-17":true,"25-나-2026-05-17":true,"29-나-2026-05-17":true,"32-나-2026-05-17":true,"11-나-2026-05-17":true,"12-나-2026-05-17":true,"28-나-2026-05-17":true,"26-나-2026-05-17":true,"22-나-2026-05-17":true,"30-나-2026-05-17":true,"24-나-2026-05-17":true,"38-나-2026-05-17":true,"17-나-2026-05-17":true,"2-나-2026-05-17":true,"40-나-2026-05-17":true,"16-나-2026-05-17":true,"23-나-2026-05-17":true,"35-나-2026-05-17":true,"4-M-2026-05-18":true,"11-M-2026-05-18":true,"6-M-2026-05-18":true,"23-M-2026-05-18":true,"17-M-2026-05-18":true,"36-M-2026-05-18":true,"39-M-2026-05-18":true,"10-M-2026-05-18":true,"8-M-2026-05-18":true,"33-M-2026-05-18":true,"27-M-2026-05-18":true,"24-M-2026-05-18":true,"19-M-2026-05-18":true,"20-M-2026-05-18":true,"2-M-2026-05-18":true,"3-M-2026-05-18":true,"22-M-2026-05-18":true,"26-M-2026-05-18":true,"34-M-2026-05-18":true,"12-M-2026-05-18":true,"25-M-2026-05-18":true,"28-M-2026-05-18":true,"18-M-2026-05-18":true,"31-M-2026-05-18":true,"9-M-2026-05-18":true,"16-M-2026-05-18":true,"0-M-2026-05-18":true,"32-M-2026-05-18":true,"30-M-2026-05-18":true,"1-M-2026-05-18":true,"29-M-2026-05-18":true,"15-M-2026-05-18":true,"18-나-2026-05-18":true,"36-나-2026-05-18":true,"23-나-2026-05-18":true,"32-나-2026-05-18":true,"35-나-2026-05-18":true,"4-나-2026-05-18":true,"10-나-2026-05-18":true,"3-나-2026-05-18":true,"12-나-2026-05-18":true,"16-나-2026-05-18":true,"2-나-2026-05-18":true,"11-나-2026-05-18":true,"0-나-2026-05-18":true,"8-나-2026-05-18":true,"19-나-2026-05-18":true,"7-나-2026-05-18":true,"31-나-2026-05-18":true,"17-나-2026-05-18":true,"20-나-2026-05-18":true,"9-나-2026-05-18":true,"13-나-2026-05-18":true,"33-나-2026-05-18":true,"25-나-2026-05-18":true,"30-나-2026-05-18":true,"1-나-2026-05-18":true,"39-나-2026-05-18":true,"28-나-2026-05-18":true,"15-나-2026-05-18":true,"22-나-2026-05-18":true,"37-나-2026-05-18":true,"21-나-2026-05-18":true,"41-나-2026-05-18":true,"38-나-2026-05-18":true,"34-나-2026-05-18":true,"27-나-2026-05-18":true,"6-나-2026-05-18":true,"14-나-2026-05-18":true,"24-나-2026-05-18":true,"26-나-2026-05-18":true,"40-나-2026-05-18":true,"5-나-2026-05-18":true,"36-나-2026-05-19":true,"23-나-2026-05-19":true,"40-나-2026-05-19":true,"32-나-2026-05-19":true,"37-나-2026-05-19":true,"0-나-2026-05-19":true,"17-나-2026-05-19":true,"9-나-2026-05-19":true,"25-나-2026-05-19":true,"2-나-2026-05-19":true,"33-나-2026-05-19":true,"35-나-2026-05-19":true,"14-나-2026-05-19":true,"21-나-2026-05-19":true,"4-나-2026-05-19":true,"1-나-2026-05-19":true,"24-나-2026-05-19":true,"15-나-2026-05-19":true,"20-나-2026-05-19":true,"39-나-2026-05-19":true,"8-나-2026-05-19":true,"34-나-2026-05-19":true,"29-나-2026-05-19":true,"5-나-2026-05-19":true,"13-나-2026-05-19":true,"10-나-2026-05-19":true,"19-나-2026-05-19":true,"30-나-2026-05-19":true,"6-나-2026-05-19":true,"28-나-2026-05-19":true,"11-나-2026-05-19":true,"3-나-2026-05-19":true,"18-나-2026-05-19":true,"7-나-2026-05-19":true,"41-나-2026-05-19":true,"26-나-2026-05-19":true,"12-나-2026-05-19":true,"22-나-2026-05-19":true,"10-M-2026-05-20":true,"36-M-2026-05-20":true,"8-M-2026-05-20":true,"23-M-2026-05-20":true,"6-M-2026-05-20":true,"3-M-2026-05-20":true,"40-M-2026-05-20":true,"12-M-2026-05-20":true,"35-M-2026-05-20":true,"4-M-2026-05-20":true,"19-M-2026-05-20":true,"21-M-2026-05-20":true,"9-M-2026-05-20":true,"18-M-2026-05-20":true,"33-M-2026-05-20":true,"24-M-2026-05-20":true,"0-M-2026-05-20":true,"2-M-2026-05-20":true,"39-M-2026-05-20":true,"15-M-2026-05-20":true,"16-M-2026-05-20":true,"20-M-2026-05-20":true,"1-M-2026-05-20":true,"31-M-2026-05-20":true,"14-M-2026-05-20":true,"37-M-2026-05-20":true,"41-M-2026-05-20":true,"30-M-2026-05-20":true,"26-M-2026-05-20":true,"28-M-2026-05-20":true,"38-M-2026-05-20":true,"34-M-2026-05-20":true,"22-M-2026-05-20":true});
   const [sel, setSel]           = useState("전체");
   const [editStudent, setEditStudent] = useState(null);
@@ -3234,11 +3235,29 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
             (p.name===s.name || phone4(p.phone||"")===phone4(s.phone))
           );
 
-        // ㄱㄴㄷ 정렬 + 검색 필터
+        // 검색 필터 + 정렬
+        const toggleSort = (col) => {
+          setRosterSort(prev => prev.by===col ? {by:col,dir:prev.dir==="asc"?"desc":"asc"} : {by:col,dir:"asc"});
+        };
+        const SortBtn = ({col}) => {
+          const active = rosterSort.by===col;
+          const asc = rosterSort.dir==="asc";
+          return (
+            <span style={{display:"inline-flex",flexDirection:"column",lineHeight:1,marginLeft:3,cursor:"pointer",verticalAlign:"middle"}}
+              onClick={()=>toggleSort(col)}>
+              <span style={{fontSize:7,color:active&&asc?"#4F46E5":T.muted,lineHeight:1}}>▲</span>
+              <span style={{fontSize:7,color:active&&!asc?"#4F46E5":T.muted,lineHeight:1}}>▼</span>
+            </span>
+          );
+        };
         const filtered = ROSTER2
           .map((s, i) => ({...s, idx: i, profile: matchedProfile(s)}))
           .filter(s => s.name.includes(rosterSearch) || s.phone.includes(rosterSearch) || (s.profile?.email||"").includes(rosterSearch))
-          .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+          .sort((a, b) => {
+            const dir = rosterSort.dir==="asc" ? 1 : -1;
+            if (rosterSort.by==="idx") return (a.idx - b.idx) * dir;
+            return a.name.localeCompare(b.name, 'ko') * dir;
+          });
 
         // 섹션 스타일 정의
         const SEC = {
@@ -3291,11 +3310,15 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                   <thead>
                     {/* 섹션 헤더 행 */}
                     <tr>
-                      {/* sticky 고정 헤더 */}
-                      <th style={{...stickyHead, width:30, minWidth:30, fontSize:10, color:T.muted, fontWeight:700, textAlign:"center", padding:"4px 2px", borderBottom:`1px solid ${T.border}`}}>#</th>
-                      <th style={{...stickyHead, left:30, width:110, minWidth:110, fontSize:11, color:T.muted, fontWeight:700, padding:"4px 6px", borderBottom:`1px solid ${T.border}`, borderLeft:`1px solid ${T.border}`}}>이름</th>
-                      {/* 이메일(ID연동) 헤더 */}
-                      <th style={{fontSize:11, color:T.muted, fontWeight:700, padding:"4px 8px", borderBottom:`1px solid ${T.border}`, borderLeft:`1px solid ${T.border}`, minWidth:160, whiteSpace:"nowrap"}}>이메일 (ID연동)</th>
+                      {/* sticky 고정 헤더 — rowSpan=2로 두 행 병합 */}
+                      <th rowSpan={2} style={{...stickyHead, width:30, minWidth:30, fontSize:10, color:T.muted, fontWeight:700, textAlign:"center", padding:"4px 2px", borderBottom:`2px solid ${T.borderStrong}`, verticalAlign:"middle"}}>
+                        #<SortBtn col="idx"/>
+                      </th>
+                      <th rowSpan={2} style={{...stickyHead, left:30, width:110, minWidth:110, fontSize:11, color:T.muted, fontWeight:700, padding:"4px 6px", borderBottom:`2px solid ${T.borderStrong}`, borderLeft:`1px solid ${T.border}`, verticalAlign:"middle"}}>
+                        이름<SortBtn col="name"/>
+                      </th>
+                      {/* 이메일(ID연동) — rowSpan=2 */}
+                      <th rowSpan={2} style={{fontSize:11, color:T.muted, fontWeight:700, padding:"4px 8px", borderBottom:`2px solid ${T.borderStrong}`, borderLeft:`1px solid ${T.border}`, minWidth:160, whiteSpace:"nowrap", verticalAlign:"middle", background:T.surfaceAlt}}>이메일 (ID연동)</th>
                       {/* 인증현황 요약 3열 헤더 */}
                       <th colSpan={3} style={{background:"#F5F3FF", color:"#6D28D9", fontSize:11, fontWeight:800, textAlign:"center", padding:"4px 0", borderBottom:`1px solid ${T.border}`, borderLeft:`2px solid #6D28D9`}}>인증 현황</th>
                       {/* 섹션 헤더 */}
@@ -3312,11 +3335,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                         </th>
                       ))}
                     </tr>
-                    {/* 날짜 헤더 행 */}
+                    {/* 날짜 헤더 행 — #/이름/이메일 칸 없음 (rowSpan으로 병합됨) */}
                     <tr>
-                      <th style={{...stickyHead, width:30, minWidth:30, borderBottom:`2px solid ${T.borderStrong}`}}></th>
-                      <th style={{...stickyHead, left:30, width:110, minWidth:110, borderBottom:`2px solid ${T.borderStrong}`, borderLeft:`1px solid ${T.border}`}}></th>
-                      <th style={{minWidth:160, borderBottom:`2px solid ${T.borderStrong}`, borderLeft:`1px solid ${T.border}`, background:T.surfaceAlt}}></th>
                       {/* 요약 3열 서브헤더 */}
                       {[["네이버",SEC.naver.color,SEC.naver.bg],["모닝",SEC.morning.color,SEC.morning.bg],["나잇",SEC.night.color,SEC.night.bg]].map(([lbl,clr,bg],i)=>(
                         <th key={`sum-${i}`} style={{width:36,minWidth:36,fontSize:9,fontWeight:700,color:clr,background:bg,textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:i===0?`2px solid #6D28D9`:`1px solid ${T.border}`}}>{lbl}</th>
