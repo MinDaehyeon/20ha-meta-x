@@ -2010,10 +2010,16 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
 
   // 기수 데이터 (회원 관리·2기 명단 공용)
   const ROSTER2_NAMES = new Set(["강예나","김가흔","김은채","김태준","박재현","손연재","윤준원","최지유","배정윤","심수윤","한설아","강가인","권민유","권순혁","최유주","김도현","김시원","김시윤","김아란","김준범","김지우","김호진","나지성","문지유","박지우","서소윤","서지우","송민건","양소윤","오수연","우정훈","윤서준","이유빈","이홍윤","임다은","정유진","박선율","한채린","오수빈","남희수","김가인","양은정"]);
-  const getCohort = (profile) => {
-    if (ROSTER2_NAMES.has(profile.name)) return "20HA 2기";
-    return "20HA 1기";
+  // 다중 기수 지원: DB 학생은 1기 기본, 2기 명단 포함 시 둘 다
+  const getCohorts = (profile) => {
+    const tags = ["20HA 1기"];
+    if (ROSTER2_NAMES.has(profile.name)) tags.push("20HA 2기");
+    return tags;
   };
+  // 회원 관리 검색·페이지 state
+  const [memberSearch, setMemberSearch] = useState("");
+  const [memberPageSize, setMemberPageSize] = useState(20);
+  const [memberPage, setMemberPage] = useState(1);
   const [dashColFilter, setDashColFilter] = useState({});
   const [dashFilterOpen, setDashFilterOpen] = useState(null);
   const [parentLinks, setParentLinks] = useState({}); // {parent_id: [{student_id, name, grade}]}
@@ -2223,7 +2229,12 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   };
 
   const roleFiltered = filterRole==="all" ? students : students.filter(s=>s.role===filterRole);
-  const filteredStudents = filterStatus==="all" ? roleFiltered : roleFiltered.filter(s=>s.approval_status===filterStatus);
+  const statusFiltered = filterStatus==="all" ? roleFiltered : roleFiltered.filter(s=>s.approval_status===filterStatus);
+  const searchFiltered = !memberSearch.trim() ? statusFiltered
+    : statusFiltered.filter(s=>(s.name||"").includes(memberSearch)||(s.email||"").includes(memberSearch));
+  const totalPages = Math.max(1, Math.ceil(searchFiltered.length / memberPageSize));
+  const safePage = Math.min(memberPage, totalPages);
+  const filteredStudents = searchFiltered.slice((safePage-1)*memberPageSize, safePage*memberPageSize);
 
   // Dashboard data
   const filtered=sel==="전체"?normLogs:normLogs.filter(l=>l.uid===sel);
@@ -2352,6 +2363,25 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
             ))}
           </div>
 
+          {/* 검색 + 페이지 크기 */}
+          <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
+            <input
+              type="text" placeholder="이름·이메일 검색"
+              value={memberSearch}
+              onChange={e=>{setMemberSearch(e.target.value);setMemberPage(1);}}
+              style={{...css.input,flex:1,minWidth:160,maxWidth:280,padding:"7px 12px",fontSize:13}}
+            />
+            <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:"auto"}}>
+              <span style={{fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>
+                총 {searchFiltered.length}명
+              </span>
+              <select value={memberPageSize} onChange={e=>{setMemberPageSize(Number(e.target.value));setMemberPage(1);}}
+                style={{...css.select,width:"auto",padding:"6px 10px",fontSize:12}}>
+                {[10,20,50,100].map(n=><option key={n} value={n}>{n}명씩</option>)}
+              </select>
+            </div>
+          </div>
+
           {/* 대기 중 알림 */}
           {pendingCount>0&&filterStatus!=="approved"&&filterStatus!=="rejected"&&(
             <div style={{background:T.orangePale,border:`1px solid ${T.orange}50`,borderRadius:12,padding:"12px 16px",marginBottom:14,fontSize:13,color:T.navy,display:"flex",alignItems:"center",gap:10}}>
@@ -2387,8 +2417,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                         : <span style={{fontSize:10,color:T.muted,marginTop:2}}>연결된 자녀 없음</span>
                       )}
                     </div>,
-                    <div key={`${s.id}-g`} style={{padding:"8px 12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center"}}>
-                      {(()=>{const cohort=getCohort(s);const is2ki=cohort==="20HA 2기";return(<span style={{fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:20,background:is2ki?"#EEF2FF":"#F0FDF4",color:is2ki?"#4F46E5":"#16A34A",border:`1px solid ${is2ki?"#C7D2FE":"#BBF7D0"}`}}>{cohort}</span>);})()}
+                    <div key={`${s.id}-g`} style={{padding:"8px 12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",flexWrap:"wrap",gap:4}}>
+                      {getCohorts(s).map(cohort=>{const is2=cohort.includes("2기");return(
+                        <span key={cohort} style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:20,background:is2?"#EEF2FF":"#F0FDF4",color:is2?"#4F46E5":"#16A34A",border:`1px solid ${is2?"#C7D2FE":"#BBF7D0"}`,whiteSpace:"nowrap"}}>{cohort}</span>
+                      );})}
                     </div>,
                     <div key={`${s.id}-st`} style={{padding:"12px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center"}}>{statusBadge(s.approval_status)}</div>,
                     ...(!isMobile?[<div key={`${s.id}-ca`} style={{padding:"12px",fontSize:12,borderBottom:`1px solid ${T.border}`,color:T.muted,display:"flex",alignItems:"center"}}>{s.created_at?.slice(0,10)||"—"}</div>]:[]),
@@ -2404,6 +2436,28 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
                     </div>,
                   ])}
                 </div>
+              </div>
+            )}
+            {/* 페이지네이션 */}
+            {totalPages > 1 && (
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4,padding:"12px 0",borderTop:`1px solid ${T.border}`,flexWrap:"wrap"}}>
+                <button onClick={()=>setMemberPage(1)} disabled={safePage===1}
+                  style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${T.border}`,cursor:safePage===1?"default":"pointer",fontSize:12,color:safePage===1?T.muted:T.navy,background:"transparent"}}>«</button>
+                <button onClick={()=>setMemberPage(p=>Math.max(1,p-1))} disabled={safePage===1}
+                  style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${T.border}`,cursor:safePage===1?"default":"pointer",fontSize:12,color:safePage===1?T.muted:T.navy,background:"transparent"}}>‹</button>
+                {Array.from({length:totalPages},(_,i)=>i+1).filter(p=>Math.abs(p-safePage)<=2||p===1||p===totalPages).reduce((acc,p,i,arr)=>{
+                  if(i>0&&p-arr[i-1]>1) acc.push("...");
+                  acc.push(p);
+                  return acc;
+                },[]).map((p,i)=>p==="..."
+                  ?<span key={`e${i}`} style={{padding:"4px 6px",fontSize:12,color:T.muted}}>…</span>
+                  :<button key={p} onClick={()=>setMemberPage(p)}
+                    style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${p===safePage?T.navy:T.border}`,cursor:"pointer",fontSize:12,fontWeight:p===safePage?700:400,background:p===safePage?T.navy:"transparent",color:p===safePage?T.white:T.navy}}>{p}</button>
+                )}
+                <button onClick={()=>setMemberPage(p=>Math.min(totalPages,p+1))} disabled={safePage===totalPages}
+                  style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${T.border}`,cursor:safePage===totalPages?"default":"pointer",fontSize:12,color:safePage===totalPages?T.muted:T.navy,background:"transparent"}}>›</button>
+                <button onClick={()=>setMemberPage(totalPages)} disabled={safePage===totalPages}
+                  style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${T.border}`,cursor:safePage===totalPages?"default":"pointer",fontSize:12,color:safePage===totalPages?T.muted:T.navy,background:"transparent"}}>»</button>
               </div>
             )}
           </Card>
