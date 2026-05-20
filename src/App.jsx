@@ -72,6 +72,18 @@ const SUBJECT_CONFIG = {
 const ERR_CODES   = ["Q1","Q2","Q3","M1","M2","M3"];
 const ERR_LABELS  = { Q1:"개념 미숙지", Q2:"추론 실패", Q3:"지식 공백", M1:"계산 실수", M2:"문제 오독", M3:"단순 실수" };
 const GRADES      = ["초1","초2","초3","초4","초5","초6","중1","중2","중3","고1","고2","고3"];
+// birth_year + birth_month(optional, null이면 3월 기준) → "초4" 같은 학년 문자열
+const calcGrade = (birthYear, birthMonth) => {
+  if (!birthYear) return "";
+  const now = new Date();
+  const schoolYear = (birthMonth ?? now.getMonth() + 1) >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  const n = schoolYear - birthYear - 6;
+  if (n < 1) return "미취학";
+  if (n <= 6) return `초${n}`;
+  if (n <= 9) return `중${n - 6}`;
+  if (n <= 12) return `고${n - 9}`;
+  return "졸업";
+};
 
 // ══════════════════════════════════════════════════════
 // DESIGN TOKENS
@@ -322,7 +334,7 @@ const AuthScreen = ({ onLogin }) => {
   const [mode, setMode]       = useState("login"); // "login"|"signup"
   const [suRole, setSuRole]   = useState("student"); // "student" | "parent"
   const [suName, setSuName]   = useState("");
-  const [suGrade, setSuGrade] = useState("고1");
+  const [suBirthYear, setSuBirthYear] = useState("");
   const [suEmail, setSuEmail] = useState("");
   const [suPw, setSuPw]       = useState("");
   const [suPwC, setSuPwC]     = useState("");
@@ -435,7 +447,7 @@ const AuthScreen = ({ onLogin }) => {
     if(!pwRegex.test(suPw)){ setError("비밀번호는 영문 대소문자, 특수문자를 포함한 8자 이상이어야 합니다."); return; }
     setLoad("signup",true);
     const {data,error:err} = await supabase.auth.updateUser({
-      password:suPw, data:{name:suName, grade:suRole==="student"?suGrade:"", target_ei:85, role:suRole}
+      password:suPw, data:{name:suName, grade:suRole==="student"?calcGrade(Number(suBirthYear),null):"", target_ei:85, role:suRole}
     });
     if(err){
       // 세션 유지 — 사용자가 바로 재시도 가능
@@ -445,7 +457,10 @@ const AuthScreen = ({ onLogin }) => {
     }
     if(data?.user){
       const { error:profErr } = await supabase.from("profiles").upsert({
-        id:data.user.id, name:suName, grade:suRole==="student"?suGrade:"",
+        id:data.user.id, name:suName,
+        grade:suRole==="student"?calcGrade(Number(suBirthYear),null):"",
+        birth_year:suRole==="student"&&suBirthYear?Number(suBirthYear):null,
+        birth_month:null, birth_day:null,
         target_ei:85, role:suRole, approval_status:"pending"
       });
       if(profErr){
@@ -620,10 +635,13 @@ const handleSocial = async (provider) => {
         <div style={{display:"grid",gap:12,marginBottom:12}}>
           <div><label style={css.label}>이름 <span style={{color:"#e53e3e"}}>*</span></label><input value={suName} onChange={e=>setSuName(e.target.value)} placeholder="홍길동" required style={css.input}/></div>
           {suRole==="student" && (
-            <div><label style={css.label}>학년</label>
-              <select value={suGrade} onChange={e=>setSuGrade(e.target.value)} style={css.select}>
-                {GRADES.map(g=><option key={g} value={g}>{g}</option>)}
-              </select>
+            <div>
+              <label style={css.label}>출생연도 <span style={{color:"#e53e3e"}}>*</span></label>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <input type="number" value={suBirthYear} onChange={e=>setSuBirthYear(e.target.value)}
+                  placeholder="예) 2013" min={2000} max={2020} style={{...css.input,flex:1}}/>
+                {suBirthYear && <span style={{fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>({calcGrade(Number(suBirthYear),null)})</span>}
+              </div>
             </div>
           )}
 
@@ -739,19 +757,23 @@ const handleSocial = async (provider) => {
 // PROFILE SETUP SCREEN (소셜 로그인 최초 가입)
 // ══════════════════════════════════════════════════════
 const ProfileSetupScreen = ({user, onComplete}) => {
-  const [name, setName]     = useState(user.user_metadata?.full_name||user.user_metadata?.name||"");
-  const [grade, setGrade]   = useState("고1");
-  const [target, setTarget] = useState(85);
-  const [saving, setSaving] = useState(false);
-  const [done, setDone]     = useState(false);
-  const [error, setError]   = useState("");
+  const [name, setName]         = useState(user.user_metadata?.full_name||user.user_metadata?.name||"");
+  const [birthYear, setBirthYear] = useState("");
+  const [target, setTarget]     = useState(85);
+  const [saving, setSaving]     = useState(false);
+  const [done, setDone]         = useState(false);
+  const [error, setError]       = useState("");
 
   const save = async () => {
     if(!name){ setError("이름을 입력해 주세요."); return; }
+    if(!birthYear){ setError("출생연도를 입력해 주세요."); return; }
     setSaving(true);
+    const by = Number(birthYear);
     await supabase.from("profiles").upsert({
-      id:user.id, name, grade, target_ei:85,
-      role:"student", approval_status:"pending"
+      id:user.id, name,
+      grade: calcGrade(by, null),
+      birth_year: by, birth_month: null, birth_day: null,
+      target_ei:85, role:"student", approval_status:"pending"
     });
     setSaving(false);
     setDone(true);
@@ -784,10 +806,13 @@ const ProfileSetupScreen = ({user, onComplete}) => {
         <div style={{fontSize:13,color:T.muted,marginBottom:20}}>소셜 가입 완료! 아래 정보를 입력해 주세요.</div>
         <div style={{display:"grid",gap:14,marginBottom:16}}>
           <div><label style={css.label}>이름</label><input value={name} onChange={e=>setName(e.target.value)} placeholder="홍길동" style={css.input}/></div>
-          <div><label style={css.label}>학년</label>
-            <select value={grade} onChange={e=>setGrade(e.target.value)} style={css.select}>
-              {GRADES.map(g=><option key={g} value={g}>{g}</option>)}
-            </select>
+          <div>
+            <label style={css.label}>출생연도 <span style={{color:"#e53e3e"}}>*</span></label>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <input type="number" value={birthYear} onChange={e=>setBirthYear(e.target.value)}
+                placeholder="예) 2013" min={2000} max={2020} style={{...css.input,flex:1}}/>
+              {birthYear && <span style={{fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>({calcGrade(Number(birthYear),null)})</span>}
+            </div>
           </div>
 
         </div>
@@ -811,26 +836,29 @@ const ProfileSetupScreen = ({user, onComplete}) => {
 // COMPLETE PROFILE SCREEN (가입 미완료 사용자 - 이름/비밀번호 입력)
 // ══════════════════════════════════════════════════════
 const CompleteProfileScreen = ({ session, onDone }) => {
-  const [name, setName]     = useState("");
-  const [role, setRole]     = useState("student");
-  const [grade, setGrade]   = useState("고1");
-  const [pw, setPw]         = useState("");
-  const [pwC, setPwC]       = useState("");
-  const [saving, setSaving] = useState(false);
-  const [done, setDone]     = useState(false);
-  const [error, setError]   = useState("");
+  const [name, setName]         = useState("");
+  const [role, setRole]         = useState("student");
+  const [birthYear, setBirthYear] = useState("");
+  const [pw, setPw]             = useState("");
+  const [pwC, setPwC]           = useState("");
+  const [saving, setSaving]     = useState(false);
+  const [done, setDone]         = useState(false);
+  const [error, setError]       = useState("");
 
   const save = async () => {
     setError("");
     if(!name.trim() || name.trim().length < 2){ setError("이름을 2자 이상 입력해주세요."); return; }
+    if(role==="student" && !birthYear){ setError("출생연도를 입력해주세요."); return; }
     const pwRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/;
     if(!pwRegex.test(pw)){ setError("비밀번호는 영문 대소문자+특수문자 8자 이상이어야 합니다."); return; }
     if(pw !== pwC){ setError("비밀번호가 일치하지 않습니다."); return; }
     setSaving(true);
     const uid = session?.user?.id;
-    const { error: ue } = await supabase.auth.updateUser({ password: pw, data: { name, role, grade: role==="student"?grade:"" } });
+    const by = role==="student" ? Number(birthYear) : null;
+    const grd = role==="student" ? calcGrade(by, null) : "";
+    const { error: ue } = await supabase.auth.updateUser({ password: pw, data: { name, role, grade: grd } });
     if(!ue && uid) {
-      await supabase.from("profiles").upsert({ id: uid, name, grade: role==="student"?grade:"", role, approval_status:"pending", target_ei:85, is_active:true });
+      await supabase.from("profiles").upsert({ id: uid, name, grade: grd, birth_year: by, birth_month: null, birth_day: null, role, approval_status:"pending", target_ei:85, is_active:true });
     }
     setSaving(false);
     if(ue){ setError("오류가 발생했습니다. 다시 시도해주세요."); return; }
@@ -867,7 +895,14 @@ const CompleteProfileScreen = ({ session, onDone }) => {
               ))}
             </div>
           </div>
-          {role==="student"&&<div><label style={css.label}>학년</label><select value={grade} onChange={e=>setGrade(e.target.value)} style={css.select}>{GRADES.map(g=><option key={g} value={g}>{g}</option>)}</select></div>}
+          {role==="student"&&<div>
+            <label style={css.label}>출생연도 <span style={{color:"#e53e3e"}}>*</span></label>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <input type="number" value={birthYear} onChange={e=>setBirthYear(e.target.value)}
+                placeholder="예) 2013" min={2000} max={2020} style={{...css.input,flex:1}}/>
+              {birthYear && <span style={{fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>({calcGrade(Number(birthYear),null)})</span>}
+            </div>
+          </div>}
           <div><label style={css.label}>비밀번호 <span style={{fontWeight:400,color:T.muted,fontSize:11}}>(대소문자+특수문자 8자↑)</span></label><input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="••••••••" style={css.input}/></div>
           <div><label style={css.label}>비밀번호 확인</label><input type="password" value={pwC} onChange={e=>setPwC(e.target.value)} placeholder="••••••••" style={css.input}/></div>
         </div>
@@ -1947,7 +1982,7 @@ const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChild
               background:selChildId===c.profile.id?T.navy:"transparent",
               color:selChildId===c.profile.id?T.white:T.textMid,cursor:"pointer",
               fontSize:13,fontWeight:700,transition:"all 0.15s"}}>
-            🎓 {c.profile.name} <span style={{opacity:0.7,fontWeight:400}}>({c.profile.grade})</span>
+            🎓 {c.profile.name} <span style={{opacity:0.7,fontWeight:400}}>({calcGrade(c.profile.birth_year, c.profile.birth_month) || c.profile.grade})</span>
           </button>
         ))}
         {/* 자녀 추가 */}
@@ -2222,10 +2257,14 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
     const {error:ue} = await supabase.rpc("admin_update_profile", {
       p_id: editStudent.id,
       p_name: editStudent.name,
-      p_grade: editStudent.grade,
+      p_grade: editStudent.grade || "",
       p_target_ei: editStudent.target_ei,
       p_approval_status: editStudent.approval_status,
     });
+    // birth_year는 직접 업데이트 (RPC 파라미터 외)
+    if(!ue && editStudent.birth_year) {
+      await supabase.from("profiles").update({birth_year: editStudent.birth_year, birth_month: null, birth_day: null}).eq("id", editStudent.id);
+    }
     if(ue) console.error("update error:", ue.message);
     setSaving(false); setEditStudent(null); onRefresh();
   };
@@ -2316,14 +2355,23 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
               <Card style={{width:"100%",maxWidth:420}}>
                 <div style={{fontSize:18,fontWeight:800,color:T.navy,marginBottom:20}}>학생 정보 수정</div>
                 <div style={{display:"grid",gap:12}}>
-                  {[{label:"이름",key:"name",type:"text"},{label:"학년",key:"grade",type:"sel",opts:GRADES},{label:"목표 EI",key:"target_ei",type:"num",min:50,max:100}].map(({label,key,type,opts,min,max})=>(
+                  {[{label:"이름",key:"name",type:"text"},{label:"목표 EI",key:"target_ei",type:"num",min:50,max:100}].map(({label,key,type,min,max})=>(
                     <div key={key}>
                       <label style={css.label}>{label}</label>
-                      {type==="sel"
-                        ?<select value={editStudent[key]} onChange={e=>setEditStudent(s=>({...s,[key]:e.target.value}))} style={css.select}>{opts.map(o=><option key={o} value={o}>{o}</option>)}</select>
-                        :<input type={type==="num"?"number":type} min={min} max={max} value={editStudent[key]} onChange={e=>setEditStudent(s=>({...s,[key]:type==="num"?Number(e.target.value):e.target.value}))} style={css.input}/>}
+                      <input type={type==="num"?"number":type} min={min} max={max} value={editStudent[key]||""} onChange={e=>setEditStudent(s=>({...s,[key]:type==="num"?Number(e.target.value):e.target.value}))} style={css.input}/>
                     </div>
                   ))}
+                  {editStudent.role==="student"&&(
+                    <div>
+                      <label style={css.label}>출생연도</label>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <input type="number" value={editStudent.birth_year||""} min={2000} max={2020}
+                          onChange={e=>setEditStudent(s=>({...s,birth_year:Number(e.target.value),grade:calcGrade(Number(e.target.value),null)}))}
+                          style={{...css.input,flex:1}}/>
+                        {editStudent.birth_year && <span style={{fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>({calcGrade(editStudent.birth_year,null)})</span>}
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label style={css.label}>승인 상태</label>
                     <select value={editStudent.approval_status} onChange={e=>setEditStudent(s=>({...s,approval_status:e.target.value}))} style={css.select}>
@@ -3631,7 +3679,7 @@ const EISetupModal = ({profile, logs=[], onSave}) => {
 // ══════════════════════════════════════════════════════
 const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
   const [name, setName]           = useState(profile.name||"");
-  const [grade, setGrade]         = useState(profile.grade||"고1");
+  const [birthYear, setBirthYear] = useState(profile.birth_year ? String(profile.birth_year) : "");
   const [target, setTarget]       = useState(gradeInfo(profile.target_ei||85).g);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url||"");
   const [uploading, setUploading] = useState(false);
@@ -3696,7 +3744,8 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
     }
     setSaving(true);
     const targetEI = GRADE_MIN[target]||85;
-    await supabase.from("profiles").update({name, grade, target_ei:targetEI, avatar_url:avatarUrl, updated_at:new Date().toISOString()}).eq("id", profile.id);
+    const by = birthYear ? Number(birthYear) : null;
+    await supabase.from("profiles").update({name, grade: calcGrade(by, null)||profile.grade, birth_year:by, birth_month:null, birth_day:null, target_ei:targetEI, avatar_url:avatarUrl, updated_at:new Date().toISOString()}).eq("id", profile.id);
     if(newPw){
       const {error:pwErr} = await supabase.auth.updateUser({password:newPw});
       if(pwErr){
@@ -3768,10 +3817,12 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
           </div>
           {profile.role==="student"&&<>
             <div>
-              <label style={css.label}>학년</label>
-              <select value={grade} onChange={e=>setGrade(e.target.value)} style={css.select}>
-                {GRADES.map(g=><option key={g} value={g}>{g}</option>)}
-              </select>
+              <label style={css.label}>출생연도</label>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <input type="number" value={birthYear} onChange={e=>setBirthYear(e.target.value)}
+                  placeholder="예) 2013" min={2000} max={2020} style={{...css.input,flex:1}}/>
+                {birthYear && <span style={{fontSize:12,color:T.muted,whiteSpace:"nowrap"}}>({calcGrade(Number(birthYear),null)})</span>}
+              </div>
             </div>
             <div>
               <label style={css.label}>목표 등급</label>
@@ -4114,7 +4165,7 @@ export default function App() {
               {!isMobile && <span style={{ fontSize:13, color:T.navy, fontWeight:700 }}>{profile.name}</span>}
               {!isMobile && (isAdmin
                 ? <Pill color={T.orange}>관리자</Pill>
-                : <Pill color={T.navyMid}>{profile.grade}</Pill>)}
+                : <Pill color={T.navyMid}>{calcGrade(profile.birth_year, profile.birth_month) || profile.grade}</Pill>)}
               {!isMobile && <span style={{fontSize:11,color:T.muted}}>✎</span>}
             </div>
             <button onClick={handleLogout} style={{ padding:"5px 10px", borderRadius:8,
