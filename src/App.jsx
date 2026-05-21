@@ -4184,92 +4184,113 @@ const BottomNav = ({nav,view,showInput,onNavigate,isAdmin}) => (
 // ══════════════════════════════════════════════════════
 // SIDE NAVIGATION
 // ══════════════════════════════════════════════════════
-const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, onShowInput, onLogout, onShowProfile, pendingCount, onToggle}) => (
-  <div style={{
-    width:240, background:"#F2F3F7", position:"fixed", top:0, left:0, bottom:0,
-    display:"flex", flexDirection:"column", zIndex:200, overflowY:"auto",
-    borderRight:"1px solid #E2E6F3"
-  }}>
-    {/* 닫기 버튼 — 우측 외곽에 플로팅 */}
-    <button onClick={onToggle} title="메뉴 닫기"
-      style={{position:"absolute", top:18, right:-12, width:24, height:24, borderRadius:"50%",
-        background:"#fff", border:"1px solid #E2E6F3", cursor:"pointer",
-        display:"flex", alignItems:"center", justifyContent:"center",
-        boxShadow:"0 2px 8px rgba(25,29,84,0.12)", fontSize:11, color:"#191D54",
-        zIndex:201, lineHeight:1}}>◀</button>
-
-    {/* 로고 + 프로필 */}
-    <div style={{padding:"20px 16px 16px", borderBottom:"1px solid #E2E6F3"}}>
-      <Logo size="md" headerMode onClick={()=>onNavigate(nav[0]?.key||"cert", false)}/>
-      <div style={{marginTop:14, display:"flex", alignItems:"center", gap:10, cursor:"pointer",
-          padding:"8px 10px", borderRadius:10, transition:"background 0.15s"}}
-        onClick={onShowProfile}
-        onMouseEnter={e=>e.currentTarget.style.background="rgba(25,29,84,0.06)"}
-        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-        <div style={{width:34, height:34, borderRadius:10, background:"linear-gradient(135deg,#191D54,#3D4499)",
-            display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, color:"#fff", flexShrink:0, overflow:"hidden"}}>
-          {profile.avatar_url
-            ? <img src={profile.avatar_url} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-            : isAdmin ? "👨‍💼" : profile.name?.charAt(0)||"🎓"}
-        </div>
-        <div style={{minWidth:0}}>
-          <div style={{fontSize:13, fontWeight:700, color:"#191D54", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{profile.name}</div>
-          <div style={{fontSize:11, color:"#8B91C0", marginTop:1}}>
-            {isAdmin ? "관리자" : calcGrade(profile.birth_year, profile.birth_month) || profile.grade || "학생"}
+const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, onShowInput, onLogout, onShowProfile, pendingCount, isOpen}) => {
+  const w = isOpen ? 240 : 56;
+  return (
+    <div style={{
+      width:w, background:"#F2F3F7", position:"fixed", top:0, left:0, bottom:0,
+      display:"flex", flexDirection:"column", zIndex:200, overflowY:"auto", overflowX:"hidden",
+      borderRight:"1px solid #E2E6F3", transition:"width 0.22s ease"
+    }}>
+      {/* 프로필 아바타 */}
+      <div style={{padding: isOpen ? "20px 16px 16px" : "16px 0", borderBottom:"1px solid #E2E6F3",
+          display:"flex", alignItems:"center", gap:10, justifyContent: isOpen ? "flex-start" : "center",
+          cursor:"pointer", transition:"padding 0.22s"}}
+        onClick={onShowProfile}>
+        {isOpen && <Logo size="md" headerMode onClick={e=>{e.stopPropagation(); onNavigate(nav[0]?.key||"cert", false);}}/>}
+        {!isOpen && (
+          <div style={{width:34, height:34, borderRadius:10, background:"linear-gradient(135deg,#191D54,#3D4499)",
+              display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, color:"#fff", overflow:"hidden", flexShrink:0}}>
+            {profile.avatar_url
+              ? <img src={profile.avatar_url} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+              : isAdmin ? "👨‍💼" : profile.name?.charAt(0)||"🎓"}
           </div>
-        </div>
-        <span style={{fontSize:10, color:"#C8CEED", marginLeft:"auto"}}>✎</span>
+        )}
+        {isOpen && (
+          <>
+            <div style={{width:34, height:34, borderRadius:10, background:"linear-gradient(135deg,#191D54,#3D4499)",
+                display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, color:"#fff", flexShrink:0, overflow:"hidden"}}>
+              {profile.avatar_url
+                ? <img src={profile.avatar_url} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                : isAdmin ? "👨‍💼" : profile.name?.charAt(0)||"🎓"}
+            </div>
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:13, fontWeight:700, color:"#191D54", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{profile.name}</div>
+              <div style={{fontSize:11, color:"#8B91C0", marginTop:1}}>
+                {isAdmin ? "관리자" : calcGrade(profile.birth_year, profile.birth_month) || profile.grade || "학생"}
+              </div>
+            </div>
+            <span style={{fontSize:10, color:"#C8CEED", marginLeft:"auto"}}>✎</span>
+          </>
+        )}
+      </div>
+
+      {/* 네비게이션 */}
+      <div style={{flex:1, padding: isOpen ? "12px 8px" : "12px 4px"}}>
+        {isAdmin && pendingCount > 0 && (
+          <div style={{
+              background:"#FEE2E2", border:"1px solid #FECACA", borderRadius:8,
+              padding: isOpen ? "8px 12px" : "8px 4px", marginBottom:8,
+              fontSize: isOpen ? 12 : 16, color:"#E8394A", fontWeight:700, cursor:"pointer",
+              textAlign: isOpen ? "left" : "center", overflow:"hidden", whiteSpace:"nowrap"}}
+            onClick={()=>onNavigate("dashboard",false)}>
+            {isOpen ? `🔔 ${pendingCount}명 승인 대기` : "🔔"}
+          </div>
+        )}
+        {nav.map(n => {
+          const isActive = view===n.key && !showInput;
+          return (
+            <div key={n.key} onClick={()=>onNavigate(n.key, false)}
+              style={{
+                display:"flex", alignItems:"center", gap:10,
+                padding: isOpen ? "11px 14px" : "11px 0",
+                justifyContent: isOpen ? "flex-start" : "center",
+                cursor:"pointer", borderRadius:10, marginBottom:2,
+                background: isActive ? "#fff" : "transparent",
+                borderLeft: isActive && isOpen ? "3px solid #F68B1E" : "3px solid transparent",
+                boxShadow: isActive ? "0 1px 4px rgba(25,29,84,0.08)" : "none",
+                transition:"all 0.15s", overflow:"hidden"
+              }}
+              onMouseEnter={e=>{ if(!isActive) e.currentTarget.style.background="rgba(25,29,84,0.05)"; }}
+              onMouseLeave={e=>{ if(!isActive) e.currentTarget.style.background="transparent"; }}>
+              <span style={{fontSize:18, flexShrink:0}}>{n.icon}</span>
+              {isOpen && <span style={{fontSize:13, fontWeight:isActive?700:500, color:isActive?"#191D54":"#4A5080", whiteSpace:"nowrap"}}>{n.label}</span>}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 하단 버튼들 */}
+      <div style={{padding: isOpen ? "0 12px 16px" : "0 6px 16px", display:"flex", flexDirection:"column", gap:6}}>
+        {!isAdmin && !isParent && (
+          <button onClick={onShowInput}
+            style={{width:"100%", background:"#F68B1E", border:"none", borderRadius:10,
+              padding:"12px", color:"#fff", fontSize: isOpen ? 13 : 18, fontWeight:800,
+              cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6}}>
+            {isOpen ? <><span style={{fontSize:16, fontWeight:300}}>+</span> 학습 입력</> : "+"}
+          </button>
+        )}
+        {isOpen && <>
+          {/* 도움말 버튼 — 비활성화
+          <button onClick={()=>window.open("/manual.html","_blank")}
+            style={{width:"100%", background:"transparent", border:"1px solid #E2E6F3", borderRadius:8, padding:"9px", color:"#8B91C0", fontSize:12, cursor:"pointer"}}>
+            ❓ 도움말
+          </button>
+          */}
+          <button onClick={onLogout}
+            style={{width:"100%", background:"transparent", border:"1px solid #E2E6F3", borderRadius:8, padding:"9px", color:"#C8CEED", fontSize:12, cursor:"pointer"}}>
+            로그아웃
+          </button>
+        </>}
+        {!isOpen && <>
+          {/* 도움말 아이콘 — 비활성화 */}
+          <button onClick={onLogout} title="로그아웃"
+            style={{width:"100%", background:"transparent", border:"1px solid #E2E6F3", borderRadius:8, padding:"8px 0", color:"#C8CEED", fontSize:14, cursor:"pointer"}}>↩</button>
+        </>}
       </div>
     </div>
-
-    {/* 네비게이션 */}
-    <div style={{flex:1, padding:"12px 8px"}}>
-      {isAdmin && pendingCount > 0 && (
-        <div style={{background:"#FEE2E2", border:"1px solid #FECACA", borderRadius:8, padding:"8px 12px", marginBottom:8, fontSize:12, color:"#E8394A", fontWeight:700, cursor:"pointer"}}
-          onClick={()=>onNavigate("dashboard",false)}>
-          🔔 {pendingCount}명 승인 대기
-        </div>
-      )}
-      {nav.map(n => {
-        const isActive = view===n.key && !showInput;
-        return (
-          <div key={n.key} onClick={()=>onNavigate(n.key, false)}
-            style={{
-              display:"flex", alignItems:"center", gap:10,
-              padding:"11px 14px", cursor:"pointer", borderRadius:10, marginBottom:2,
-              background: isActive ? "#fff" : "transparent",
-              borderLeft: isActive ? "3px solid #F68B1E" : "3px solid transparent",
-              boxShadow: isActive ? "0 1px 4px rgba(25,29,84,0.08)" : "none",
-              transition:"all 0.15s"
-            }}
-            onMouseEnter={e=>{ if(!isActive) e.currentTarget.style.background="rgba(25,29,84,0.05)"; }}
-            onMouseLeave={e=>{ if(!isActive) e.currentTarget.style.background="transparent"; }}>
-            <span style={{fontSize:16}}>{n.icon}</span>
-            <span style={{fontSize:13, fontWeight:isActive?700:500, color:isActive?"#191D54":"#4A5080"}}>{n.label}</span>
-          </div>
-        );
-      })}
-    </div>
-
-    {/* 하단 버튼들 */}
-    <div style={{padding:"0 12px 16px", display:"flex", flexDirection:"column", gap:6}}>
-      {!isAdmin && !isParent && (
-        <button onClick={onShowInput}
-          style={{width:"100%", background:"#F68B1E", border:"none", borderRadius:10, padding:"12px", color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6}}>
-          <span style={{fontSize:16, fontWeight:300}}>+</span> 학습 입력
-        </button>
-      )}
-      <button onClick={()=>window.open("/manual.html","_blank")}
-        style={{width:"100%", background:"transparent", border:"1px solid #E2E6F3", borderRadius:8, padding:"9px", color:"#8B91C0", fontSize:12, cursor:"pointer"}}>
-        ❓ 도움말
-      </button>
-      <button onClick={onLogout}
-        style={{width:"100%", background:"transparent", border:"1px solid #E2E6F3", borderRadius:8, padding:"9px", color:"#C8CEED", fontSize:12, cursor:"pointer"}}>
-        로그아웃
-      </button>
-    </div>
-  </div>
-);
+  );
+};
 
 // ══════════════════════════════════════════════════════
 // ROOT APP
@@ -4474,7 +4495,7 @@ export default function App() {
   return (
     <div style={{ display:"flex", minHeight:"100vh", background:T.bg, fontFamily:"'Noto Sans KR',sans-serif", color:T.text, overflowX:"hidden" }}>
       {/* 좌측 사이드바 — 데스크톱 전용 */}
-      {!isMobile && sidebarOpen && (
+      {!isMobile && (
         <SideNav
           nav={NAV}
           view={view}
@@ -4487,25 +4508,26 @@ export default function App() {
           onLogout={handleLogout}
           onShowProfile={() => setShowProfileModal(true)}
           pendingCount={pendingCount}
-          onToggle={() => setSidebarOpen(false)}
+          isOpen={sidebarOpen}
         />
       )}
 
-      {/* 사이드바 닫힌 상태 — 열기 버튼 */}
-      {!isMobile && !sidebarOpen && (
-        <button onClick={() => setSidebarOpen(true)} title="메뉴 열기"
-          style={{position:"fixed", left:0, top:"50%", transform:"translateY(-50%)",
-            width:20, height:52, background:"#F2F3F7", border:"1px solid #E2E6F3", borderLeft:"none",
-            borderRadius:"0 10px 10px 0", cursor:"pointer", zIndex:201,
-            display:"flex", alignItems:"center", justifyContent:"center",
-            color:"#8B91C0", fontSize:11, boxShadow:"2px 0 8px rgba(25,29,84,0.10)"}}>▶</button>
-      )}
-
       {/* 메인 영역 */}
-      <div style={{ flex:1, marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 0), minHeight:"100vh", display:"flex", flexDirection:"column", transition:"margin-left 0.2s ease" }}>
+      <div style={{ flex:1, marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 56), minHeight:"100vh", display:"flex", flexDirection:"column", transition:"margin-left 0.22s ease" }}>
         {/* 상단바 */}
         <div style={{ position:"sticky", top:0, zIndex:100, borderBottom:`1px solid ${T.border}`, background:T.surface, boxShadow:"0 1px 4px rgba(25,29,84,0.05)" }}>
           <div style={{ display:"flex", alignItems:"center", height:isMobile?56:58, gap:12, padding:`0 ${isMobile?16:24}px` }}>
+            {/* 햄버거 버튼 — 데스크톱 */}
+            {!isMobile && (
+              <button onClick={() => setSidebarOpen(o => !o)}
+                style={{ background:"none", border:"none", cursor:"pointer", padding:"6px 8px",
+                  borderRadius:8, display:"flex", flexDirection:"column", gap:4, flexShrink:0 }}
+                title={sidebarOpen ? "메뉴 닫기" : "메뉴 열기"}>
+                <span style={{display:"block", width:18, height:2, background:T.navy, borderRadius:1}}/>
+                <span style={{display:"block", width:18, height:2, background:T.navy, borderRadius:1}}/>
+                <span style={{display:"block", width:18, height:2, background:T.navy, borderRadius:1}}/>
+              </button>
+            )}
             {isMobile && <Logo size="sm" headerMode={true} onClick={()=>navigate(NAV[0]?.key||"cert",false)}/>}
             {!isMobile && (
               <div style={{ fontSize:16, fontWeight:800, color:T.navy }}>
