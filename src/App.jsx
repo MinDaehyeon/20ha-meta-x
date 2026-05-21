@@ -2066,6 +2066,19 @@ const INIT_ATTENDANCE2 = {"36-나-2026-05-17":true,"27-나-2026-05-17":true,"4-�
 // 학생: 20HA 인증 현황 탭
 // ══════════════════════════════════════════════════════
 const StudentCertView = ({profile}) => {
+  const [peerGrades, setPeerGrades] = useState({});
+  useEffect(() => {
+    supabase.from("profiles").select("name,grade,birth_year,birth_month")
+      .in("name", ROSTER2.map(s=>s.name))
+      .then(({data}) => {
+        if(data && data.length>0) {
+          const map = {};
+          data.forEach(p => { map[p.name] = calcGrade(p.birth_year, p.birth_month) || p.grade || ""; });
+          setPeerGrades(map);
+        }
+      });
+  }, []);
+
   const fk = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
   const myIdx = ROSTER2.findIndex(s => s.name === profile.name);
 
@@ -2209,110 +2222,95 @@ const StudentCertView = ({profile}) => {
         ))}
       </div>
 
-      {/* ③④ 이번 주 + 클래스 랭킹 — 2열 */}
-      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12}}>
-        {/* 이번 주 */}
-        <Card style={{padding:"16px 18px"}}>
-          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12}}>
-            <span style={{fontSize:13, fontWeight:800, color:T.navy}}>📅 이번 주</span>
-            <span style={{fontSize:11, color:T.muted}}>{currentWeekIdx+1}주차 / 8주</span>
-          </div>
-          <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:4, marginBottom:14}}>
-            {thisWeek.map((d, i) => {
-              const dk = fk(d);
-              const isToday = d.toDateString() === today.toDateString();
-              const isPast  = d < today && !isToday;
-              const hasN  = myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-N-${dk}`];
-              const hasM  = myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-M-${dk}`];
-              const hasNa = myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-나-${dk}`];
-              const hasAny = hasN || hasM || hasNa;
-              return (
-                <div key={i} style={{textAlign:"center"}}>
-                  <div style={{fontSize:9, fontWeight:700, color:isToday?T.navy:T.muted, marginBottom:3}}>{ROSTER2_DAY_KO[i]}</div>
-                  <div style={{
-                    borderRadius:8, padding:"5px 2px",
-                    background: isToday?T.navy: hasAny?"#ECFDF5": isPast?"#FEF2F2":T.surfaceAlt,
-                    border:`1px solid ${isToday?T.navy: hasAny?"#6EE7B7": isPast?"#FECACA":T.border}`,
-                    minHeight:40, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2
-                  }}>
-                    <div style={{fontSize:9, color:isToday?"rgba(255,255,255,0.7)":T.muted}}>{d.getDate()}</div>
-                    {hasN  && <div style={{width:5,height:5,borderRadius:"50%",background:"#4F46E5"}}/>}
-                    {hasM  && <div style={{width:5,height:5,borderRadius:"50%",background:"#EA580C"}}/>}
-                    {hasNa && <div style={{width:5,height:5,borderRadius:"50%",background:"#16A34A"}}/>}
-                    {!hasAny && isPast  && <span style={{fontSize:9, color:"#FCA5A5", fontWeight:700}}>✗</span>}
-                    {!hasAny && !isPast && !isToday && <span style={{fontSize:9, color:T.border}}>·</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div style={{borderTop:`1px solid ${T.border}`, paddingTop:10}}>
-            <div style={{fontSize:10, fontWeight:700, color:T.muted, marginBottom:7}}>8주 진도</div>
-            <div style={{display:"flex", gap:4, alignItems:"center"}}>
-              {weeklyData.map(({w, pct:p, isCurrent}) => {
-                const isFuture = w-1 > currentWeekIdx;
-                const dotColor = isCurrent ? T.orange : p>=80 ? "#16A34A" : p>=50 ? "#4F46E5" : p>0 ? T.muted : T.border;
-                const size = isCurrent ? 14 : 10;
-                return (
-                  <div key={w} style={{flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2}}>
-                    <div style={{width:size, height:size, borderRadius:"50%", background:isFuture?"transparent":dotColor,
-                      border:`2px solid ${isFuture?T.border:dotColor}`, transition:"all 0.3s"}}/>
-                    <span style={{fontSize:8, color:isCurrent?T.orange:T.muted, fontWeight:isCurrent?800:400}}>{w}주</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </Card>
-
-        {/* 클래스 랭킹 */}
-        <Card style={{padding:"16px 18px"}}>
-          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12}}>
-            <span style={{fontSize:13, fontWeight:800, color:T.navy}}>🏆 클래스 랭킹</span>
-            {myRank && myRank <= Math.ceil(ROSTER2.length * 0.05) + 1 && (
-              <span style={{fontSize:10, fontWeight:700, background:T.gradOrange, color:"#fff", borderRadius:20, padding:"3px 10px"}}>TOP 5%</span>
-            )}
-          </div>
-          <div style={{display:"grid", gap:3}}>
-            {top10.map((s, rank) => {
-              const isMe = s.name === profile.name;
-              const barPct = pct(s.total, grandTotal);
-              const avatarBg = isMe ? "#191D54" : rank===0 ? "#F68B1E" : rank===1 ? "#6B7280" : rank===2 ? "#B45309" : "#E2E6F3";
-              const avatarColor = rank < 3 || isMe ? "#fff" : "#8B91C0";
-              return (
-                <div key={rank} style={{display:"flex", alignItems:"center", gap:6, padding:"5px 6px", borderRadius:7,
-                  background: isMe?"#EEF2FF": rank===0?"#FFFBEB":"transparent",
-                  border:`1px solid ${isMe?"#C7D2FE": rank===0?"#FDE68A":"transparent"}`}}>
-                  <div style={{width:16, textAlign:"center", fontSize:rank<3?12:9, flexShrink:0}}>
-                    {rank===0?"🥇":rank===1?"🥈":rank===2?"🥉":<span style={{fontWeight:700,color:T.muted}}>{rank+1}</span>}
-                  </div>
-                  <div style={{width:22, height:22, borderRadius:"50%", background:avatarBg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, border:`2px solid ${isMe?"#191D54":rank===0?"#F68B1E":T.border}`}}>
-                    <span style={{fontSize:8, fontWeight:800, color:avatarColor}}>{s.name.charAt(0)}</span>
-                  </div>
-                  <div style={{fontSize:11, fontWeight:isMe?800:500, color:T.navy, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
-                    {s.name}{isMe&&<span style={{fontSize:8,color:"#4F46E5",marginLeft:2}}>(나)</span>}
-                  </div>
-                  <div style={{width:28, textAlign:"right", fontSize:10, fontWeight:800, flexShrink:0,
-                    color: isMe?"#4F46E5": rank===0?T.orange:T.navy}}>
-                    {barPct}%
-                  </div>
-                </div>
-              );
-            })}
-            {myRank && myRank > 10 && (<>
-              <div style={{textAlign:"center",color:T.muted,fontSize:10,padding:"2px 0"}}>···</div>
-              <div style={{display:"flex", alignItems:"center", gap:6, padding:"5px 6px", borderRadius:7, background:"#EEF2FF", border:"1px solid #C7D2FE"}}>
-                <div style={{width:16, textAlign:"center", fontSize:9, fontWeight:800, color:"#4F46E5", flexShrink:0}}>{myRank}</div>
-                <div style={{width:22, height:22, borderRadius:"50%", background:"#191D54", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, border:"2px solid #191D54"}}>
-                  <span style={{fontSize:8, fontWeight:800, color:"#fff"}}>{profile.name.charAt(0)}</span>
-                </div>
-                <div style={{fontSize:11, fontWeight:800, color:T.navy, flex:1}}>{profile.name}<span style={{fontSize:8,color:"#4F46E5",marginLeft:2}}>(나)</span></div>
-                <div style={{width:28, textAlign:"right", fontSize:10, fontWeight:800, color:"#4F46E5", flexShrink:0}}>{pct(myStat.total,grandTotal)}%</div>
+      {/* ③ 8주 전체 일정 */}
+      {(()=>{
+        const myGrade = calcGrade(profile.birth_year, profile.birth_month) || profile.grade || "";
+        const sameGradeRanked = myGrade && Object.keys(peerGrades).length>0
+          ? [...allStats].filter(s=>(peerGrades[s.name]||"")===myGrade).sort((a,b)=>b.total-a.total).slice(0,3)
+          : [];
+        const ACTIVITIES = [
+          {label:"미라클모닝", dates:ROSTER2_MORNING_DATES, type:"M",   color:"#EA580C"},
+          {label:"카페 인증",  dates:ROSTER2_NAVER_DATES,   type:"N",   color:"#03C75A"},
+          {label:"미라클나이트",dates:ROSTER2_NIGHT_DATES,   type:"나",  color:"#6366F1"},
+        ];
+        const RankRow = ({s, rank, isMe}) => {
+          const medals=["🥇","🥈","🥉"];
+          const abg=isMe?"#191D54":rank===0?"#F68B1E":rank===1?"#6B7280":"#B45309";
+          return(
+            <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:9,
+              background:isMe?"#EEF2FF":rank===0?"#FFFBEB":"transparent",
+              border:`1px solid ${isMe?"#C7D2FE":rank===0?"#FDE68A":"transparent"}`}}>
+              <span style={{fontSize:16,width:20,textAlign:"center",flexShrink:0}}>{medals[rank]}</span>
+              <div style={{width:26,height:26,borderRadius:"50%",background:abg,display:"flex",alignItems:"center",justifyContent:"center",border:`2px solid ${isMe?"#191D54":rank===0?"#F68B1E":"transparent"}`,flexShrink:0}}>
+                <span style={{fontSize:9,fontWeight:800,color:"#fff"}}>{s.name.charAt(0)}</span>
               </div>
-            </>)}
+              <div style={{flex:1,fontSize:13,fontWeight:isMe?800:500,color:T.navy,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {s.name}{isMe&&<span style={{fontSize:9,color:"#4F46E5",marginLeft:3}}>(나)</span>}
+              </div>
+              <div style={{fontSize:12,fontWeight:800,color:isMe?"#4F46E5":rank===0?T.orange:T.navy,flexShrink:0}}>{pct(s.total,grandTotal)}%</div>
+            </div>
+          );
+        };
+        return(<>
+          <Card style={{padding:"16px 18px"}}>
+            <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:12}}>📅 8주 전체 일정</div>
+            {ACTIVITIES.map(({label,dates,type,color})=>(
+              <div key={label} style={{marginBottom:12}}>
+                <div style={{fontSize:11,fontWeight:700,color,marginBottom:6}}>● {label} <span style={{fontWeight:400,color:T.muted}}>({dates.length}회)</span></div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                  {[...dates].sort((a,b)=>a-b).map((dt,i)=>{
+                    const dk=fk(dt);
+                    const done=myIdx>=0&&INIT_ATTENDANCE2[`${myIdx}-${type}-${dk}`];
+                    const isPast=dt<today;
+                    return(
+                      <div key={i} style={{
+                        padding:"3px 8px",borderRadius:6,fontSize:10,fontWeight:done?700:400,whiteSpace:"nowrap",
+                        background:done?color:isPast?`${color}12`:T.surfaceAlt,
+                        border:`1px solid ${done?color:isPast?`${color}30`:T.border}`,
+                        color:done?"#fff":isPast?color:T.muted
+                      }}>
+                        {dt.getMonth()+1}/{dt.getDate()}{done?" ✓":!isPast?" ·":""}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            <div style={{fontSize:10,color:T.muted,opacity:0.6,paddingTop:10,borderTop:`1px solid ${T.border}`}}>
+              ⚠️ 인증 데이터는 실시간 반영이 아니며, 최대 1일 소요될 수 있습니다.
+            </div>
+          </Card>
+
+          {/* ④ 랭킹 2열 */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            <Card style={{padding:"14px 16px"}}>
+              <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10}}>🏆 전체 BEST 3</div>
+              <div style={{display:"grid",gap:5}}>
+                {ranked.slice(0,3).map((s,rank)=>(
+                  <RankRow key={rank} s={s} rank={rank} isMe={s.name===profile.name}/>
+                ))}
+              </div>
+            </Card>
+            <Card style={{padding:"14px 16px"}}>
+              <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10}}>
+                🎓 같은 학년 BEST 3
+                {myGrade&&<span style={{fontSize:10,color:T.muted,fontWeight:400,marginLeft:6}}>({myGrade})</span>}
+              </div>
+              {sameGradeRanked.length===0 ? (
+                <div style={{fontSize:11,color:T.muted,textAlign:"center",padding:"16px 0"}}>
+                  {Object.keys(peerGrades).length===0?"학년 정보 로딩 중...":"같은 학년 데이터 없음"}
+                </div>
+              ) : (
+                <div style={{display:"grid",gap:5}}>
+                  {sameGradeRanked.map((s,rank)=>(
+                    <RankRow key={rank} s={s} rank={rank} isMe={s.name===profile.name}/>
+                  ))}
+                </div>
+              )}
+            </Card>
           </div>
-        </Card>
-      </div>
+        </>);
+      })()}
 
       {/* ⑤ 멘토 인사이트 + 마스터리 도전 — 2열 */}
       <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
