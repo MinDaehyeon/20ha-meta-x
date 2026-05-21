@@ -4784,7 +4784,7 @@ export default function App() {
       )}
 
       {/* 메인 영역 */}
-      <div style={{ flex:1, marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 56), minHeight:"100vh", display:"flex", flexDirection:"column", transition:"margin-left 0.22s ease" }}>
+      <div style={{ flex:1, minWidth:0, marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 56), minHeight:"100vh", display:"flex", flexDirection:"column", transition:"margin-left 0.22s ease", overflow:"hidden" }}>
         {/* 상단바 */}
         <div style={{ position:"sticky", top:0, zIndex:100, borderBottom:`1px solid ${T.border}`, background:T.surface, boxShadow:"0 1px 4px rgba(25,29,84,0.05)" }}>
           <div style={{ display:"flex", alignItems:"center", height:isMobile?56:58, gap:12, padding:`0 ${isMobile?16:24}px` }}>
@@ -4828,7 +4828,7 @@ export default function App() {
         </div>
 
         {/* 페이지 콘텐츠 */}
-        <div style={{ padding: isMobile ? "16px 12px 100px" : "28px 32px 60px", overflowX:"auto" }}>
+        <div style={{ padding: isMobile ? "16px 12px 100px" : "28px 32px 60px", overflowX:"auto", flex:1 }}>
           {showInput ? (
             <div>
               <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
