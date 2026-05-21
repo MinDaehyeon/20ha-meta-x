@@ -1749,6 +1749,42 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
               <span key={k} style={{fontSize:11,color:c,fontWeight:700}}>● {k}: {v}회</span>
             ))}
           </div>
+          {/* COIN 백분율 띠그래프 */}
+          {(()=>{
+            const tot=(coinT.cc||0)+(coinT.ci||0)+(coinT.ic||0)+(coinT.ii||0);
+            if(tot===0) return null;
+            const bars=[
+              {k:"C-C",v:coinT.cc||0,color:GRAPH.ccColor},
+              {k:"C-I",v:coinT.ci||0,color:GRAPH.ciColor},
+              {k:"I-C",v:coinT.ic||0,color:T.orange},
+              {k:"I-I",v:coinT.ii||0,color:"#9CA3AF"},
+            ];
+            return(
+              <div style={{marginBottom:14}}>
+                <div style={{height:18,borderRadius:9,overflow:"hidden",display:"flex",gap:2}}>
+                  {bars.map(({k,v,color})=>{
+                    const p=v/tot*100;
+                    if(p<0.5) return null;
+                    return(
+                      <div key={k} style={{flex:`0 0 ${p}%`,background:color,borderRadius:0,transition:"flex 0.6s ease",position:"relative"}}
+                        title={`${k}: ${v}회 (${p.toFixed(1)}%)`}/>
+                    );
+                  })}
+                </div>
+                <div style={{display:"flex",gap:10,marginTop:6,flexWrap:"wrap",justifyContent:"center"}}>
+                  {bars.map(({k,v,color})=>{
+                    const p=+(v/tot*100).toFixed(0);
+                    return(
+                      <div key={k} style={{display:"flex",alignItems:"center",gap:3,fontSize:10}}>
+                        <div style={{width:8,height:8,borderRadius:2,background:color,flexShrink:0}}/>
+                        <span style={{color:T.muted}}>{k} <strong style={{color}}>{p}%</strong></span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
           {/* C-I / I-C 위험 지표 강조 */}
           {(coinT.ci||0)+(coinT.ic||0)>0&&(()=>{
             const tot=Object.values(coinT).reduce((s,v)=>s+v,0)||1;
