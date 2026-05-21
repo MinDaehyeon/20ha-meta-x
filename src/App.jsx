@@ -2579,6 +2579,7 @@ const StudentCertView = ({profile}) => {
 // ══════════════════════════════════════════════════════
 const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) => {
   const [adminTab, setAdminTab] = useState(defaultTab);
+  useEffect(() => { setAdminTab(defaultTab); }, [defaultTab]);
   const [rosterSearch, setRosterSearch] = useState("");
   const [rosterSort, setRosterSort] = useState({by:"name",dir:"asc"});
   const [attendance2, setAttendance2] = useState(INIT_ATTENDANCE2);
@@ -2876,21 +2877,6 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
 
   return(
     <div>
-      {/* Admin tab */}
-      <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
-        {[
-          {key:"users",label:"👥 회원 관리",badge:pendingCount},
-          {key:"roster2",label:"📝 2기 명단"},
-        ].map(t=>(
-          <button key={t.key} onClick={()=>setAdminTab(t.key)}
-            style={{padding:"9px 20px",borderRadius:10,border:`1px solid ${adminTab===t.key?T.navy:T.border}`,cursor:"pointer",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:8,
-              background:adminTab===t.key?T.navy:T.white,color:adminTab===t.key?T.white:T.muted}}>
-            {t.label}
-            {t.badge>0&&<span style={{background:T.danger,color:T.white,borderRadius:20,padding:"1px 7px",fontSize:11,fontWeight:800}}>{t.badge}</span>}
-          </button>
-        ))}
-      </div>
-
       {/* ── 회원 관리 탭 ── */}
       {adminTab==="users"&&(
         <div>
