@@ -2323,17 +2323,27 @@ const StudentCertView = ({profile}) => {
                                           const dk=fk(dt);
                                           const done=myIdx>=0&&INIT_ATTENDANCE2[`${myIdx}-${type}-${dk}`];
                                           const isPast=dt<today;
+                                          const missed = isPast && !done;
                                           return(
                                             <div key={i} title={`${dt.getMonth()+1}/${dt.getDate()}`} style={{
                                               width:cell,height:cell,borderRadius:4,
-                                              background:done?color:isPast?`${color}18`:"#F0F2FA",
-                                              border:`1px solid ${done?color:isPast?`${color}40`:"#E2E6F3"}`,
+                                              background:done?color:missed?"transparent":"#F0F2FA",
+                                              border:`1px solid ${done?color:missed?`${color}35`:"#E2E6F3"}`,
                                               display:"flex",alignItems:"center",justifyContent:"center",
-                                              fontSize:isMobile?7:8,fontWeight:700,
-                                              color:done?"#fff":isPast?color:"#C8CEED",
-                                              flexShrink:0
+                                              flexShrink:0, position:"relative", overflow:"hidden"
                                             }}>
-                                              {dt.getDate()}
+                                              {done && (
+                                                <span style={{fontSize:isMobile?7:8,fontWeight:700,color:"#fff"}}>{dt.getDate()}</span>
+                                              )}
+                                              {missed && (<>
+                                                {/* 사선 */}
+                                                <div style={{position:"absolute",top:"50%",left:"-5%",width:"110%",height:"1.5px",
+                                                  background:`${color}60`,transform:"rotate(-45deg)",transformOrigin:"center"}}/>
+                                                <span style={{fontSize:isMobile?7:8,fontWeight:400,color:`${color}70`,zIndex:1}}>{dt.getDate()}</span>
+                                              </>)}
+                                              {!done && !missed && (
+                                                <span style={{fontSize:isMobile?7:8,fontWeight:700,color:"#C8CEED"}}>{dt.getDate()}</span>
+                                              )}
                                             </div>
                                           );
                                         })
