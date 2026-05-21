@@ -2067,6 +2067,7 @@ const INIT_ATTENDANCE2 = {"36-나-2026-05-17":true,"27-나-2026-05-17":true,"4-�
 // ══════════════════════════════════════════════════════
 const StudentCertView = ({profile}) => {
   const [peerGrades, setPeerGrades] = useState({});
+  const isMobile = useMobile();
   useEffect(() => {
     supabase.from("profiles").select("name,grade,birth_year,birth_month")
       .in("name", ROSTER2.map(s=>s.name))
@@ -2255,58 +2256,97 @@ const StudentCertView = ({profile}) => {
           <Card style={{padding:"16px 18px"}}>
             <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:14}}>📅 8주 전체 일정</div>
             {/* 주차 × 활동 히트맵 그리드 */}
-            <div style={{overflowX:"auto"}}>
-              <table style={{borderCollapse:"separate",borderSpacing:"4px",width:"100%",minWidth:500}}>
-                <thead>
-                  <tr>
-                    <td style={{width:74,fontSize:10,color:T.muted,fontWeight:700,paddingBottom:4}}/>
-                    {Array.from({length:8},(_,i)=>(
-                      <td key={i} style={{textAlign:"center",fontSize:10,color:currentWeekIdx===i?T.orange:T.muted,fontWeight:currentWeekIdx===i?800:600,paddingBottom:4,whiteSpace:"nowrap"}}>
-                        {i+1}주{currentWeekIdx===i&&" ◀"}
-                      </td>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ACTIVITIES.map(({label,dates,type,color})=>(
-                    <tr key={label}>
-                      <td style={{fontSize:11,fontWeight:700,color,paddingRight:8,whiteSpace:"nowrap",verticalAlign:"middle"}}>● {label}</td>
-                      {Array.from({length:8},(_,wIdx)=>{
-                        const wStart=new Date(WEEK_START.getTime()+wIdx*7*86400000);
-                        const wEnd=new Date(wStart.getTime()+7*86400000);
-                        const wDates=[...dates].filter(dt=>dt>=wStart&&dt<wEnd).sort((a,b)=>a-b);
-                        return(
-                          <td key={wIdx} style={{verticalAlign:"middle",padding:"2px 0"}}>
-                            <div style={{display:"flex",flexWrap:"wrap",gap:2,justifyContent:"center"}}>
-                              {wDates.length===0
-                                ? <div style={{width:22,height:22,borderRadius:5,background:T.surfaceAlt,border:`1px solid ${T.border}`}}/>
-                                : wDates.map((dt,i)=>{
-                                    const dk=fk(dt);
-                                    const done=myIdx>=0&&INIT_ATTENDANCE2[`${myIdx}-${type}-${dk}`];
-                                    const isPast=dt<today;
-                                    return(
-                                      <div key={i} title={`${dt.getMonth()+1}/${dt.getDate()}`} style={{
-                                        width:22,height:22,borderRadius:5,
-                                        background:done?color:isPast?`${color}18`:"#F0F2FA",
-                                        border:`1px solid ${done?color:isPast?`${color}40`:"#E2E6F3"}`,
-                                        display:"flex",alignItems:"center",justifyContent:"center",
-                                        fontSize:8,fontWeight:700,
-                                        color:done?"#fff":isPast?color:"#C8CEED"
-                                      }}>
-                                        {dt.getDate()}
-                                      </div>
-                                    );
-                                  })
-                              }
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {(()=>{
+              const cell = isMobile ? 18 : 22;
+              const labelW = isMobile ? 66 : 80;
+              // 주차별 시작 날짜 계산
+              const weekStarts = Array.from({length:8}, (_,i) => new Date(WEEK_START.getTime()+i*7*86400000));
+              return(
+                <div style={{position:"relative"}}>
+                  <div style={{overflowX:"auto", WebkitOverflowScrolling:"touch"}}>
+                    <table style={{borderCollapse:"separate",borderSpacing:"3px",minWidth: labelW + 8*(cell+3)}}>
+                      <thead>
+                        {/* 월 표시 행 */}
+                        <tr>
+                          <td style={{width:labelW}}/>
+                          {weekStarts.map((ws,i)=>{
+                            const prevWs = i>0 ? weekStarts[i-1] : null;
+                            const showMonth = i===0 || ws.getMonth() !== prevWs.getMonth();
+                            return(
+                              <td key={i} style={{textAlign:"center",fontSize:9,color:T.muted,fontWeight:600,paddingBottom:1,whiteSpace:"nowrap"}}>
+                                {showMonth ? `${ws.getMonth()+1}월` : ""}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                        {/* 주차 헤더 */}
+                        <tr>
+                          <td style={{width:labelW,paddingBottom:6}}/>
+                          {Array.from({length:8},(_,i)=>(
+                            <td key={i} style={{textAlign:"center",paddingBottom:6}}>
+                              <div style={{
+                                display:"inline-block",
+                                background: currentWeekIdx===i ? T.orange : "transparent",
+                                color: currentWeekIdx===i ? "#fff" : T.muted,
+                                fontWeight: currentWeekIdx===i ? 800 : 600,
+                                fontSize: isMobile ? 9 : 10,
+                                borderRadius: 6,
+                                padding: currentWeekIdx===i ? "2px 5px" : "2px 2px",
+                                whiteSpace:"nowrap"
+                              }}>{i+1}주</div>
+                            </td>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ACTIVITIES.map(({label,dates,type,color})=>(
+                          <tr key={label}>
+                            <td style={{fontSize:isMobile?10:11,fontWeight:700,color,paddingRight:6,whiteSpace:"nowrap",verticalAlign:"middle"}}>
+                              ● {label}
+                            </td>
+                            {weekStarts.map((wStart,wIdx)=>{
+                              const wEnd=new Date(wStart.getTime()+7*86400000);
+                              const wDates=[...dates].filter(dt=>dt>=wStart&&dt<wEnd).sort((a,b)=>a-b);
+                              return(
+                                <td key={wIdx} style={{verticalAlign:"middle",padding:"2px 0"}}>
+                                  <div style={{display:"flex",flexWrap:"wrap",gap:2,justifyContent:"center"}}>
+                                    {wDates.length===0
+                                      ? <div style={{width:cell,height:cell,borderRadius:4,background:T.surfaceAlt,border:`1px solid ${T.border}`}}/>
+                                      : wDates.map((dt,i)=>{
+                                          const dk=fk(dt);
+                                          const done=myIdx>=0&&INIT_ATTENDANCE2[`${myIdx}-${type}-${dk}`];
+                                          const isPast=dt<today;
+                                          return(
+                                            <div key={i} title={`${dt.getMonth()+1}/${dt.getDate()}`} style={{
+                                              width:cell,height:cell,borderRadius:4,
+                                              background:done?color:isPast?`${color}18`:"#F0F2FA",
+                                              border:`1px solid ${done?color:isPast?`${color}40`:"#E2E6F3"}`,
+                                              display:"flex",alignItems:"center",justifyContent:"center",
+                                              fontSize:isMobile?7:8,fontWeight:700,
+                                              color:done?"#fff":isPast?color:"#C8CEED",
+                                              flexShrink:0
+                                            }}>
+                                              {dt.getDate()}
+                                            </div>
+                                          );
+                                        })
+                                    }
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* 모바일 스크롤 힌트 페이드 */}
+                  {isMobile && (
+                    <div style={{position:"absolute",top:0,right:0,bottom:0,width:24,background:"linear-gradient(to right,transparent,#fff)",pointerEvents:"none"}}/>
+                  )}
+                </div>
+              );
+            })()}
             {/* 범례 */}
             <div style={{display:"flex",gap:14,marginTop:12,flexWrap:"wrap",alignItems:"center"}}>
               <div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:T.muted}}>
