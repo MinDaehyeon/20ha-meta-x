@@ -2057,6 +2057,10 @@ const StudentCertView = ({profile}) => {
   const avgNight   = Math.round(allStats.reduce((s,x)=>s+x.night,0)   / allStats.length);
   const avgTotal   = avgNaver + avgMorning + avgNight;
 
+  const today = new Date();
+  const weekStart = new Date(today); weekStart.setDate(today.getDate() - today.getDay());
+  const thisWeek = Array.from({length:7}, (_, i) => { const d = new Date(weekStart); d.setDate(weekStart.getDate()+i); return d; });
+
   // 주차별 달성률 (8주, 시작: 2026-05-17 일요일)
   const WEEK_START = new Date(2026, 4, 17);
   const currentWeekIdx = Math.min(7, Math.max(0, Math.floor((today - WEEK_START) / 604800000)));
@@ -2077,9 +2081,6 @@ const StudentCertView = ({profile}) => {
   const remaining = Math.max(0, targetCount - myStat.total);
 
   const pct = (v, t) => t > 0 ? Math.round(v / t * 100) : 0;
-  const today = new Date();
-  const weekStart = new Date(today); weekStart.setDate(today.getDate() - today.getDay());
-  const thisWeek = Array.from({length:7}, (_, i) => { const d = new Date(weekStart); d.setDate(weekStart.getDate()+i); return d; });
 
   const CATS = [
     {key:"naver",   label:"카페 인증",   v:myStat.naver,   avg:avgNaver,   t:naverTotal,   color:"#4F46E5", bg:"#EEF2FF"},
