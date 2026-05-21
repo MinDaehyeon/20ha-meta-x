@@ -3124,15 +3124,22 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
 
         return (
           <div>
-            {/* 우측 크롤링 버튼만 */}
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,justifyContent:"flex-end"}}>
-              <button onClick={triggerCrawl} disabled={crawlRunning}
-                style={{...css.btnOrange,padding:"7px 16px",fontSize:13,background:"#059669",opacity:crawlRunning?0.6:1}}>
-                {crawlRunning?"⏳ 실행 중...":"🔄 지금 크롤링"}
-              </button>
+            {/* 서브탭 + 크롤링 버튼 */}
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+              {[{k:"attendance",l:"📋 출석표"},{k:"records",l:"📝 인증글 관리"},{k:"roster",l:"👥 명단 관리"}].map(({k,l})=>(
+                <button key={k} onClick={()=>setCertSubTab(k)}
+                  style={{...certSubTab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>{l}</button>
+              ))}
+              <div style={{marginLeft:"auto"}}>
+                <button onClick={triggerCrawl} disabled={crawlRunning}
+                  style={{...css.btnOrange,padding:"7px 16px",fontSize:13,background:"#059669",opacity:crawlRunning?0.6:1}}>
+                  {crawlRunning?"⏳ 실행 중...":"🔄 지금 크롤링"}
+                </button>
+              </div>
             </div>
 
-            {/* ── 출석표 ── */}
+            {/* ── 출석표 서브탭 ── */}
+            {certSubTab==="attendance"&&(
             <div>
                 {/* 날짜 범위 선택 */}
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14,flexWrap:"wrap"}}>
@@ -3323,9 +3330,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                   </div>
                 )}
               </div>
+            )}
 
-            {/* ── 인증글 관리 (숨김) ── */}
-            {false&&certSubTab==="records"&&(
+            {/* ── 인증글 관리 서브탭 ── */}
+            {certSubTab==="records"&&(
               <div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
                   {Object.entries(STATUS_LABELS).map(([k,l])=>(
@@ -3433,8 +3441,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
               </div>
             )}
 
-            {/* ── 명단 관리 (숨김) ── */}
-            {false&&certSubTab==="roster"&&(
+            {/* ── 명단 관리 서브탭 ── */}
+            {certSubTab==="roster"&&(
               <div>
                 <div style={{marginBottom:12}}>
                   <button onClick={()=>{setRosterAddMode(true);setRosterEditRow(null);}}
