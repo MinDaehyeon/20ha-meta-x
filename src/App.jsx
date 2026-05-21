@@ -4553,6 +4553,7 @@ export default function App() {
     if(path === "/cert")    return "cert";
     if(path === "/input")   return "input";
     if(path === "/users")   return "users";
+    if(path === "/roster2") return "roster2";
     return "dashboard";
   };
   const [view, setView]           = useState(getInitialView);
@@ -4562,7 +4563,7 @@ export default function App() {
 
   // URL ↔ 상태 동기화
   const navigate = (v, input=false) => {
-    const path = input ? "/input" : v === "history" ? "/history" : v === "cert" ? "/cert" : v === "users" ? "/users" : "/";
+    const path = input ? "/input" : v === "history" ? "/history" : v === "cert" ? "/cert" : v === "users" ? "/users" : v === "roster2" ? "/roster2" : "/";
     window.history.pushState({ view:v, input }, "", path);
     setView(v);
     setShowInput(input);
@@ -4750,7 +4751,7 @@ export default function App() {
   const NAV = isAdmin
     ? [
         { key:"users",   label:"회원 관리",     icon:"users"    },
-        { key:"cert",    label:"20HA 2기 현황", icon:"trophy"   },
+        { key:"roster2", label:"20HA 2기 현황", icon:"trophy"   },
         { key:"history", label:"전체 기록",     icon:"calendar" },
       ]
     : isParent
@@ -4844,7 +4845,7 @@ export default function App() {
             </div>
           ) : view === "cert" && !isAdmin && !isParent && isIn2ki ? (
             <StudentCertView profile={profile}/>
-          ) : (view === "users" || view === "cert") && isAdmin ? (
+          ) : (view === "users" || view === "cert" || view === "roster2") && isAdmin ? (
             <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData} defaultTab={view}/>
           ) : view === "dashboard" ? (
             isAdmin
