@@ -10,6 +10,43 @@ import {
 import { supabase } from "./supabase";
 
 // ══════════════════════════════════════════════════════
+// HEROICONS — outline style (인라인 SVG, 설치 불필요)
+// ══════════════════════════════════════════════════════
+const HI = {
+  _svg: (path, sz=20, c="currentColor", sw=1.6) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+      strokeWidth={sw} stroke={c} width={sz} height={sz} style={{display:"block",flexShrink:0}}>
+      <path strokeLinecap="round" strokeLinejoin="round" d={path}/>
+    </svg>
+  ),
+  sun:   (sz=20,c="currentColor") => HI._svg("M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z",sz,c),
+  moon:  (sz=20,c="currentColor") => HI._svg("M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z",sz,c),
+  trophy:(sz=20,c="currentColor") => HI._svg("M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 0 1-.982-3.172M9.497 14.25a7.454 7.454 0 0 0 .981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 0 0 7.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 0 0 2.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 0 1 2.916.52 6.003 6.003 0 0 1-5.395 4.972m0 0a6.726 6.726 0 0 1-2.749 1.35m0 0a6.772 6.772 0 0 1-3.044 0",sz,c),
+  cap:   (sz=20,c="currentColor") => HI._svg("M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5",sz,c),
+  calendar:(sz=20,c="currentColor") => HI._svg("M6.75 2.994v2.25m10.5-2.25v2.25m-14.252 13.5V7.491a2.25 2.25 0 0 1 2.25-2.25h13.5a2.25 2.25 0 0 1 2.25 2.25v11.251m-18 0a2.25 2.25 0 0 0 2.25 2.25h13.5a2.25 2.25 0 0 0 2.25-2.25m-18 0v-7.5a2.25 2.25 0 0 1 2.25-2.25h13.5a2.25 2.25 0 0 1 2.25 2.25v7.5m-6.75-6h2.25m-9 2.25h4.5m.002-2.25h.005v.005H12v-.005Zm-.001 4.5h.006v.006h-.006v-.006Zm-2.25.001h.005v.005H9.75v-.005Zm-2.25 0h.005v.005H7.5v-.005Zm6.75-2.25h.005v.005h-.005v-.005Zm0 2.25h.005v.005h-.005v-.005Zm2.25-4.5h.005v.005H16.5v-.005Zm0 2.25h.005v.005H16.5v-.005Z",sz,c),
+  search:(sz=20,c="currentColor") => HI._svg("m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z",sz,c),
+  users: (sz=20,c="currentColor") => HI._svg("M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z",sz,c),
+  user:  (sz=20,c="currentColor") => HI._svg("M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z",sz,c),
+  bell:  (sz=20,c="currentColor") => HI._svg("M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0",sz,c),
+  chart: (sz=20,c="currentColor") => HI._svg("M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z",sz,c),
+  clipboard:(sz=20,c="currentColor") => HI._svg("M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z",sz,c),
+  check: (sz=20,c="currentColor") => HI._svg("M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",sz,c),
+  warn:  (sz=20,c="currentColor") => HI._svg("M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z",sz,c),
+  camera:(sz=20,c="currentColor") => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+      strokeWidth={1.6} stroke={c} width={sz} height={sz} style={{display:"block",flexShrink:0}}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z"/>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z"/>
+    </svg>
+  ),
+};
+// 아이콘 키 → JSX 렌더 헬퍼
+const navIcon = (key, sz=18, color="currentColor") => {
+  const map = {trophy:HI.trophy, cap:HI.cap, calendar:HI.calendar, search:HI.search, users:HI.users, user:HI.user};
+  return (map[key]?.(sz, color)) || <span style={{fontSize:sz}}>{key}</span>;
+};
+
+// ══════════════════════════════════════════════════════
 // FONT INJECT — Sandoll Gothic Neo + Noto Sans KR fallback
 // ══════════════════════════════════════════════════════
 const injectStyles = () => {
@@ -321,7 +358,7 @@ const PasswordResetScreen = ({ onDone }) => {
         <div style={{fontSize:13,color:T.muted,marginBottom:20}}>사용할 새 비밀번호를 입력해주세요.</div>
         {done ? (
           <div style={{textAlign:"center",padding:"20px 0"}}>
-            <div style={{fontSize:40,marginBottom:12}}>✅</div>
+            <div style={{marginBottom:12,display:"flex",justifyContent:"center"}}>{HI.check(48,"#16A34A")}</div>
             <div style={{fontSize:15,fontWeight:700,color:T.navy}}>비밀번호가 변경됐어요!</div>
             <div style={{fontSize:13,color:T.muted,marginTop:6}}>잠시 후 로그인 화면으로 이동합니다...</div>
           </div>
@@ -545,13 +582,15 @@ const handleSocial = async (provider) => {
           보이지 않던 공부의 과정을 데이터로 읽어내다.<br/>Meta-X, 성장의 흐름을 기록하는 학습 시스템
         </div>
         {[
-          {icon:"📋",text:"학습데이터 기록 — 공부 시간, 수행 여부, 이해도 등 학습 과정을 데이터로 기록합니다."},
-          {icon:"📊",text:"학습 상태 시각화 — 아이의 학습 흐름과 현재 상태를 한눈에 확인할 수 있습니다."},
-          {icon:"🔍",text:"학습 패턴 분석 — 반복적으로 막히는 지점과 공부 습관을 데이터로 분석합니다."},
-          {icon:"✅",text:"자기점검 시스템 — 학생이 자신의 학습을 스스로 점검하고 조정하도록 돕습니다."},
+          {icon:"clipboard",text:"학습데이터 기록 — 공부 시간, 수행 여부, 이해도 등 학습 과정을 데이터로 기록합니다."},
+          {icon:"chart",    text:"학습 상태 시각화 — 아이의 학습 흐름과 현재 상태를 한눈에 확인할 수 있습니다."},
+          {icon:"search",   text:"학습 패턴 분석 — 반복적으로 막히는 지점과 공부 습관을 데이터로 분석합니다."},
+          {icon:"check",    text:"자기점검 시스템 — 학생이 자신의 학습을 스스로 점검하고 조정하도록 돕습니다."},
         ].map(f=>(
           <div key={f.text} style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
-            <div style={{width:34,height:34,background:"rgba(255,255,255,0.1)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{f.icon}</div>
+            <div style={{width:34,height:34,background:"rgba(255,255,255,0.1)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {HI[f.icon]?.(18,"rgba(255,255,255,0.85)")}
+            </div>
             <span style={{fontSize:14,color:"rgba(255,255,255,0.7)"}}>{f.text}</span>
           </div>
         ))}
@@ -565,7 +604,7 @@ const handleSocial = async (provider) => {
       {!isMobile && brandPanel}
       <div style={{width:isMobile?"100%":480,background:T.surface,borderLeft:isMobile?"none":`1px solid ${T.border}`,display:"flex",flexDirection:"column",justifyContent:"center",padding:"48px 44px"}}>
         <div style={{textAlign:"center"}}>
-          <div style={{fontSize:48,marginBottom:16}}>✅</div>
+          <div style={{marginBottom:16,display:"flex",justifyContent:"center"}}>{HI.check(52,"#16A34A")}</div>
           <div style={{fontSize:20,fontWeight:800,color:T.navy,marginBottom:8}}>가입 완료!</div>
           <div style={{fontSize:14,color:T.textMid,lineHeight:1.8,marginBottom:24}}>
             관리자 승인 후 로그인하실 수 있습니다.<br/>담당 선생님께 승인을 요청해 주세요.
@@ -652,11 +691,12 @@ const handleSocial = async (provider) => {
       {mode==="signup" && (<>
         {/* 역할 선택 */}
         <div style={{display:"flex",gap:8,marginBottom:16,background:T.surfaceAlt,borderRadius:10,padding:4}}>
-          {[{v:"student",label:"🎓 학생"},{v:"parent",label:"👨‍👩‍👧 학부모"}].map(({v,label})=>(
+          {[{v:"student",icon:"cap",label:"학생"},{v:"parent",icon:"users",label:"학부모"}].map(({v,icon,label})=>(
             <button key={v} onClick={()=>setSuRole(v)}
               style={{flex:1,padding:"9px 0",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,
-                background:suRole===v?T.navy:"transparent",color:suRole===v?T.white:T.muted,transition:"all 0.15s"}}>
-              {label}
+                background:suRole===v?T.navy:"transparent",color:suRole===v?T.white:T.muted,transition:"all 0.15s",
+                display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+              {navIcon(icon,13,suRole===v?T.white:T.muted)} {label}
             </button>
           ))}
         </div>
@@ -1080,7 +1120,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {/* 카드1: 날짜 · 과목 */}
           <Card>
-            <div style={{fontSize:12,fontWeight:700,color:T.muted,marginBottom:12,letterSpacing:"0.06em"}}>📅 날짜 · 과목</div>
+            <div style={{fontSize:12,fontWeight:700,color:T.muted,marginBottom:12,letterSpacing:"0.06em",display:"flex",alignItems:"center",gap:5}}>{HI.calendar(12,T.muted)} 날짜 · 과목</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
               <div>
                 <label style={css.label}>날짜</label>
@@ -1214,7 +1254,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
       {(step===1||true)&&(
         <div style={{display:"flex",flexDirection:"column",gap:14,marginTop:12}}>
           <Card>
-            <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:14}}>🧠 CO-IN Filter</div>
+            <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:14,display:"flex",alignItems:"center",gap:5}}>{HI.chart(13,T.navy)} CO-IN Filter</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               {[{key:"cc",label:"C-C",desc:"맞을 것 같았고 실제로 맞음",color:GRAPH.ccColor},{key:"ci",label:"C-I",desc:"맞을 것 같았으나 틀림",color:GRAPH.ciColor},{key:"ic",label:"I-C",desc:"틀릴 것 같았으나 맞음",color:GRAPH.icColor},{key:"ii",label:"I-I",desc:"틀릴 것 같았고 실제로 틀림",color:GRAPH.iiColor}].map(({key,label,desc,color})=>(
                 <div key={key} style={{background:color+"0e",border:`1px solid ${color}30`,borderRadius:12,padding:"12px 14px"}}>
@@ -1292,7 +1332,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
       {/* 하단 CTA 배너 */}
       <div style={{borderRadius:12, background:"linear-gradient(135deg,#191D54,#3D4499)", padding:"16px 20px", color:"#fff", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12}}>
         <div>
-          <div style={{fontSize:13, fontWeight:700, marginBottom:2}}>📊 진도를 업데이트할 준비가 됐나요?</div>
+          <div style={{fontSize:13, fontWeight:700, marginBottom:2, display:"flex", alignItems:"center", gap:5}}>{HI.chart(13,"rgba(255,255,255,0.9)")} 진도를 업데이트할 준비가 됐나요?</div>
           <div style={{fontSize:11, opacity:0.7}}>입력 데이터는 매주 학습 인사이트 생성에 사용됩니다.</div>
         </div>
         <div style={{display:"flex", gap:8, flexShrink:0}}>
@@ -1377,7 +1417,7 @@ const LearningCalendar = ({logs}) => {
     <Card style={{marginBottom:12}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
         <div>
-          <div style={{fontSize:14,fontWeight:800,color:T.navy}}>📅 학습 달력</div>
+          <div style={{fontSize:14,fontWeight:800,color:T.navy,display:"flex",alignItems:"center",gap:5}}>{HI.calendar(14,T.navy)} 학습 달력</div>
           <div style={{fontSize:11,color:T.muted,marginTop:2}}>색칠된 날 = 학습 기록이 있는 날이에요</div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
@@ -1797,11 +1837,13 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
             const borderColor=anyDanger?"#FECACA":anyWarn?"#FED7AA":"#BBF7D0";
             const bgColor=anyDanger?"#FFF5F5":anyWarn?"#FFFBEB":"#F0FDF4";
             const titleColor=anyDanger?T.danger:anyWarn?T.orange:T.success;
-            const titleIcon=anyDanger?"⚠️":anyWarn?"🟡":"✅";
+            const titleIcon=anyDanger?"warn":anyWarn?"warn":"check";
             const titleText=anyDanger?"메타인지 위험 지표":anyWarn?"메타인지 주의 지표":"메타인지 양호";
             return(
               <div style={{background:bgColor,border:`1px solid ${borderColor}`,borderRadius:10,padding:"10px 14px"}}>
-                <div style={{fontSize:11,fontWeight:800,color:titleColor,marginBottom:8}}>{titleIcon} {titleText}</div>
+                <div style={{fontSize:11,fontWeight:800,color:titleColor,marginBottom:8,display:"flex",alignItems:"center",gap:4}}>
+                  {HI[titleIcon]?.(12,titleColor)} {titleText}
+                </div>
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   <div>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
@@ -1962,7 +2004,10 @@ const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChild
               background:selChildId===c.profile.id?T.navy:"transparent",
               color:selChildId===c.profile.id?T.white:T.textMid,cursor:"pointer",
               fontSize:13,fontWeight:700,transition:"all 0.15s"}}>
-            🎓 {c.profile.name} <span style={{opacity:0.7,fontWeight:400}}>({calcGrade(c.profile.birth_year, c.profile.birth_month) || c.profile.grade})</span>
+            <span style={{display:"flex",alignItems:"center",gap:5}}>
+              {HI.cap(13,selChildId===c.profile.id?T.white:T.textMid)}
+              {c.profile.name} <span style={{opacity:0.7,fontWeight:400}}>({calcGrade(c.profile.birth_year, c.profile.birth_month) || c.profile.grade})</span>
+            </span>
           </button>
         ))}
         {/* 자녀 추가 */}
@@ -1985,18 +2030,19 @@ const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChild
 
       {children.length === 0 ? (
         <Card style={{textAlign:"center",padding:"48px 24px"}}>
-          <div style={{fontSize:40,marginBottom:12}}>👨‍👩‍👧</div>
+          <div style={{marginBottom:12,display:"flex",justifyContent:"center"}}>{HI.users(44,T.muted)}</div>
           <div style={{fontSize:16,fontWeight:700,color:T.navy,marginBottom:8}}>연결된 자녀가 없어요</div>
           <div style={{fontSize:13,color:T.muted}}>위에서 자녀의 이메일을 입력해 연결해보세요.</div>
         </Card>
       ) : selChild ? (<>
         {/* 자녀 뷰 탭 */}
         <div style={{display:"flex",gap:2,marginBottom:16,background:T.surfaceAlt,borderRadius:10,padding:4,width:"fit-content"}}>
-          {[{v:"dashboard",label:"🧠 메타인지 현황"},{v:"history",label:"📅 학습 기록"}].map(({v,label})=>(
+          {[{v:"dashboard",icon:"cap",label:"메타인지 현황"},{v:"history",icon:"calendar",label:"학습 기록"}].map(({v,icon,label})=>(
             <button key={v} onClick={()=>setChildView(v)}
               style={{padding:"7px 16px",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,
-                background:childView===v?T.navy:"transparent",color:childView===v?T.white:T.muted,transition:"all 0.15s"}}>
-              {label}
+                background:childView===v?T.navy:"transparent",color:childView===v?T.white:T.muted,transition:"all 0.15s",
+                display:"flex",alignItems:"center",gap:5}}>
+              {navIcon(icon,13,childView===v?T.white:T.muted)} {label}
             </button>
           ))}
         </div>
@@ -2146,9 +2192,9 @@ const StudentCertView = ({profile}) => {
   const statusNight   = getActivityStatus(ROSTER2_NIGHT_DATES,   "나");
 
   const CATS = [
-    {key:"morning", label:"미라클모닝",  icon:"☀️", iconBg:"#FFF0E6", v:myStat.morning, t:morningTotal, color:"#EA580C"},
-    {key:"naver",   label:"카페 인증",   icon:"naver",             iconBg:"#E8F5E9", v:myStat.naver,   t:naverTotal,   color:"#03C75A"},
-    {key:"night",   label:"미라클나이트",icon:"🌙", iconBg:"#EEF0FF", v:myStat.night,   t:nightTotal,   color:"#6366F1"},
+    {key:"morning", label:"미라클모닝",  icon:"sun",   iconBg:"#FFF0E6", v:myStat.morning, t:morningTotal, color:"#EA580C"},
+    {key:"naver",   label:"카페 인증",   icon:"naver", iconBg:"#E8F5E9", v:myStat.naver,   t:naverTotal,   color:"#03C75A"},
+    {key:"night",   label:"미라클나이트",icon:"moon",  iconBg:"#EEF0FF", v:myStat.night,   t:nightTotal,   color:"#6366F1"},
   ];
 
   // ── 멘토 인사이트 메시지 풀
@@ -2301,7 +2347,7 @@ const StudentCertView = ({profile}) => {
                   </svg>
                 </div>
               ) : (
-                <span style={{fontSize:26}}>{icon}</span>
+                HI[icon]?.(28, color) || <span style={{fontSize:26}}>{icon}</span>
               )}
             </div>
             {/* 제목 */}
@@ -2330,12 +2376,14 @@ const StudentCertView = ({profile}) => {
           {label:"미라클나이트",dates:ROSTER2_NIGHT_DATES,   type:"나",  color:"#6366F1"},
         ];
         const RankRow = ({s, rank, isMe}) => {
-          const medals=["🥇","🥈","🥉"];
+          const medalColors=["#F59E0B","#94A3B8","#B87333"];
           return(
             <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:9,
               background:isMe?"#EEF2FF":rank===0?"#FFFBEB":"transparent",
               border:`1px solid ${isMe?"#C7D2FE":rank===0?"#FDE68A":"transparent"}`}}>
-              <span style={{fontSize:22,width:24,textAlign:"center",flexShrink:0}}>{medals[rank]}</span>
+              <span style={{width:24,height:24,borderRadius:6,background:medalColors[rank]||"#CBD5E1",
+                display:"inline-flex",alignItems:"center",justifyContent:"center",
+                fontSize:11,fontWeight:900,color:"#fff",flexShrink:0}}>{rank+1}</span>
               <div style={{flex:1,fontSize:13,fontWeight:isMe?800:500,color:T.navy,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 {s.name}{isMe&&<span style={{fontSize:9,color:"#4F46E5",marginLeft:3}}>(나)</span>}
               </div>
@@ -2345,7 +2393,9 @@ const StudentCertView = ({profile}) => {
         };
         return(<>
           <Card style={{padding:"16px 18px"}}>
-            <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:14}}>📅 8주 전체 일정</div>
+            <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:14,display:"flex",alignItems:"center",gap:6}}>
+              {HI.calendar(15,T.navy)} 8주 전체 일정
+            </div>
             {/* 주차 × 활동 히트맵 그리드 */}
             {(()=>{
               const cell = isMobile ? 18 : 22;
@@ -2476,7 +2526,7 @@ const StudentCertView = ({profile}) => {
           {/* ④ 랭킹 2열 */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <Card style={{padding:"14px 16px"}}>
-              <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10}}>🏆 전체 BEST 3</div>
+              <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10,display:"flex",alignItems:"center",gap:5}}>{HI.trophy(14,T.navy)} 전체 BEST 3</div>
               <div style={{display:"grid",gap:5}}>
                 {ranked.slice(0,3).map((s,rank)=>(
                   <RankRow key={rank} s={s} rank={rank} isMe={s.name===profile.name}/>
@@ -2484,9 +2534,9 @@ const StudentCertView = ({profile}) => {
               </div>
             </Card>
             <Card style={{padding:"14px 16px"}}>
-              <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10}}>
-                🎓 같은 학년 BEST 3
-                {myGrade&&<span style={{fontSize:10,color:T.muted,fontWeight:400,marginLeft:6}}>({myGrade})</span>}
+              <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10,display:"flex",alignItems:"center",gap:5}}>
+                {HI.cap(14,T.navy)} 같은 학년 BEST 3
+                {myGrade&&<span style={{fontSize:10,color:T.muted,fontWeight:400,marginLeft:4}}>({myGrade})</span>}
               </div>
               {sameGradeRanked.length===0 ? (
                 <div style={{fontSize:11,color:T.muted,textAlign:"center",padding:"16px 0"}}>
@@ -2507,11 +2557,15 @@ const StudentCertView = ({profile}) => {
       {/* ⑤ 멘토 인사이트 + 마스터리 도전 — 2열 */}
       <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
         <div style={{borderRadius:14, background:"#1E2255", padding:"16px 18px", color:"#fff"}}>
-          <div style={{fontSize:13, fontWeight:700, marginBottom:6}}>💡 멘토 인사이트</div>
+          <div style={{fontSize:13, fontWeight:700, marginBottom:6, display:"flex", alignItems:"center", gap:5}}>
+            {HI.bell(13,"rgba(255,255,255,0.9)")} 멘토 인사이트
+          </div>
           <div style={{fontSize:12, opacity:0.8, lineHeight:1.8}}>{mentorMsg}</div>
         </div>
         <div style={{borderRadius:14, background:"linear-gradient(135deg,#F68B1E,#FFA94D)", padding:"16px 18px", color:"#fff"}}>
-          <div style={{fontSize:13, fontWeight:700, marginBottom:6}}>🎯 마스터리 도전!</div>
+          <div style={{fontSize:13, fontWeight:700, marginBottom:6, display:"flex", alignItems:"center", gap:5}}>
+            {HI.trophy(13,"rgba(255,255,255,0.9)")} 마스터리 도전!
+          </div>
           <div style={{fontSize:12, opacity:0.9, lineHeight:1.8, marginBottom:6}}>{masteryMsg}</div>
           <div style={{fontSize:11, opacity:0.7}}>전체 {grandTotal}회 중 {myStat.total}회 완료</div>
         </div>
@@ -2782,9 +2836,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const advLogs=filtered.filter(l=>(l.qAdv||0)>0);
   const avgSec3=advLogs.length>0?advLogs.reduce((s,l)=>s+(l.qAdv>0?l.netTime*60/l.qAdv:0),0)/advLogs.length:0;
   const feedbacks=[];
-  if(ciRate>0.3) feedbacks.push({type:"warn",msg:"과잉확신(C-I) 비중이 높습니다. 백지목차 테스트 강도를 높이세요.",icon:"⚠️"});
-  if(advLogs.length>0&&avgSec3>180) feedbacks.push({type:"alert",msg:`심화 문항 풀이 평균 ${avgSec3.toFixed(0)}초/문항 — 유형별 심화 학습 세션을 추가하세요.`,icon:"🔴"});
-  if(feedbacks.length===0) feedbacks.push({type:"ok",msg:"현재 데이터에서 주요 위험 신호가 감지되지 않았습니다.",icon:"✅"});
+  if(ciRate>0.3) feedbacks.push({type:"warn",msg:"과잉확신(C-I) 비중이 높습니다. 백지목차 테스트 강도를 높이세요.",icon:"warn"});
+  if(advLogs.length>0&&avgSec3>180) feedbacks.push({type:"alert",msg:`심화 문항 풀이 평균 ${avgSec3.toFixed(0)}초/문항 — 유형별 심화 학습 세션을 추가하세요.`,icon:"warn"});
+  if(feedbacks.length===0) feedbacks.push({type:"ok",msg:"현재 데이터에서 주요 위험 신호가 감지되지 않았습니다.",icon:"check"});
   const byStudent=students.filter(s=>s.approval_status==="approved"&&s.role!=="parent"&&!s.is_test).map(s=>{
     const sl=normLogs.filter(l=>l.uid===s.id);
     const now=new Date(), d7=new Date(now-7*86400000), d30=new Date(now-30*86400000);
@@ -2884,8 +2938,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
           <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
             {[
               {k:"all", l:`전체 (${students.length})`},
-              {k:"student", l:`🎓 학생 (${students.filter(s=>s.role==="student").length})`},
-              {k:"parent", l:`👨‍👩‍👧 학부모 (${students.filter(s=>s.role==="parent").length})`},
+              {k:"student", l:`학생 (${students.filter(s=>s.role==="student").length})`},
+              {k:"parent", l:`학부모 (${students.filter(s=>s.role==="parent").length})`},
             ].map(({k,l})=>(
               <button key={k} onClick={()=>setFilterRole(k)}
                 style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${filterRole===k?T.navy:T.border}`,cursor:"pointer",fontSize:12,fontWeight:700,
@@ -2923,7 +2977,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
           {/* 대기 중 알림 */}
           {pendingCount>0&&filterStatus!=="approved"&&filterStatus!=="rejected"&&(
             <div style={{background:T.orangePale,border:`1px solid ${T.orange}50`,borderRadius:12,padding:"12px 16px",marginBottom:14,fontSize:13,color:T.navy,display:"flex",alignItems:"center",gap:10}}>
-              <span style={{fontSize:20}}>🔔</span>
+              <span style={{display:"flex"}}>{HI.bell(20,T.orange)}</span>
               <span><strong style={{color:T.orange}}>{pendingCount}명</strong>이 승인을 기다리고 있습니다.</span>
             </div>
           )}
@@ -3631,12 +3685,15 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
 
               {/* ── 자동 피드백 진단 ── */}
               <Card style={{marginBottom:12}}>
-                <SectionTitle>🔍 자동 피드백 진단</SectionTitle>
+                <SectionTitle><span style={{display:"flex",alignItems:"center",gap:5}}>{HI.search(14,T.navy)} 자동 피드백 진단</span></SectionTitle>
                 {feedbacks.map((f,i)=>(
                   <div key={i} style={{padding:"12px 16px",borderRadius:10,marginBottom:i<feedbacks.length-1?8:0,fontSize:13,color:T.navy,
                     background:f.type==="warn"?T.orangePale:f.type==="alert"?"#FEE2E2":"#F0FDF4",
                     border:`1px solid ${f.type==="warn"?T.orange+"50":f.type==="alert"?T.danger+"40":T.success+"40"}`}}>
-                    {f.icon} {f.msg}
+                    <span style={{display:"flex",alignItems:"center",gap:7}}>
+                      {HI[f.icon]?.(15, f.type==="ok"?"#16A34A":f.type==="warn"?"#EA580C":"#DC2626")}
+                      {f.msg}
+                    </span>
                   </div>
                 ))}
               </Card>
@@ -3999,7 +4056,7 @@ const LogHistory = ({logs, onDelete, isAdmin, allProfiles}) => {
       {pagedDates.map(date=>(
         <div key={date} style={{marginBottom:20}}>
           <div style={{fontSize:12,fontWeight:700,color:T.muted,marginBottom:8,paddingBottom:6,borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:6}}>
-            📅 {date}
+            {HI.calendar(12,T.muted)} {date}
             <span style={{fontSize:11,color:T.border,fontWeight:400}}>({grouped[date].length}건)</span>
           </div>
           {grouped[date].map(log=><LogCard key={log.id} log={log}/>)}
@@ -4262,10 +4319,12 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
                 ? <Spinner size={28} color={T.white}/>
                 : avatarUrl
                   ? <img src={avatarUrl} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                  : <span>{profile.role==="admin"?"👨‍💼":"🎓"}</span>
+                  : (profile.role==="admin" ? HI.user(28,"#fff") : HI.cap(28,"#fff"))
               }
             </div>
-            <div style={{position:"absolute",bottom:0,right:0,width:24,height:24,background:T.orange,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>📷</div>
+            <div style={{position:"absolute",bottom:0,right:0,width:24,height:24,background:T.orange,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>
+              {HI.camera(13,"#fff")}
+            </div>
           </label>
           <div style={{fontSize:11,color:T.muted,marginTop:8}}>사진 클릭하여 변경</div>
           <div style={{fontSize:12,color:T.muted,marginTop:2}}>
@@ -4394,7 +4453,7 @@ const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, 
               display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, color:"#fff", overflow:"hidden", flexShrink:0}}>
             {profile.avatar_url
               ? <img src={profile.avatar_url} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-              : isAdmin ? "👨‍💼" : profile.name?.charAt(0)||"🎓"}
+              : isAdmin ? HI.user(16,"#fff") : profile.name?.charAt(0)||HI.cap(16,"#fff")}
           </div>
         )}
         {isOpen && (
@@ -4403,7 +4462,7 @@ const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, 
                 display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, color:"#fff", flexShrink:0, overflow:"hidden"}}>
               {profile.avatar_url
                 ? <img src={profile.avatar_url} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                : isAdmin ? "👨‍💼" : profile.name?.charAt(0)||"🎓"}
+                : isAdmin ? HI.user(16,"#fff") : profile.name?.charAt(0)||HI.cap(16,"#fff")}
             </div>
             <div style={{minWidth:0}}>
               <div style={{fontSize:13, fontWeight:700, color:"#191D54", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{profile.name}</div>
@@ -4425,7 +4484,9 @@ const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, 
               fontSize: isOpen ? 12 : 16, color:"#E8394A", fontWeight:700, cursor:"pointer",
               textAlign: isOpen ? "left" : "center", overflow:"hidden", whiteSpace:"nowrap"}}
             onClick={()=>onNavigate("dashboard",false)}>
-            {isOpen ? `🔔 ${pendingCount}명 승인 대기` : "🔔"}
+            {isOpen
+              ? <span style={{display:"flex",alignItems:"center",gap:5}}>{HI.bell(13,"#E8394A")}{pendingCount}명 승인 대기</span>
+              : <span style={{display:"flex",justifyContent:"center"}}>{HI.bell(16,"#E8394A")}</span>}
           </div>
         )}
         {nav.map(n => {
@@ -4444,7 +4505,9 @@ const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, 
               }}
               onMouseEnter={e=>{ if(!isActive) e.currentTarget.style.background="rgba(25,29,84,0.05)"; }}
               onMouseLeave={e=>{ if(!isActive) e.currentTarget.style.background="transparent"; }}>
-              <span style={{fontSize:18, flexShrink:0}}>{n.icon}</span>
+              <span style={{display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                {navIcon(n.icon, 19, isActive?"#191D54":"#6B7299")}
+              </span>
               {isOpen && <span style={{fontSize:13, fontWeight:isActive?700:500, color:isActive?"#191D54":"#4A5080", whiteSpace:"nowrap"}}>{n.label}</span>}
             </div>
           );
@@ -4683,13 +4746,13 @@ export default function App() {
   // 20HA 2기 소속 여부 (학생 전용)
   const isIn2ki  = !isAdmin && !isParent && ROSTER2.some(s => s.name === profile.name);
   const NAV = isAdmin
-    ? [{ key:"dashboard", label:"진단 센터", icon:"🔍" }, { key:"history", label:"전체 기록", icon:"📅" }]
+    ? [{ key:"dashboard", label:"진단 센터", icon:"search" }, { key:"history", label:"전체 기록", icon:"calendar" }]
     : isParent
-      ? [{ key:"dashboard", label:"자녀 현황", icon:"👨‍👩‍👧" }]
+      ? [{ key:"dashboard", label:"자녀 현황", icon:"users" }]
       : [
-          ...(isIn2ki ? [{ key:"cert", label:"20HA 2기 인증현황", icon:"🏅" }] : []),
-          { key:"dashboard", label:"메타인지 분석", icon:"🧠" },
-          { key:"history",   label:"학습 기록",     icon:"📅" },
+          ...(isIn2ki ? [{ key:"cert", label:"20HA 2기 인증현황", icon:"trophy" }] : []),
+          { key:"dashboard", label:"메타인지 분석", icon:"cap" },
+          { key:"history",   label:"학습 기록",     icon:"calendar" },
         ];
   const pendingCount = allProfiles.filter(p => (p.role==="student"||p.role==="parent") && p.approval_status==="pending").length;
 
@@ -4747,7 +4810,7 @@ export default function App() {
                   style={{ width:32, height:32, borderRadius:10, background:T.grad, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, color:T.white, cursor:"pointer", overflow:"hidden", flexShrink:0 }}>
                   {profile.avatar_url
                     ? <img src={profile.avatar_url} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                    : isAdmin ? "👨‍💼" : profile.name?.charAt(0)||"🎓"}
+                    : isAdmin ? HI.user(16,"#fff") : profile.name?.charAt(0)||HI.cap(16,"#fff")}
                 </div>
               )}
               {isMobile && (
