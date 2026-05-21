@@ -2236,15 +2236,11 @@ const StudentCertView = ({profile}) => {
         ];
         const RankRow = ({s, rank, isMe}) => {
           const medals=["🥇","🥈","🥉"];
-          const abg=isMe?"#191D54":rank===0?"#F68B1E":rank===1?"#6B7280":"#B45309";
           return(
             <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:9,
               background:isMe?"#EEF2FF":rank===0?"#FFFBEB":"transparent",
               border:`1px solid ${isMe?"#C7D2FE":rank===0?"#FDE68A":"transparent"}`}}>
               <span style={{fontSize:22,width:24,textAlign:"center",flexShrink:0}}>{medals[rank]}</span>
-              <div style={{width:26,height:26,borderRadius:"50%",background:abg,display:"flex",alignItems:"center",justifyContent:"center",border:`2px solid ${isMe?"#191D54":rank===0?"#F68B1E":"transparent"}`,flexShrink:0}}>
-                <span style={{fontSize:9,fontWeight:800,color:"#fff"}}>{s.name.charAt(0)}</span>
-              </div>
               <div style={{flex:1,fontSize:13,fontWeight:isMe?800:500,color:T.navy,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 {s.name}{isMe&&<span style={{fontSize:9,color:"#4F46E5",marginLeft:3}}>(나)</span>}
               </div>
