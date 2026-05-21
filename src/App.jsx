@@ -2132,9 +2132,9 @@ const StudentCertView = ({profile}) => {
   const statusNight   = getActivityStatus(ROSTER2_NIGHT_DATES,   "나");
 
   const CATS = [
-    {key:"naver",   label:"카페 인증",   icon:"☕", v:myStat.naver,   avg:avgNaver,   t:naverTotal,   color:"#4F46E5", bg:"#EEF2FF", status:statusNaver},
-    {key:"morning", label:"미라클모닝",  icon:"☀️", v:myStat.morning, avg:avgMorning, t:morningTotal, color:"#EA580C", bg:"#FFF7ED", status:statusMorning},
-    {key:"night",   label:"미라클나이트",icon:"🌙", v:myStat.night,   avg:avgNight,   t:nightTotal,   color:"#16A34A", bg:"#F0FDF4", status:statusNight},
+    {key:"morning", label:"미라클모닝",  icon:"☀️", iconBg:"#FFF0E6", v:myStat.morning, t:morningTotal, color:"#EA580C"},
+    {key:"naver",   label:"카페 인증",   icon:"naver",             iconBg:"#E8F5E9", v:myStat.naver,   t:naverTotal,   color:"#03C75A"},
+    {key:"night",   label:"미라클나이트",icon:"🌙", iconBg:"#EEF0FF", v:myStat.night,   t:nightTotal,   color:"#6366F1"},
   ];
 
   return (
@@ -2171,31 +2171,38 @@ const StudentCertView = ({profile}) => {
         </div>
       </div>
 
-      {/* ② 항목별 3칸 — 상태 배지 카드 */}
+      {/* ② 항목별 3칸 — Stitch 스타일 카드 */}
       <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8}}>
-        {CATS.map(({label, icon, v, avg, t, color, bg, status}) => {
-          const sColor = status==="완료" ? "#16A34A" : status==="진행중" ? "#F68B1E" : "#8B91C0";
-          const sBg    = status==="완료" ? "#F0FDF4" : status==="진행중" ? "#FFF7ED" : "#F7F8FC";
-          const sIcon  = status==="완료" ? "✓" : status==="진행중" ? "⏳" : "⏰";
-          return (
-            <div key={label} style={{borderRadius:14, background:"#FFFFFF", border:`1px solid #E2E6F3`, padding:"14px 12px", boxShadow:"0 1px 4px rgba(25,29,84,0.06)"}}>
-              <div style={{fontSize:20, marginBottom:6, lineHeight:1}}>{icon}</div>
-              <div style={{fontSize:11, fontWeight:700, color:"#191D54", marginBottom:8}}>{label}</div>
-              <div style={{display:"inline-flex", alignItems:"center", gap:3, background:sBg, border:`1px solid ${sColor}30`, borderRadius:20, padding:"3px 9px", marginBottom:8}}>
-                <span style={{fontSize:9}}>{sIcon}</span>
-                <span style={{fontSize:10, fontWeight:700, color:sColor}}>{status}</span>
-              </div>
-              <div style={{display:"flex", alignItems:"baseline", gap:2, marginBottom:4}}>
-                <span style={{fontSize:20, fontWeight:900, color, lineHeight:1}}>{v}</span>
-                <span style={{fontSize:10, color, opacity:0.6}}>/{t}회</span>
-              </div>
-              <div style={{height:3, background:`${color}20`, borderRadius:2, overflow:"hidden"}}>
-                <div style={{height:"100%", width:`${pct(v,t)}%`, background:color, borderRadius:2}}/>
-              </div>
-              <div style={{fontSize:9, color:"#8B91C0", marginTop:4}}>클래스 평균 {avg}회</div>
+        {CATS.map(({label, icon, iconBg, v, t, color}) => (
+          <div key={label} style={{borderRadius:16, background:"#FFFFFF", border:"1px solid #E2E6F3",
+            padding:"20px 14px 16px", boxShadow:"0 2px 8px rgba(25,29,84,0.06)",
+            display:"flex", flexDirection:"column", alignItems:"center", gap:10, textAlign:"center"}}>
+            {/* 아이콘 원형 */}
+            <div style={{width:52, height:52, borderRadius:"50%", background:iconBg,
+              display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
+              {icon === "naver" ? (
+                <div style={{width:26, height:26, background:"#03C75A", borderRadius:5,
+                  display:"flex", alignItems:"center", justifyContent:"center"}}>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="white">
+                    <path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/>
+                  </svg>
+                </div>
+              ) : (
+                <span style={{fontSize:22}}>{icon}</span>
+              )}
             </div>
-          );
-        })}
+            {/* 제목 */}
+            <div style={{fontSize:12, color:"#8B91C0", fontWeight:500, letterSpacing:"0.02em"}}>{label}</div>
+            {/* 진행 바 */}
+            <div style={{width:"100%", padding:"0 4px"}}>
+              <div style={{height:7, background:`${color}22`, borderRadius:6, overflow:"hidden"}}>
+                <div style={{height:"100%", width:`${pct(v,t)}%`, background:color, borderRadius:6, transition:"width 0.8s ease"}}/>
+              </div>
+            </div>
+            {/* 횟수 */}
+            <div style={{fontSize:13, fontWeight:700, color:"#191D54"}}>{v} / {t}회</div>
+          </div>
+        ))}
       </div>
 
       {/* ③④ 이번 주 + 클래스 랭킹 — 2열 */}
