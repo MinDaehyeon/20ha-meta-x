@@ -2297,7 +2297,8 @@ const StudentCertView = ({profile}) => {
                 나의 20HA 인증 현황
               </div>
               <div style={{fontSize:13,color:"rgba(255,255,255,0.75)",lineHeight:1.75,maxWidth:480}}>
-                매일의 기록이 실력을 만들어요. 오늘도 인증을 완료해보세요.
+                8주 동안 미라클모닝·카페 인증·미라클나이트를 실천하는 자기계발 챌린지.<br/>
+                매일의 작은 실천이 쌓여 진짜 변화를 만들어요.
               </div>
             </div>
             {/* 순위 */}
