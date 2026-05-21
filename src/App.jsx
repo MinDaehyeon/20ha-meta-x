@@ -1212,7 +1212,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
       )}
 
       {(step===1||true)&&(
-        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{display:"flex",flexDirection:"column",gap:14,marginTop:12}}>
           <Card>
             <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:14}}>🧠 CO-IN Filter</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -2162,146 +2162,134 @@ const StudentCertView = ({profile}) => {
         })}
       </div>
 
-      {/* ③ 이번 주 + 8주 진도 한 카드에 */}
-      <Card style={{padding:"16px 18px"}}>
-        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12}}>
-          <span style={{fontSize:13, fontWeight:800, color:T.navy}}>📅 이번 주</span>
-          <span style={{fontSize:11, color:T.muted}}>{currentWeekIdx+1}주차 / 8주</span>
-        </div>
-        {/* 이번 주 7일 */}
-        <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:5, marginBottom:14}}>
-          {thisWeek.map((d, i) => {
-            const dk = fk(d);
-            const isToday = d.toDateString() === today.toDateString();
-            const isPast  = d < today && !isToday;
-            const hasN  = myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-N-${dk}`];
-            const hasM  = myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-M-${dk}`];
-            const hasNa = myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-나-${dk}`];
-            const hasAny = hasN || hasM || hasNa;
-            return (
-              <div key={i} style={{textAlign:"center"}}>
-                <div style={{fontSize:9, fontWeight:700, color:isToday?T.navy:T.muted, marginBottom:3}}>{ROSTER2_DAY_KO[i]}</div>
-                <div style={{
-                  borderRadius:8, padding:"5px 2px",
-                  background: isToday?T.navy: hasAny?"#ECFDF5": isPast?"#FEF2F2":T.surfaceAlt,
-                  border:`1px solid ${isToday?T.navy: hasAny?"#6EE7B7": isPast?"#FECACA":T.border}`,
-                  minHeight:44, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2
-                }}>
-                  <div style={{fontSize:9, color:isToday?"rgba(255,255,255,0.7)":T.muted}}>{d.getMonth()+1}/{d.getDate()}</div>
-                  {hasN  && <div style={{width:6,height:6,borderRadius:"50%",background:"#4F46E5"}}/>}
-                  {hasM  && <div style={{width:6,height:6,borderRadius:"50%",background:"#EA580C"}}/>}
-                  {hasNa && <div style={{width:6,height:6,borderRadius:"50%",background:"#16A34A"}}/>}
-                  {!hasAny && isPast  && <span style={{fontSize:10, color:"#FCA5A5", fontWeight:700}}>✗</span>}
-                  {!hasAny && !isPast && !isToday && <span style={{fontSize:10, color:T.border}}>·</span>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        {/* 8주 점 진도 */}
-        <div style={{borderTop:`1px solid ${T.border}`, paddingTop:10}}>
-          <div style={{fontSize:10, fontWeight:700, color:T.muted, marginBottom:7}}>8주 진도</div>
-          <div style={{display:"flex", gap:6, alignItems:"center"}}>
-            {weeklyData.map(({w, pct:p, isCurrent}) => {
-              const isFuture = w-1 > currentWeekIdx;
-              const dotColor = isCurrent ? T.orange : p>=80 ? "#16A34A" : p>=50 ? "#4F46E5" : p>0 ? T.muted : T.border;
-              const size = isCurrent ? 14 : 10;
+      {/* ③④ 이번 주 + 클래스 랭킹 — 2열 */}
+      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12}}>
+        {/* 이번 주 */}
+        <Card style={{padding:"16px 18px"}}>
+          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12}}>
+            <span style={{fontSize:13, fontWeight:800, color:T.navy}}>📅 이번 주</span>
+            <span style={{fontSize:11, color:T.muted}}>{currentWeekIdx+1}주차 / 8주</span>
+          </div>
+          <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:4, marginBottom:14}}>
+            {thisWeek.map((d, i) => {
+              const dk = fk(d);
+              const isToday = d.toDateString() === today.toDateString();
+              const isPast  = d < today && !isToday;
+              const hasN  = myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-N-${dk}`];
+              const hasM  = myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-M-${dk}`];
+              const hasNa = myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-나-${dk}`];
+              const hasAny = hasN || hasM || hasNa;
               return (
-                <div key={w} style={{flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3}}>
-                  <div style={{width:size, height:size, borderRadius:"50%", background: isFuture?"transparent":dotColor,
-                    border:`2px solid ${isFuture?T.border:dotColor}`, transition:"all 0.3s"}}/>
-                  <span style={{fontSize:8, color:isCurrent?T.orange:T.muted, fontWeight:isCurrent?800:400}}>{w}주</span>
+                <div key={i} style={{textAlign:"center"}}>
+                  <div style={{fontSize:9, fontWeight:700, color:isToday?T.navy:T.muted, marginBottom:3}}>{ROSTER2_DAY_KO[i]}</div>
+                  <div style={{
+                    borderRadius:8, padding:"5px 2px",
+                    background: isToday?T.navy: hasAny?"#ECFDF5": isPast?"#FEF2F2":T.surfaceAlt,
+                    border:`1px solid ${isToday?T.navy: hasAny?"#6EE7B7": isPast?"#FECACA":T.border}`,
+                    minHeight:40, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2
+                  }}>
+                    <div style={{fontSize:9, color:isToday?"rgba(255,255,255,0.7)":T.muted}}>{d.getDate()}</div>
+                    {hasN  && <div style={{width:5,height:5,borderRadius:"50%",background:"#4F46E5"}}/>}
+                    {hasM  && <div style={{width:5,height:5,borderRadius:"50%",background:"#EA580C"}}/>}
+                    {hasNa && <div style={{width:5,height:5,borderRadius:"50%",background:"#16A34A"}}/>}
+                    {!hasAny && isPast  && <span style={{fontSize:9, color:"#FCA5A5", fontWeight:700}}>✗</span>}
+                    {!hasAny && !isPast && !isToday && <span style={{fontSize:9, color:T.border}}>·</span>}
+                  </div>
                 </div>
               );
             })}
           </div>
-          <div style={{display:"flex", gap:10, marginTop:8, fontSize:9, color:T.muted}}>
-            <span>● <span style={{color:T.orange}}>현재</span></span>
-            <span>● <span style={{color:"#16A34A"}}>80%↑</span></span>
-            <span>● <span style={{color:"#4F46E5"}}>50%↑</span></span>
-            <span>○ 예정</span>
+          <div style={{borderTop:`1px solid ${T.border}`, paddingTop:10}}>
+            <div style={{fontSize:10, fontWeight:700, color:T.muted, marginBottom:7}}>8주 진도</div>
+            <div style={{display:"flex", gap:4, alignItems:"center"}}>
+              {weeklyData.map(({w, pct:p, isCurrent}) => {
+                const isFuture = w-1 > currentWeekIdx;
+                const dotColor = isCurrent ? T.orange : p>=80 ? "#16A34A" : p>=50 ? "#4F46E5" : p>0 ? T.muted : T.border;
+                const size = isCurrent ? 14 : 10;
+                return (
+                  <div key={w} style={{flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2}}>
+                    <div style={{width:size, height:size, borderRadius:"50%", background:isFuture?"transparent":dotColor,
+                      border:`2px solid ${isFuture?T.border:dotColor}`, transition:"all 0.3s"}}/>
+                    <span style={{fontSize:8, color:isCurrent?T.orange:T.muted, fontWeight:isCurrent?800:400}}>{w}주</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
 
-      {/* ④ 클래스 랭킹 */}
-      <Card style={{padding:"16px 18px"}}>
-        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12}}>
-          <span style={{fontSize:13, fontWeight:800, color:T.navy}}>🏆 클래스 랭킹</span>
-          {myRank && myRank <= Math.ceil(ROSTER2.length * 0.05) + 1 && (
-            <span style={{fontSize:10, fontWeight:700, background:T.gradOrange, color:"#fff", borderRadius:20, padding:"3px 10px"}}>TOP 5%</span>
-          )}
-        </div>
-        <div style={{display:"grid", gap:3}}>
-          {top10.map((s, rank) => {
-            const isMe = s.name === profile.name;
-            const barPct = pct(s.total, grandTotal);
-            const avatarBg = isMe ? "#191D54" : rank===0 ? "#F68B1E" : rank===1 ? "#6B7280" : rank===2 ? "#B45309" : "#E2E6F3";
-            const avatarColor = rank < 3 || isMe ? "#fff" : "#8B91C0";
-            return (
-              <div key={rank} style={{display:"flex", alignItems:"center", gap:8, padding:"7px 8px", borderRadius:8,
-                background: isMe?"#EEF2FF": rank===0?"#FFFBEB":"transparent",
-                border:`1px solid ${isMe?"#C7D2FE": rank===0?"#FDE68A":"transparent"}`}}>
-                <div style={{width:18, textAlign:"center", fontSize:rank<3?13:10, flexShrink:0}}>
-                  {rank===0?"🥇":rank===1?"🥈":rank===2?"🥉":<span style={{fontWeight:700,color:T.muted}}>{rank+1}</span>}
+        {/* 클래스 랭킹 */}
+        <Card style={{padding:"16px 18px"}}>
+          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12}}>
+            <span style={{fontSize:13, fontWeight:800, color:T.navy}}>🏆 클래스 랭킹</span>
+            {myRank && myRank <= Math.ceil(ROSTER2.length * 0.05) + 1 && (
+              <span style={{fontSize:10, fontWeight:700, background:T.gradOrange, color:"#fff", borderRadius:20, padding:"3px 10px"}}>TOP 5%</span>
+            )}
+          </div>
+          <div style={{display:"grid", gap:3}}>
+            {top10.map((s, rank) => {
+              const isMe = s.name === profile.name;
+              const barPct = pct(s.total, grandTotal);
+              const avatarBg = isMe ? "#191D54" : rank===0 ? "#F68B1E" : rank===1 ? "#6B7280" : rank===2 ? "#B45309" : "#E2E6F3";
+              const avatarColor = rank < 3 || isMe ? "#fff" : "#8B91C0";
+              return (
+                <div key={rank} style={{display:"flex", alignItems:"center", gap:6, padding:"5px 6px", borderRadius:7,
+                  background: isMe?"#EEF2FF": rank===0?"#FFFBEB":"transparent",
+                  border:`1px solid ${isMe?"#C7D2FE": rank===0?"#FDE68A":"transparent"}`}}>
+                  <div style={{width:16, textAlign:"center", fontSize:rank<3?12:9, flexShrink:0}}>
+                    {rank===0?"🥇":rank===1?"🥈":rank===2?"🥉":<span style={{fontWeight:700,color:T.muted}}>{rank+1}</span>}
+                  </div>
+                  <div style={{width:22, height:22, borderRadius:"50%", background:avatarBg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, border:`2px solid ${isMe?"#191D54":rank===0?"#F68B1E":T.border}`}}>
+                    <span style={{fontSize:8, fontWeight:800, color:avatarColor}}>{s.name.charAt(0)}</span>
+                  </div>
+                  <div style={{fontSize:11, fontWeight:isMe?800:500, color:T.navy, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+                    {s.name}{isMe&&<span style={{fontSize:8,color:"#4F46E5",marginLeft:2}}>(나)</span>}
+                  </div>
+                  <div style={{width:28, textAlign:"right", fontSize:10, fontWeight:800, flexShrink:0,
+                    color: isMe?"#4F46E5": rank===0?T.orange:T.navy}}>
+                    {barPct}%
+                  </div>
                 </div>
-                {/* 원형 아바타 */}
-                <div style={{width:26, height:26, borderRadius:"50%", background:avatarBg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, border:`2px solid ${isMe?"#191D54":rank===0?"#F68B1E":T.border}`}}>
-                  <span style={{fontSize:9, fontWeight:800, color:avatarColor}}>{s.name.charAt(0)}</span>
+              );
+            })}
+            {myRank && myRank > 10 && (<>
+              <div style={{textAlign:"center",color:T.muted,fontSize:10,padding:"2px 0"}}>···</div>
+              <div style={{display:"flex", alignItems:"center", gap:6, padding:"5px 6px", borderRadius:7, background:"#EEF2FF", border:"1px solid #C7D2FE"}}>
+                <div style={{width:16, textAlign:"center", fontSize:9, fontWeight:800, color:"#4F46E5", flexShrink:0}}>{myRank}</div>
+                <div style={{width:22, height:22, borderRadius:"50%", background:"#191D54", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, border:"2px solid #191D54"}}>
+                  <span style={{fontSize:8, fontWeight:800, color:"#fff"}}>{profile.name.charAt(0)}</span>
                 </div>
-                <div style={{fontSize:12, fontWeight:isMe?800:500, color:T.navy, width:62, flexShrink:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
-                  {s.name}{isMe&&<span style={{fontSize:9,color:"#4F46E5",marginLeft:3}}>(나)</span>}
-                </div>
-                <div style={{flex:1, height:4, background:T.surfaceAlt, borderRadius:2, overflow:"hidden"}}>
-                  <div style={{height:"100%", width:`${barPct}%`, borderRadius:2,
-                    background: isMe?"#4F46E5": rank===0?"#F68B1E":T.muted}}/>
-                </div>
-                <div style={{width:34, textAlign:"right", fontSize:11, fontWeight:800, flexShrink:0,
-                  color: isMe?"#4F46E5": rank===0?T.orange:T.navy}}>
-                  {barPct}%
-                </div>
+                <div style={{fontSize:11, fontWeight:800, color:T.navy, flex:1}}>{profile.name}<span style={{fontSize:8,color:"#4F46E5",marginLeft:2}}>(나)</span></div>
+                <div style={{width:28, textAlign:"right", fontSize:10, fontWeight:800, color:"#4F46E5", flexShrink:0}}>{pct(myStat.total,grandTotal)}%</div>
               </div>
-            );
-          })}
-          {myRank && myRank > 10 && (<>
-            <div style={{textAlign:"center",color:T.muted,fontSize:10,padding:"2px 0"}}>···</div>
-            <div style={{display:"flex", alignItems:"center", gap:8, padding:"7px 8px", borderRadius:8, background:"#EEF2FF", border:"1px solid #C7D2FE"}}>
-              <div style={{width:18, textAlign:"center", fontSize:10, fontWeight:800, color:"#4F46E5", flexShrink:0}}>{myRank}</div>
-              <div style={{width:26, height:26, borderRadius:"50%", background:"#191D54", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, border:"2px solid #191D54"}}>
-                <span style={{fontSize:9, fontWeight:800, color:"#fff"}}>{profile.name.charAt(0)}</span>
-              </div>
-              <div style={{fontSize:12, fontWeight:800, color:T.navy, width:62, flexShrink:0}}>{profile.name}<span style={{fontSize:9,color:"#4F46E5",marginLeft:3}}>(나)</span></div>
-              <div style={{flex:1, height:4, background:T.surfaceAlt, borderRadius:2, overflow:"hidden"}}>
-                <div style={{height:"100%", width:`${pct(myStat.total,grandTotal)}%`, background:"#4F46E5", borderRadius:2}}/>
-              </div>
-              <div style={{width:34, textAlign:"right", fontSize:11, fontWeight:800, color:"#4F46E5", flexShrink:0}}>{pct(myStat.total,grandTotal)}%</div>
-            </div>
-          </>)}
-        </div>
+            </>)}
+          </div>
+        </Card>
+      </div>
 
-        {/* 하단 CTA 카드들 */}
-        <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginTop:12}}>
-          <div style={{borderRadius:12, background:"#1E2255", padding:"14px 16px", color:"#fff"}}>
-            <div style={{fontSize:12, fontWeight:700, marginBottom:4}}>💡 멘토 인사이트</div>
-            <div style={{fontSize:11, opacity:0.7, lineHeight:1.6}}>
-              {myStat.total > avgTotal
-                ? `클래스 평균보다 ${myStat.total - avgTotal}회 더 달성했어요. 이 흐름을 유지하세요!`
-                : myStat.total === 0
-                ? "아직 인증 기록이 없어요. 첫 번째 인증을 시작해보세요!"
-                : `클래스 평균까지 ${avgTotal - myStat.total}회 남았어요. 조금만 더 힘내세요!`}
-            </div>
-          </div>
-          <div style={{borderRadius:12, background:"linear-gradient(135deg,#F68B1E,#FFA94D)", padding:"14px 16px", color:"#fff"}}>
-            <div style={{fontSize:12, fontWeight:700, marginBottom:4}}>🎯 마스터리 도전!</div>
-            <div style={{fontSize:11, opacity:0.9, lineHeight:1.6, marginBottom:8}}>
-              {remaining === 0
-                ? "🎉 목표 달성! 최고의 성과예요!"
-                : `목표 80% 달성까지 ${remaining}회 남았어요.`}
-            </div>
-            <div style={{fontSize:10, opacity:0.8}}>전체 {grandTotal}회 중 {myStat.total}회 완료</div>
+      {/* ⑤ 멘토 인사이트 + 마스터리 도전 — 2열 */}
+      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
+        <div style={{borderRadius:14, background:"#1E2255", padding:"16px 18px", color:"#fff"}}>
+          <div style={{fontSize:13, fontWeight:700, marginBottom:6}}>💡 멘토 인사이트</div>
+          <div style={{fontSize:12, opacity:0.75, lineHeight:1.7}}>
+            {myStat.total > avgTotal
+              ? `클래스 평균보다 ${myStat.total - avgTotal}회 더 달성했어요. 이 흐름을 유지하세요!`
+              : myStat.total === 0
+              ? "아직 인증 기록이 없어요. 첫 번째 인증을 시작해보세요!"
+              : `클래스 평균까지 ${avgTotal - myStat.total}회 남았어요. 조금만 더 힘내세요!`}
           </div>
         </div>
-      </Card>
+        <div style={{borderRadius:14, background:"linear-gradient(135deg,#F68B1E,#FFA94D)", padding:"16px 18px", color:"#fff"}}>
+          <div style={{fontSize:13, fontWeight:700, marginBottom:6}}>🎯 마스터리 도전!</div>
+          <div style={{fontSize:12, opacity:0.9, lineHeight:1.7, marginBottom:6}}>
+            {remaining === 0
+              ? "🎉 목표 달성! 최고의 성과예요!"
+              : `목표 80% 달성까지 ${remaining}회 남았어요.`}
+          </div>
+          <div style={{fontSize:11, opacity:0.8}}>전체 {grandTotal}회 중 {myStat.total}회 완료</div>
+        </div>
+      </div>
+
     </div>
   );
 };
@@ -4130,6 +4118,84 @@ const BottomNav = ({nav,view,showInput,onNavigate,isAdmin}) => (
 );
 
 // ══════════════════════════════════════════════════════
+// SIDE NAVIGATION
+// ══════════════════════════════════════════════════════
+const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, onShowInput, onLogout, onShowProfile, pendingCount}) => (
+  <div style={{
+    width:240, background:"#191D54", position:"fixed", top:0, left:0, bottom:0,
+    display:"flex", flexDirection:"column", zIndex:200, overflowY:"auto"
+  }}>
+    {/* 로고 + 프로필 */}
+    <div style={{padding:"20px 20px 16px", borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
+      <Logo size="md" dark onClick={()=>onNavigate(nav[0]?.key||"cert", false)}/>
+      <div style={{marginTop:14, display:"flex", alignItems:"center", gap:10, cursor:"pointer", padding:"8px 10px", borderRadius:10, transition:"background 0.15s"}}
+        onClick={onShowProfile}
+        onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.07)"}
+        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+        <div style={{width:34, height:34, borderRadius:10, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, color:"#fff", flexShrink:0, overflow:"hidden"}}>
+          {profile.avatar_url
+            ? <img src={profile.avatar_url} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+            : isAdmin ? "👨‍💼" : profile.name?.charAt(0)||"🎓"}
+        </div>
+        <div style={{minWidth:0}}>
+          <div style={{fontSize:13, fontWeight:700, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{profile.name}</div>
+          <div style={{fontSize:11, color:"rgba(255,255,255,0.45)", marginTop:1}}>
+            {isAdmin ? "관리자" : calcGrade(profile.birth_year, profile.birth_month) || profile.grade || "학생"}
+          </div>
+        </div>
+        <span style={{fontSize:10, color:"rgba(255,255,255,0.3)", marginLeft:"auto"}}>✎</span>
+      </div>
+    </div>
+
+    {/* 네비게이션 */}
+    <div style={{flex:1, padding:"12px 8px"}}>
+      {isAdmin && pendingCount > 0 && (
+        <div style={{background:"rgba(232,57,74,0.18)", border:"1px solid rgba(232,57,74,0.3)", borderRadius:8, padding:"8px 12px", marginBottom:8, fontSize:12, color:"#F87171", fontWeight:700, cursor:"pointer"}}
+          onClick={()=>onNavigate("dashboard",false)}>
+          🔔 {pendingCount}명 승인 대기
+        </div>
+      )}
+      {nav.map(n => {
+        const isActive = view===n.key && !showInput;
+        return (
+          <div key={n.key} onClick={()=>onNavigate(n.key, false)}
+            style={{
+              display:"flex", alignItems:"center", gap:10,
+              padding:"11px 14px", cursor:"pointer", borderRadius:10, marginBottom:2,
+              background: isActive ? "rgba(246,139,30,0.18)" : "transparent",
+              borderLeft: isActive ? "3px solid #F68B1E" : "3px solid transparent",
+              transition:"all 0.15s"
+            }}
+            onMouseEnter={e=>{ if(!isActive) e.currentTarget.style.background="rgba(255,255,255,0.07)"; }}
+            onMouseLeave={e=>{ if(!isActive) e.currentTarget.style.background="transparent"; }}>
+            <span style={{fontSize:16}}>{n.icon}</span>
+            <span style={{fontSize:13, fontWeight:isActive?700:500, color:isActive?"#fff":"rgba(255,255,255,0.65)"}}>{n.label}</span>
+          </div>
+        );
+      })}
+    </div>
+
+    {/* 하단 버튼들 */}
+    <div style={{padding:"0 12px 16px", display:"flex", flexDirection:"column", gap:6}}>
+      {!isAdmin && !isParent && (
+        <button onClick={onShowInput}
+          style={{width:"100%", background:"#F68B1E", border:"none", borderRadius:10, padding:"12px", color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6}}>
+          <span style={{fontSize:16, fontWeight:300}}>+</span> 학습 입력
+        </button>
+      )}
+      <button onClick={()=>window.open("/manual.html","_blank")}
+        style={{width:"100%", background:"transparent", border:"1px solid rgba(255,255,255,0.13)", borderRadius:8, padding:"9px", color:"rgba(255,255,255,0.55)", fontSize:12, cursor:"pointer"}}>
+        ❓ 도움말
+      </button>
+      <button onClick={onLogout}
+        style={{width:"100%", background:"transparent", border:"1px solid rgba(255,255,255,0.08)", borderRadius:8, padding:"9px", color:"rgba(255,255,255,0.35)", fontSize:12, cursor:"pointer"}}>
+        로그아웃
+      </button>
+    </div>
+  </div>
+);
+
+// ══════════════════════════════════════════════════════
 // ROOT APP
 // ══════════════════════════════════════════════════════
 export default function App() {
@@ -4329,116 +4395,98 @@ export default function App() {
   const pendingCount = allProfiles.filter(p => (p.role==="student"||p.role==="parent") && p.approval_status==="pending").length;
 
   return (
-    <div style={{ minHeight:"100vh", background:T.bg, fontFamily:"'Noto Sans KR',sans-serif", color:T.text, overflowX:"hidden" }}>
-      {/* Header */}
-      <div style={{ position:"sticky", top:0, zIndex:100, borderBottom:`1px solid ${T.border}`,
-        background:T.surface, boxShadow:"0 1px 6px rgba(25,29,84,0.06)" }}>
-        <div style={{ maxWidth:960, margin:"0 auto", display:"flex", alignItems:"center",
-          height:isMobile?56:60, gap:16, padding:`0 ${isMobile?16:24}px` }}>
-          <Logo size={isMobile?"sm":"md"} headerMode={true} onClick={()=>navigate("dashboard",false)}/>
-          {!isMobile && (
-            <div style={{ display:"flex", gap:2, flex:1 }}>
-              {NAV.map(n => (
-                <button key={n.key} onClick={() => navigate(n.key, false)}
-                  style={{ padding:"6px 14px", borderRadius:8, border:"none", cursor:"pointer",
-                    fontSize:13, fontWeight:600,
-                    background:view===n.key&&!showInput ? T.navy+"0e" : "transparent",
-                    color:view===n.key&&!showInput ? T.navy : T.muted }}>
-                  {n.icon} {n.label}
+    <div style={{ display:"flex", minHeight:"100vh", background:T.bg, fontFamily:"'Noto Sans KR',sans-serif", color:T.text, overflowX:"hidden" }}>
+      {/* 좌측 사이드바 — 데스크톱 전용 */}
+      {!isMobile && (
+        <SideNav
+          nav={NAV}
+          view={view}
+          showInput={showInput}
+          onNavigate={(v, input=false) => navigate(v, input)}
+          profile={profile}
+          isAdmin={isAdmin}
+          isParent={isParent}
+          onShowInput={() => navigate(view, true)}
+          onLogout={handleLogout}
+          onShowProfile={() => setShowProfileModal(true)}
+          pendingCount={pendingCount}
+        />
+      )}
+
+      {/* 메인 영역 */}
+      <div style={{ flex:1, marginLeft: isMobile ? 0 : 240, minHeight:"100vh", display:"flex", flexDirection:"column" }}>
+        {/* 상단바 */}
+        <div style={{ position:"sticky", top:0, zIndex:100, borderBottom:`1px solid ${T.border}`, background:T.surface, boxShadow:"0 1px 4px rgba(25,29,84,0.05)" }}>
+          <div style={{ display:"flex", alignItems:"center", height:isMobile?56:58, gap:12, padding:`0 ${isMobile?16:24}px` }}>
+            {isMobile && <Logo size="sm" headerMode={true} onClick={()=>navigate(NAV[0]?.key||"cert",false)}/>}
+            {!isMobile && (
+              <div style={{ fontSize:16, fontWeight:800, color:T.navy }}>
+                {showInput ? "학습 입력" : NAV.find(n=>n.key===view)?.label || ""}
+              </div>
+            )}
+            <div style={{ flex:1 }}/>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              {isMobile && !isAdmin && !isParent && (
+                <button onClick={() => navigate(view, true)} style={{ padding:"7px 14px", borderRadius:8, border:"none", cursor:"pointer", fontSize:12, fontWeight:700, background:T.orange, color:T.white, display:"flex", alignItems:"center", gap:4 }}>
+                  <span style={{fontSize:15, fontWeight:300}}>+</span> 입력
                 </button>
-              ))}
+              )}
+              {isMobile && (
+                <div onClick={()=>setShowProfileModal(true)}
+                  style={{ width:32, height:32, borderRadius:10, background:T.grad, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, color:T.white, cursor:"pointer", overflow:"hidden", flexShrink:0 }}>
+                  {profile.avatar_url
+                    ? <img src={profile.avatar_url} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                    : isAdmin ? "👨‍💼" : profile.name?.charAt(0)||"🎓"}
+                </div>
+              )}
+              {isMobile && (
+                <button onClick={handleLogout} style={{ padding:"5px 10px", borderRadius:8, border:`1px solid ${T.border}`, background:T.white, color:T.muted, cursor:"pointer", fontSize:11, whiteSpace:"nowrap" }}>로그아웃</button>
+              )}
             </div>
-          )}
-          <div style={{ flex:isMobile?1:0 }}/>
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            {isAdmin && pendingCount > 0 && (
-              <div style={{ background:T.danger, color:T.white, borderRadius:20,
-                padding:"3px 10px", fontSize:11, fontWeight:800, cursor:"pointer" }}
-                onClick={() => { setView("dashboard"); setShowInput(false); }}>
-                🔔 {pendingCount}명 승인 대기
-              </div>
-            )}
-            {!isAdmin && !isParent && !isMobile && (
-              <button onClick={() => navigate(view, true)} style={{ padding:"8px 18px", borderRadius:8,
-                border:"none", cursor:"pointer", fontSize:13, fontWeight:700,
-                background:T.orange, color:T.white, display:"flex", alignItems:"center", gap:6 }}>
-                <span style={{fontSize:16,fontWeight:300}}>+</span> 학습 입력
-              </button>
-            )}
-            <button onClick={()=>window.open("/manual.html","_blank")}
-              title="도움말"
-              style={{ padding:"6px 10px", borderRadius:8, border:`1px solid ${T.border}`,
-                background:"transparent", color:T.muted, cursor:"pointer", fontSize:13, fontWeight:700,
-                display:"flex", alignItems:"center", gap:4, whiteSpace:"nowrap" }}>
-              {isMobile ? "?" : "❓ 도움말"}
-            </button>
-            {!isMobile && <div style={{ height:24, width:1, background:T.border }}/>}
-            <div onClick={()=>setShowProfileModal(true)}
-              style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer", padding:"4px 8px", borderRadius:8,
-                transition:"background 0.15s" }}
-              onMouseEnter={e=>e.currentTarget.style.background=T.surfaceAlt}
-              onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <div style={{ width:30, height:30, borderRadius:10, background:T.grad,
-                display:"flex", alignItems:"center", justifyContent:"center",
-                fontSize:14, color:T.white, flexShrink:0, overflow:"hidden" }}>
-                {profile.avatar_url
-                  ? <img src={profile.avatar_url} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                  : isAdmin ? "👨‍💼" : profile.name?.charAt(0)||"🎓"}
-              </div>
-              {!isMobile && <span style={{ fontSize:13, color:T.navy, fontWeight:700 }}>{profile.name}</span>}
-              {!isMobile && (isAdmin
-                ? <Pill color={T.orange}>관리자</Pill>
-                : <Pill color={T.navyMid}>{calcGrade(profile.birth_year, profile.birth_month) || profile.grade}</Pill>)}
-              {!isMobile && <span style={{fontSize:11,color:T.muted}}>✎</span>}
-            </div>
-            <button onClick={handleLogout} style={{ padding:"5px 10px", borderRadius:8,
-              border:`1px solid ${T.border}`, background:T.white, color:T.muted,
-              cursor:"pointer", fontSize:isMobile?11:12, whiteSpace:"nowrap" }}>로그아웃</button>
           </div>
         </div>
-      </div>
 
-      {/* Content */}
-      <div style={{ maxWidth:960, margin:"0 auto",
-        padding:isMobile?"16px 12px 100px":"28px 24px 60px" }}>
-        {showInput ? (
-          <div>
-            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
-              <button onClick={() => navigate(view, false)}
-                style={{ background:"none", border:"none", color:T.muted, cursor:"pointer", fontSize:22 }}>←</button>
-              <div>
-                <div style={{ fontSize:isMobile?16:18, fontWeight:800, color:T.navy }}>오늘의 학습 데이터 입력</div>
-                <div style={{ fontSize:12, color:T.muted, marginTop:2 }}>정직하게 입력할수록 EI의 정확도가 높아집니다.</div>
+        {/* 페이지 콘텐츠 */}
+        <div style={{ padding: isMobile ? "16px 12px 100px" : "28px 32px 60px" }}>
+          {showInput ? (
+            <div>
+              <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
+                <button onClick={() => navigate(view, false)}
+                  style={{ background:"none", border:"none", color:T.muted, cursor:"pointer", fontSize:22 }}>←</button>
+                <div>
+                  <div style={{ fontSize:isMobile?16:18, fontWeight:800, color:T.navy }}>학습 데이터 입력</div>
+                  <div style={{ fontSize:12, color:T.muted, marginTop:2 }}>정직하게 입력할수록 EI의 정확도가 높아집니다.</div>
+                </div>
               </div>
+              <DataInputForm uid={session.user.id}
+                onSave={() => { navigate(view, false); refreshData(); }}
+                onCancel={() => navigate(view, false)}/>
             </div>
-            <DataInputForm uid={session.user.id}
-              onSave={() => { navigate(view, false); refreshData(); }}
-              onCancel={() => navigate(view, false)}/>
-          </div>
-        ) : view === "cert" && !isAdmin && !isParent ? (
-          <StudentCertView profile={profile}/>
-        ) : view === "dashboard" ? (
-          isAdmin
-            ? <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData}/>
-            : isParent
-              ? <ParentDashboard
-                  children={children}
-                  selChildId={selChildId}
-                  setSelChildId={setSelChildId}
-                  parentId={session.user.id}
-                  onChildrenUpdate={(newChildren, newSelId) => { setChildren(newChildren); if(newSelId) setSelChildId(newSelId); }}
-                />
-              : <StudentDashboard logs={logs} profile={profile}/>
-        ) : (
-          <LogHistory
-            logs={logs}
-            onDelete={async (id) => {
-              await supabase.from("learning_logs").delete().eq("id", id);
-              setLogs(l => l.filter(x => x.id !== id));
-            }}
-            isAdmin={isAdmin}
-            allProfiles={allProfiles}/>
-        )}
+          ) : view === "cert" && !isAdmin && !isParent ? (
+            <StudentCertView profile={profile}/>
+          ) : view === "dashboard" ? (
+            isAdmin
+              ? <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData}/>
+              : isParent
+                ? <ParentDashboard
+                    children={children}
+                    selChildId={selChildId}
+                    setSelChildId={setSelChildId}
+                    parentId={session.user.id}
+                    onChildrenUpdate={(newChildren, newSelId) => { setChildren(newChildren); if(newSelId) setSelChildId(newSelId); }}
+                  />
+                : <StudentDashboard logs={logs} profile={profile}/>
+          ) : (
+            <LogHistory
+              logs={logs}
+              onDelete={async (id) => {
+                await supabase.from("learning_logs").delete().eq("id", id);
+                setLogs(l => l.filter(x => x.id !== id));
+              }}
+              isAdmin={isAdmin}
+              allProfiles={allProfiles}/>
+          )}
+        </div>
       </div>
 
       {isMobile && <BottomNav nav={NAV} view={view} showInput={showInput} onNavigate={navigate} isAdmin={isAdmin||isParent}/>}
