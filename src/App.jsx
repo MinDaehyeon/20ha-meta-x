@@ -2232,37 +2232,54 @@ const StudentCertView = ({profile}) => {
   return (
     <div style={{display:"grid", gap:12}}>
 
-      {/* ① 히어로 카드 */}
-      <div style={{borderRadius:20, background:"linear-gradient(135deg,#191D54 0%,#3D4499 100%)", padding:"32px 36px", color:"#fff", position:"relative", overflow:"hidden"}}>
-        <div style={{position:"absolute",top:-50,right:-50,width:200,height:200,borderRadius:"50%",background:"rgba(255,255,255,0.04)",pointerEvents:"none"}}/>
-        <div style={{position:"absolute",bottom:-70,left:-30,width:260,height:260,borderRadius:"50%",background:"rgba(246,139,30,0.07)",pointerEvents:"none"}}/>
-        <div style={{position:"relative",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-          <div>
-            <div style={{fontSize:13,fontWeight:600,opacity:0.5,marginBottom:12,letterSpacing:"0.08em"}}>20HA 2기 인증 현황</div>
-            <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:8}}>
-              <span style={{fontSize:80,fontWeight:900,lineHeight:1,letterSpacing:"-3px"}}>{pct(myStat.total,grandTotal)}</span>
-              <span style={{fontSize:28,fontWeight:400,opacity:0.55}}>%</span>
+      {/* ① 히어로 카드 — Stitch 스타일 */}
+      <div style={{borderRadius:20, background:"linear-gradient(135deg,#0D1340 0%,#141B5C 50%,#1E2878 100%)", padding:"28px 32px", color:"#fff", position:"relative", overflow:"hidden"}}>
+        {/* 배경 장식 */}
+        <div style={{position:"absolute",top:-60,right:-60,width:240,height:240,borderRadius:"50%",background:"rgba(255,255,255,0.03)",pointerEvents:"none"}}/>
+        <div style={{position:"absolute",bottom:-80,right:"30%",width:300,height:300,borderRadius:"50%",background:"rgba(28,40,120,0.5)",pointerEvents:"none"}}/>
+
+        <div style={{position:"relative"}}>
+          {/* Academic Progress 배지 */}
+          <div style={{display:"inline-block",background:"#fc9024",borderRadius:20,padding:"4px 14px",fontSize:11,fontWeight:700,color:"#fff",marginBottom:14,letterSpacing:"0.02em"}}>
+            20HA 2기 진행 중
+          </div>
+
+          {/* 제목 + 순위 */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:22,fontWeight:900,color:"#ffffff",lineHeight:1.3,marginBottom:10}}>
+                나의 20HA 인증 현황
+              </div>
+              <div style={{fontSize:13,color:"rgba(255,255,255,0.55)",lineHeight:1.75,maxWidth:480}}>
+                {mentorMsg}
+              </div>
             </div>
-            <div style={{fontSize:15,opacity:0.45}}>{myStat.total}회 달성 · 전체 {grandTotal}회</div>
-          </div>
-          <div style={{textAlign:"right"}}>
-            <div style={{fontSize:13,fontWeight:600,opacity:0.45,marginBottom:10,letterSpacing:"0.04em"}}>클래스 순위</div>
-            <div style={{display:"flex",alignItems:"baseline",gap:6,justifyContent:"flex-end"}}>
-              <span style={{fontSize:64,fontWeight:900,color:T.orangeLight,lineHeight:1}}>{myRank ?? "—"}</span>
-              <span style={{fontSize:22,fontWeight:400,color:"rgba(255,255,255,0.4)"}}>위</span>
+            {/* 순위 */}
+            <div style={{marginLeft:24,flexShrink:0,textAlign:"center",background:"rgba(255,255,255,0.06)",borderRadius:14,padding:"12px 20px",border:"1px solid rgba(255,255,255,0.1)"}}>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.45)",fontWeight:600,letterSpacing:"0.06em",marginBottom:6}}>클래스 순위</div>
+              <div style={{display:"flex",alignItems:"baseline",gap:3,justifyContent:"center"}}>
+                <span style={{fontSize:36,fontWeight:900,color:"#fc9024",lineHeight:1}}>{myRank ?? "—"}</span>
+                <span style={{fontSize:14,color:"rgba(255,255,255,0.5)"}}>위</span>
+              </div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginTop:4}}>/ {ROSTER2.length}명 중</div>
             </div>
-            <div style={{fontSize:14,opacity:0.35,marginTop:6}}>/ {ROSTER2.length}명 중</div>
           </div>
-        </div>
-        <div style={{position:"relative",marginTop:28}}>
-          <div style={{height:8,background:"rgba(255,255,255,0.12)",borderRadius:4,overflow:"hidden",position:"relative"}}>
-            <div style={{position:"absolute",left:`${80}%`,top:0,bottom:0,width:2,background:"rgba(255,255,255,0.3)",zIndex:1}}/>
-            <div style={{height:"100%",width:`${pct(myStat.total,grandTotal)}%`,background:"linear-gradient(90deg,#F68B1E,#FFA94D)",borderRadius:4,transition:"width 1s ease"}}/>
-          </div>
-          <div style={{display:"flex",justifyContent:"space-between",marginTop:8,fontSize:12,opacity:0.3}}>
-            <span>0%</span>
-            <span>목표 80%</span>
-            <span>100%</span>
+
+          {/* 진행 바 + % */}
+          <div style={{display:"flex",alignItems:"center",gap:16,marginTop:18}}>
+            <div style={{flex:1,position:"relative"}}>
+              <div style={{height:8,background:"rgba(255,255,255,0.12)",borderRadius:4,overflow:"hidden",position:"relative"}}>
+                <div style={{position:"absolute",left:"80%",top:0,bottom:0,width:2,background:"rgba(255,255,255,0.25)",zIndex:1}}/>
+                <div style={{height:"100%",width:`${totalPct}%`,background:"linear-gradient(90deg,#fc9024,#ffb77e)",borderRadius:4,transition:"width 1s ease"}}/>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:10,color:"rgba(255,255,255,0.28)"}}>
+                <span>0%</span><span>목표 80%</span><span>100%</span>
+              </div>
+            </div>
+            <div style={{flexShrink:0,textAlign:"right"}}>
+              <div style={{fontSize:22,fontWeight:900,color:"#fff",lineHeight:1}}>{totalPct}%</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.4)",marginTop:4}}>{myStat.total} / {grandTotal}회</div>
+            </div>
           </div>
         </div>
       </div>
