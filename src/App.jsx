@@ -42,7 +42,7 @@ const HI = {
 };
 // 아이콘 키 → JSX 렌더 헬퍼
 const navIcon = (key, sz=18, color="currentColor") => {
-  const map = {trophy:HI.trophy, cap:HI.cap, calendar:HI.calendar, search:HI.search, users:HI.users, user:HI.user};
+  const map = {trophy:HI.trophy, cap:HI.cap, calendar:HI.calendar, search:HI.search, users:HI.users, user:HI.user, clipboard:HI.clipboard, bell:HI.bell, chart:HI.chart};
   return (map[key]?.(sz, color)) || <span style={{fontSize:sz}}>{key}</span>;
 };
 
