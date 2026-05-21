@@ -2140,34 +2140,38 @@ const StudentCertView = ({profile}) => {
   return (
     <div style={{display:"grid", gap:12}}>
 
-      {/* ① 히어로 카드 — 그라디언트 배경 */}
-      <div style={{borderRadius:16, background:"linear-gradient(135deg,#191D54 0%,#3D4499 100%)", padding:"20px 24px", color:"#fff"}}>
-        <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start"}}>
+      {/* ① 히어로 카드 */}
+      <div style={{borderRadius:20, background:"linear-gradient(135deg,#191D54 0%,#3D4499 100%)", padding:"32px 36px", color:"#fff", position:"relative", overflow:"hidden"}}>
+        <div style={{position:"absolute",top:-50,right:-50,width:200,height:200,borderRadius:"50%",background:"rgba(255,255,255,0.04)",pointerEvents:"none"}}/>
+        <div style={{position:"absolute",bottom:-70,left:-30,width:260,height:260,borderRadius:"50%",background:"rgba(246,139,30,0.07)",pointerEvents:"none"}}/>
+        <div style={{position:"relative",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div>
-            <div style={{fontSize:11, fontWeight:600, opacity:0.6, marginBottom:4, letterSpacing:"0.06em"}}>20HA 2기 인증 현황</div>
-            <div style={{display:"flex", alignItems:"baseline", gap:6}}>
-              <span style={{fontSize:48, fontWeight:900, lineHeight:1}}>{pct(myStat.total, grandTotal)}</span>
-              <span style={{fontSize:18, fontWeight:400, opacity:0.7}}>%</span>
+            <div style={{fontSize:13,fontWeight:600,opacity:0.5,marginBottom:12,letterSpacing:"0.08em"}}>20HA 2기 인증 현황</div>
+            <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:8}}>
+              <span style={{fontSize:80,fontWeight:900,lineHeight:1,letterSpacing:"-3px"}}>{pct(myStat.total,grandTotal)}</span>
+              <span style={{fontSize:28,fontWeight:400,opacity:0.55}}>%</span>
             </div>
-            <div style={{fontSize:12, opacity:0.55, marginTop:4}}>{myStat.total}회 달성 · 전체 {grandTotal}회</div>
+            <div style={{fontSize:15,opacity:0.45}}>{myStat.total}회 달성 · 전체 {grandTotal}회</div>
           </div>
           <div style={{textAlign:"right"}}>
-            <div style={{fontSize:11, fontWeight:600, opacity:0.6, marginBottom:4}}>클래스 순위</div>
-            <div style={{fontSize:36, fontWeight:900, color:T.orangeLight, lineHeight:1}}>{myRank ?? "—"}<span style={{fontSize:14, fontWeight:400, color:"rgba(255,255,255,0.5)"}}>위</span></div>
-            <div style={{fontSize:11, opacity:0.5, marginTop:4}}>/ {ROSTER2.length}명</div>
+            <div style={{fontSize:13,fontWeight:600,opacity:0.45,marginBottom:10,letterSpacing:"0.04em"}}>클래스 순위</div>
+            <div style={{display:"flex",alignItems:"baseline",gap:6,justifyContent:"flex-end"}}>
+              <span style={{fontSize:64,fontWeight:900,color:T.orangeLight,lineHeight:1}}>{myRank ?? "—"}</span>
+              <span style={{fontSize:22,fontWeight:400,color:"rgba(255,255,255,0.4)"}}>위</span>
+            </div>
+            <div style={{fontSize:14,opacity:0.35,marginTop:6}}>/ {ROSTER2.length}명 중</div>
           </div>
         </div>
-        {/* 진행 트랙 */}
-        <div style={{marginTop:16, height:6, background:"rgba(255,255,255,0.15)", borderRadius:3, overflow:"hidden", position:"relative"}}>
-          <div style={{position:"absolute", left:`${80}%`, top:-2, bottom:-2, width:2, background:"rgba(255,255,255,0.4)", borderRadius:1}}/>
-          <div style={{height:"100%", width:`${pct(myStat.total,grandTotal)}%`, background:"linear-gradient(90deg,#F68B1E,#FFA94D)", borderRadius:3, transition:"width 0.8s"}}/>
-        </div>
-        <div style={{display:"flex", justifyContent:"space-between", marginTop:6, fontSize:10, opacity:0.5}}>
-          <span>0%</span>
-          <span style={{color:T.orangeLight, fontWeight:700, opacity:1}}>
-            {remaining===0 ? "🎉 목표 달성!" : `목표 80% · 앞으로 ${remaining}회`}
-          </span>
-          <span>100%</span>
+        <div style={{position:"relative",marginTop:28}}>
+          <div style={{height:8,background:"rgba(255,255,255,0.12)",borderRadius:4,overflow:"hidden",position:"relative"}}>
+            <div style={{position:"absolute",left:`${80}%`,top:0,bottom:0,width:2,background:"rgba(255,255,255,0.3)",zIndex:1}}/>
+            <div style={{height:"100%",width:`${pct(myStat.total,grandTotal)}%`,background:"linear-gradient(90deg,#F68B1E,#FFA94D)",borderRadius:4,transition:"width 1s ease"}}/>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:8,fontSize:12,opacity:0.3}}>
+            <span>0%</span>
+            <span>목표 80%</span>
+            <span>100%</span>
+          </div>
         </div>
       </div>
 
@@ -2178,29 +2182,29 @@ const StudentCertView = ({profile}) => {
             padding:"20px 14px 16px", boxShadow:"0 2px 8px rgba(25,29,84,0.06)",
             display:"flex", flexDirection:"column", alignItems:"center", gap:10, textAlign:"center"}}>
             {/* 아이콘 원형 */}
-            <div style={{width:52, height:52, borderRadius:"50%", background:iconBg,
+            <div style={{width:60, height:60, borderRadius:"50%", background:iconBg,
               display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
               {icon === "naver" ? (
-                <div style={{width:26, height:26, background:"#03C75A", borderRadius:5,
+                <div style={{width:30, height:30, background:"#03C75A", borderRadius:6,
                   display:"flex", alignItems:"center", justifyContent:"center"}}>
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="white">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="white">
                     <path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/>
                   </svg>
                 </div>
               ) : (
-                <span style={{fontSize:22}}>{icon}</span>
+                <span style={{fontSize:26}}>{icon}</span>
               )}
             </div>
             {/* 제목 */}
-            <div style={{fontSize:12, color:"#8B91C0", fontWeight:500, letterSpacing:"0.02em"}}>{label}</div>
+            <div style={{fontSize:14, color:"#8B91C0", fontWeight:500, letterSpacing:"0.02em"}}>{label}</div>
             {/* 진행 바 */}
-            <div style={{width:"100%", padding:"0 4px"}}>
-              <div style={{height:7, background:`${color}22`, borderRadius:6, overflow:"hidden"}}>
+            <div style={{width:"100%", padding:"0 6px"}}>
+              <div style={{height:8, background:`${color}22`, borderRadius:6, overflow:"hidden"}}>
                 <div style={{height:"100%", width:`${pct(v,t)}%`, background:color, borderRadius:6, transition:"width 0.8s ease"}}/>
               </div>
             </div>
             {/* 횟수 */}
-            <div style={{fontSize:13, fontWeight:700, color:"#191D54"}}>{v} / {t}회</div>
+            <div style={{fontSize:15, fontWeight:700, color:"#191D54"}}>{v} / {t}회</div>
           </div>
         ))}
       </div>
