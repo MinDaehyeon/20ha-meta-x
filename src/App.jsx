@@ -1069,7 +1069,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
     await doSave();
   };
 
-  const STEPS=["① 기본 정보","② 전략 수행","③ 메타인지"];
+  const STEPS=["① 기본 정보","② 메타인지"];
   return(
     <div style={{maxWidth:640,margin:"0 auto"}}>
       <div style={{display:"flex",gap:6,marginBottom:20}}>
@@ -1217,85 +1217,6 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
       )}
 
       {step===1&&(
-        <Card>
-          <div style={{marginBottom:22}}>
-            <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:14}}>📊 정량 평가 (0–100점)</div>
-            {subjectCfg.quant.map(item=>{
-              const on=!!form.quantEnabled[item];
-              const{g,c}=gradeInfo(on?form.quant[item]:0);
-              return(
-                <div key={item} style={{marginBottom:14,opacity:on?1:0.45}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <div onClick={()=>setForm(f=>({...f,quantEnabled:{...f.quantEnabled,[item]:!on}}))}
-                        style={{width:20,height:20,borderRadius:6,border:`2px solid ${on?T.navy:T.border}`,background:on?T.navy:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        {on&&<span style={{color:"#fff",fontSize:12,fontWeight:900}}>✓</span>}
-                      </div>
-                      <span style={{fontSize:13,color:T.textMid}}>{item}</span>
-                    </div>
-                    {on&&<div style={{display:"flex",gap:8,alignItems:"center"}}><Pill color={c}>{g}</Pill><span style={{fontSize:14,fontWeight:800,color:T.navy,minWidth:28,textAlign:"right"}}>{form.quant[item]}</span></div>}
-                  </div>
-                  {on&&<input type="range" min={0} max={100} step={1} value={form.quant[item]} onChange={e=>setForm(f=>({...f,quant:{...f.quant,[item]:Number(e.target.value)}}))} style={sliderFill(form.quant[item],0,100,c)}/>}
-                </div>
-              );
-            })}
-          </div>
-          <Divider/>
-          <div>
-            <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:8}}>✅ 정성 수행 (5점 척도)</div>
-            <div style={{background:T.surfaceAlt,borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",flexDirection:"column",gap:4}}>
-              {[["1","전혀 하지 않음","해당 루틴을 아예 생략하고 넘어감","#DC2626"],
-                ["2","시도만 했음","형식적으로 흉내만 냈거나 일부분만 수행","#F97316"],
-                ["3","절반의 수행","방법은 알지만 일부 핵심 절차를 빠뜨림","#111827"],
-                ["4","충실히 수행","정해진 방법대로 성실히 이행, 학습 효과를 느낌","#2563EB"],
-                ["5","완벽히 몰입","단 1초의 흐트러짐 없이 뇌에 각인되는 느낌","#16A34A"],
-              ].map(([n,title,desc,c])=>(
-                <div key={n} style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                  <span style={{fontSize:11,fontWeight:800,color:c,minWidth:14}}>{n}</span>
-                  <span style={{fontSize:11,color:c}}><strong>{title}</strong> — {desc}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              {subjectCfg.qual.map(item=>{
-                const on=!!form.qualEnabled[item];
-                const score=form.qual[item]||3;
-                const qualColor=score>=5?"#16A34A":score>=4?"#2563EB":score>=3?"#111827":score>=2?"#F97316":"#DC2626";
-                const qualLabel=["","전혀 하지 않음","시도만 했음","절반의 수행","충실히 수행","완벽히 몰입"][score];
-                return(
-                  <div key={item} style={{opacity:on?1:0.45}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:6,alignItems:"center"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <div onClick={()=>setForm(f=>({...f,qualEnabled:{...f.qualEnabled,[item]:!on}}))}
-                          style={{width:20,height:20,borderRadius:6,border:`2px solid ${on?T.navy:T.border}`,background:on?T.navy:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                          {on&&<span style={{color:"#fff",fontSize:12,fontWeight:900}}>✓</span>}
-                        </div>
-                        <span style={{fontSize:12,color:T.textMid,fontWeight:600}}>{item}</span>
-                      </div>
-                      {on&&<div style={{display:"flex",alignItems:"center",gap:6}}>
-                        <span style={{fontSize:11,color:qualColor}}>{qualLabel}</span>
-                        <span style={{fontSize:14,fontWeight:800,color:qualColor,minWidth:16,textAlign:"center"}}>{score}</span>
-                      </div>}
-                    </div>
-                    {on&&<div style={{display:"flex",gap:6}}>
-                      {[1,2,3,4,5].map(n=>(
-                        <div key={n} onClick={()=>setForm(f=>({...f,qual:{...f.qual,[item]:n}}))}
-                          style={{flex:1,height:32,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",
-                            cursor:"pointer",fontWeight:800,fontSize:13,transition:"all 0.15s",
-                            background:score===n?qualColor:score>n?qualColor+"30":T.surfaceAlt,
-                            color:score===n?T.white:score>n?qualColor:T.muted,
-                            border:`1px solid ${score>=n?qualColor:T.border}`}}>{n}</div>
-                      ))}
-                    </div>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {step===2&&(
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <Card>
             <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:14}}>🧠 CO-IN Filter</div>
@@ -1375,7 +1296,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
       </div>
       <div style={{display:"flex",gap:10}}>
         {step>0&&<button onClick={()=>{setErr("");setStep(s=>s-1);}} style={{...css.btnGhost,flex:1}}>← 이전</button>}
-        {step<2
+        {step<1
           ?<button onClick={()=>{setErr("");setStep(s=>s+1);}} style={{...css.btnPrimary,flex:2}}>다음 →</button>
           :<button onClick={save} disabled={saving||saveWarnings.length>0} style={{...css.btnOrange,flex:2,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:saveWarnings.length>0?0.4:1}}>
             {saving?<><Spinner size={16} color="#fff"/>저장 중...</>:"💾 오늘의 학습 저장"}
@@ -2163,7 +2084,7 @@ const StudentCertView = ({profile}) => {
               <div style={{fontSize:11, color:T.muted, marginTop:6, textAlign:"right"}}>{myStat.total} / {grandTotal}회</div>
             </div>
             {[
-              {label:"📰 네이버 인증", v:myStat.naver,   t:naverTotal,   color:"#4F46E5"},
+              {label:"📰 카페 인증", v:myStat.naver,   t:naverTotal,   color:"#4F46E5"},
               {label:"🌅 미라클모닝",  v:myStat.morning, t:morningTotal, color:"#EA580C"},
               {label:"🌙 미라클나이트",v:myStat.night,   t:nightTotal,   color:"#16A34A"},
             ].map(({label,v,t,color}) => (
@@ -2196,7 +2117,7 @@ const StudentCertView = ({profile}) => {
                 <div style={{fontSize:10, fontWeight:700, color: isToday ? T.white : T.muted, marginBottom:2}}>{ROSTER2_DAY_KO[i]}</div>
                 <div style={{fontSize:11, color: isToday ? "rgba(255,255,255,0.7)" : T.muted, marginBottom:4}}>{d.getMonth()+1}/{d.getDate()}</div>
                 <div style={{display:"flex", flexDirection:"column", gap:2, alignItems:"center", minHeight:36}}>
-                  {hasN  && <span style={{fontSize:8, fontWeight:700, color:"#4F46E5", background:"#EEF2FF", borderRadius:3, padding:"1px 5px", whiteSpace:"nowrap"}}>네이버</span>}
+                  {hasN  && <span style={{fontSize:8, fontWeight:700, color:"#4F46E5", background:"#EEF2FF", borderRadius:3, padding:"1px 5px", whiteSpace:"nowrap"}}>카페</span>}
                   {hasM  && <span style={{fontSize:8, fontWeight:700, color:"#EA580C", background:"#FFF7ED", borderRadius:3, padding:"1px 5px", whiteSpace:"nowrap"}}>모닝</span>}
                   {hasNa && <span style={{fontSize:8, fontWeight:700, color:"#16A34A", background:"#F0FDF4", borderRadius:3, padding:"1px 5px", whiteSpace:"nowrap"}}>나이트</span>}
                   {!hasN && !hasM && !hasNa && <span style={{fontSize:14, color: isToday?"rgba(255,255,255,0.2)":T.border}}>—</span>}
@@ -2225,7 +2146,7 @@ const StudentCertView = ({profile}) => {
                   {s.name}{isMe && <span style={{fontSize:11, color:"#4F46E5", fontWeight:700, marginLeft:6}}>(나)</span>}
                 </div>
                 <div style={{display:"flex", gap:8, fontSize:11, color:T.muted}}>
-                  <span style={{color:"#4F46E5"}}>네이버 {s.naver}회</span>
+                  <span style={{color:"#4F46E5"}}>카페 {s.naver}회</span>
                   <span style={{color:"#EA580C"}}>모닝 {s.morning}회</span>
                   <span style={{color:"#16A34A"}}>나이트 {s.night}회</span>
                 </div>
@@ -2241,7 +2162,7 @@ const StudentCertView = ({profile}) => {
               <div style={{fontSize:13, fontWeight:800, color:"#4F46E5", minWidth:28, textAlign:"center"}}>{myRank}</div>
               <div style={{fontWeight:800, color:T.navy, flex:1}}>{profile.name}<span style={{fontSize:11,color:"#4F46E5",fontWeight:700,marginLeft:6}}>(나)</span></div>
               <div style={{display:"flex",gap:8,fontSize:11,color:T.muted}}>
-                <span style={{color:"#4F46E5"}}>네이버 {myStat.naver}회</span>
+                <span style={{color:"#4F46E5"}}>카페 {myStat.naver}회</span>
                 <span style={{color:"#EA580C"}}>모닝 {myStat.morning}회</span>
                 <span style={{color:"#16A34A"}}>나이트 {myStat.night}회</span>
               </div>
@@ -3475,7 +3396,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
 
         // 섹션 스타일 정의
         const SEC = {
-          naver:   { bg:"#EEF2FF", color:"#4F46E5", label:"네이버 인증",  dates: naverDates,   type:"N", total: naverDates.length },
+          naver:   { bg:"#EEF2FF", color:"#4F46E5", label:"카페 인증",  dates: naverDates,   type:"N", total: naverDates.length },
           morning: { bg:"#FFF7ED", color:"#EA580C", label:"미라클모닝",   dates: morningDates, type:"M", total: morningDates.length },
           night:   { bg:"#F0FDF4", color:"#16A34A", label:"미라클나이트", dates: nightDates,   type:"나", total: nightDates.length },
         };
