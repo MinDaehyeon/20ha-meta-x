@@ -2577,8 +2577,8 @@ const StudentCertView = ({profile}) => {
 };
 
 // ══════════════════════════════════════════════════════
-const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
-  const [adminTab, setAdminTab] = useState("users");
+const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) => {
+  const [adminTab, setAdminTab] = useState(defaultTab);
   const [rosterSearch, setRosterSearch] = useState("");
   const [rosterSort, setRosterSort] = useState({by:"name",dir:"asc"});
   const [attendance2, setAttendance2] = useState(INIT_ATTENDANCE2);
@@ -4747,7 +4747,11 @@ export default function App() {
   // 20HA 2기 소속 여부 (학생 전용)
   const isIn2ki  = !isAdmin && !isParent && ROSTER2.some(s => s.name === profile.name);
   const NAV = isAdmin
-    ? [{ key:"dashboard", label:"진단 센터", icon:"search" }, { key:"history", label:"전체 기록", icon:"calendar" }]
+    ? [
+        { key:"users",   label:"회원 관리",     icon:"users"    },
+        { key:"cert",    label:"20HA 2기 현황", icon:"trophy"   },
+        { key:"history", label:"전체 기록",     icon:"calendar" },
+      ]
     : isParent
       ? [{ key:"dashboard", label:"자녀 현황", icon:"users" }]
       : [
@@ -4839,9 +4843,11 @@ export default function App() {
             </div>
           ) : view === "cert" && !isAdmin && !isParent && isIn2ki ? (
             <StudentCertView profile={profile}/>
+          ) : (view === "users" || view === "cert") && isAdmin ? (
+            <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData} defaultTab={view}/>
           ) : view === "dashboard" ? (
             isAdmin
-              ? <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData}/>
+              ? <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData} defaultTab="users"/>
               : isParent
                 ? <ParentDashboard
                     children={children}
