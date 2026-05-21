@@ -4186,7 +4186,7 @@ const BottomNav = ({nav,view,showInput,onNavigate,isAdmin}) => (
 // ══════════════════════════════════════════════════════
 const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, onShowInput, onLogout, onShowProfile, pendingCount, onToggle}) => (
   <div style={{
-    width:240, background:"#191D54", position:"fixed", top:0, left:0, bottom:0,
+    width:240, background:"#363d92", position:"fixed", top:0, left:0, bottom:0,
     display:"flex", flexDirection:"column", zIndex:200, overflowY:"auto"
   }}>
     {/* 닫기 버튼 — 우측 외곽에 플로팅 */}
@@ -4490,7 +4490,7 @@ export default function App() {
       {!isMobile && !sidebarOpen && (
         <button onClick={() => setSidebarOpen(true)} title="메뉴 열기"
           style={{position:"fixed", left:0, top:"50%", transform:"translateY(-50%)",
-            width:20, height:52, background:"#191D54", border:"none",
+            width:20, height:52, background:"#363d92", border:"none",
             borderRadius:"0 10px 10px 0", cursor:"pointer", zIndex:201,
             display:"flex", alignItems:"center", justifyContent:"center",
             color:"#fff", fontSize:12, boxShadow:"2px 0 10px rgba(0,0,0,0.18)"}}>▶</button>
