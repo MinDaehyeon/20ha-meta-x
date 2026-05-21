@@ -4750,9 +4750,10 @@ export default function App() {
   const isIn2ki  = !isAdmin && !isParent && ROSTER2.some(s => s.name === profile.name);
   const NAV = isAdmin
     ? [
-        { key:"users",   label:"회원 관리",     icon:"users"    },
-        { key:"roster2", label:"20HA 2기 현황", icon:"trophy"   },
-        { key:"history", label:"전체 기록",     icon:"calendar" },
+        { key:"users",   label:"회원 관리",          icon:"users"     },
+        { key:"roster2", label:"20HA 2기 현황",      icon:"trophy"    },
+        { key:"cert",    label:"20HA 2기 인증글 관리", icon:"clipboard" },
+        { key:"history", label:"전체 기록",           icon:"calendar"  },
       ]
     : isParent
       ? [{ key:"dashboard", label:"자녀 현황", icon:"users" }]
