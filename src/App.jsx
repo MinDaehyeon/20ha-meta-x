@@ -2196,9 +2196,9 @@ const StudentCertView = ({profile}) => {
                 <div style={{fontSize:10, fontWeight:700, color: isToday ? T.white : T.muted, marginBottom:2}}>{ROSTER2_DAY_KO[i]}</div>
                 <div style={{fontSize:11, color: isToday ? "rgba(255,255,255,0.7)" : T.muted, marginBottom:4}}>{d.getMonth()+1}/{d.getDate()}</div>
                 <div style={{display:"flex", flexDirection:"column", gap:2, alignItems:"center", minHeight:36}}>
-                  {hasN  && <span style={{fontSize:9, fontWeight:700, color:"#4F46E5", background:"#EEF2FF", borderRadius:3, padding:"1px 4px"}}>N</span>}
-                  {hasM  && <span style={{fontSize:9, fontWeight:700, color:"#EA580C", background:"#FFF7ED", borderRadius:3, padding:"1px 4px"}}>M</span>}
-                  {hasNa && <span style={{fontSize:9, fontWeight:700, color:"#16A34A", background:"#F0FDF4", borderRadius:3, padding:"1px 4px"}}>나</span>}
+                  {hasN  && <span style={{fontSize:8, fontWeight:700, color:"#4F46E5", background:"#EEF2FF", borderRadius:3, padding:"1px 5px", whiteSpace:"nowrap"}}>네이버</span>}
+                  {hasM  && <span style={{fontSize:8, fontWeight:700, color:"#EA580C", background:"#FFF7ED", borderRadius:3, padding:"1px 5px", whiteSpace:"nowrap"}}>모닝</span>}
+                  {hasNa && <span style={{fontSize:8, fontWeight:700, color:"#16A34A", background:"#F0FDF4", borderRadius:3, padding:"1px 5px", whiteSpace:"nowrap"}}>나이트</span>}
                   {!hasN && !hasM && !hasNa && <span style={{fontSize:14, color: isToday?"rgba(255,255,255,0.2)":T.border}}>—</span>}
                 </div>
               </div>
@@ -2225,9 +2225,9 @@ const StudentCertView = ({profile}) => {
                   {s.name}{isMe && <span style={{fontSize:11, color:"#4F46E5", fontWeight:700, marginLeft:6}}>(나)</span>}
                 </div>
                 <div style={{display:"flex", gap:8, fontSize:11, color:T.muted}}>
-                  <span style={{color:"#4F46E5"}}>N {s.naver}</span>
-                  <span style={{color:"#EA580C"}}>M {s.morning}</span>
-                  <span style={{color:"#16A34A"}}>나 {s.night}</span>
+                  <span style={{color:"#4F46E5"}}>네이버 {s.naver}회</span>
+                  <span style={{color:"#EA580C"}}>모닝 {s.morning}회</span>
+                  <span style={{color:"#16A34A"}}>나이트 {s.night}회</span>
                 </div>
                 <div style={{fontWeight:900, fontSize:15, color:rank===0?T.orange:T.navy, minWidth:44, textAlign:"right"}}>
                   {pct(s.total, grandTotal)}<span style={{fontSize:11, fontWeight:400}}>%</span>
@@ -2241,9 +2241,9 @@ const StudentCertView = ({profile}) => {
               <div style={{fontSize:13, fontWeight:800, color:"#4F46E5", minWidth:28, textAlign:"center"}}>{myRank}</div>
               <div style={{fontWeight:800, color:T.navy, flex:1}}>{profile.name}<span style={{fontSize:11,color:"#4F46E5",fontWeight:700,marginLeft:6}}>(나)</span></div>
               <div style={{display:"flex",gap:8,fontSize:11,color:T.muted}}>
-                <span style={{color:"#4F46E5"}}>N {myStat.naver}</span>
-                <span style={{color:"#EA580C"}}>M {myStat.morning}</span>
-                <span style={{color:"#16A34A"}}>나 {myStat.night}</span>
+                <span style={{color:"#4F46E5"}}>네이버 {myStat.naver}회</span>
+                <span style={{color:"#EA580C"}}>모닝 {myStat.morning}회</span>
+                <span style={{color:"#16A34A"}}>나이트 {myStat.night}회</span>
               </div>
               <div style={{fontWeight:900,fontSize:15,color:T.navy,minWidth:44,textAlign:"right"}}>{pct(myStat.total,grandTotal)}<span style={{fontSize:11,fontWeight:400}}>%</span></div>
             </div>
