@@ -3758,11 +3758,15 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
 // LOG HISTORY
 // ══════════════════════════════════════════════════════
 const LogHistory = ({logs, onDelete, isAdmin, allProfiles}) => {
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
   const sorted=[...logs].sort((a,b)=>b.date.localeCompare(a.date));
   const nameMap=Object.fromEntries((allProfiles||[]).map(p=>[p.id,p.name]));
   if(sorted.length===0) return <div style={{textAlign:"center",padding:"80px 20px",color:T.muted,fontSize:14}}>학습 기록이 없습니다.</div>;
   const grouped={};sorted.forEach(log=>{if(!grouped[log.date])grouped[log.date]=[];grouped[log.date].push(log);});
   const dates=Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
+  const totalPages=Math.ceil(dates.length/PAGE_SIZE);
+  const pagedDates=dates.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
   const LogCard=({log})=>{
     const ei=log.engram_index||0;
     const{g,c}=gradeInfo(ei);
@@ -3795,7 +3799,13 @@ const LogHistory = ({logs, onDelete, isAdmin, allProfiles}) => {
   };
   return(
     <div>
-      {dates.map(date=>(
+      {/* 상단 요약 + 페이지 정보 */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,padding:"10px 14px",background:T.surface,border:`1px solid ${T.border}`,borderRadius:12}}>
+        <span style={{fontSize:13,color:T.muted}}>총 <strong style={{color:T.navy}}>{sorted.length}건</strong> · <strong style={{color:T.navy}}>{dates.length}일</strong></span>
+        {totalPages>1&&<span style={{fontSize:12,color:T.muted}}>{page} / {totalPages} 페이지</span>}
+      </div>
+
+      {pagedDates.map(date=>(
         <div key={date} style={{marginBottom:20}}>
           <div style={{fontSize:12,fontWeight:700,color:T.muted,marginBottom:8,paddingBottom:6,borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:6}}>
             📅 {date}
@@ -3804,6 +3814,24 @@ const LogHistory = ({logs, onDelete, isAdmin, allProfiles}) => {
           {grouped[date].map(log=><LogCard key={log.id} log={log}/>)}
         </div>
       ))}
+
+      {/* 페이지네이션 */}
+      {totalPages>1&&(
+        <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:6,marginTop:8,paddingTop:16,borderTop:`1px solid ${T.border}`}}>
+          <button onClick={()=>{setPage(p=>Math.max(1,p-1));window.scrollTo(0,0);}}
+            disabled={page===1}
+            style={{padding:"7px 14px",borderRadius:8,border:`1px solid ${T.border}`,background:T.surface,color:page===1?T.border:T.navy,cursor:page===1?"default":"pointer",fontSize:13,fontWeight:700}}>◀</button>
+          {Array.from({length:totalPages},(_,i)=>i+1).map(p=>(
+            <button key={p} onClick={()=>{setPage(p);window.scrollTo(0,0);}}
+              style={{width:34,height:34,borderRadius:8,border:`1px solid ${page===p?T.navy:T.border}`,
+                background:page===p?T.navy:T.surface,color:page===p?"#fff":T.muted,
+                cursor:"pointer",fontSize:13,fontWeight:page===p?800:400}}>{p}</button>
+          ))}
+          <button onClick={()=>{setPage(p=>Math.min(totalPages,p+1));window.scrollTo(0,0);}}
+            disabled={page===totalPages}
+            style={{padding:"7px 14px",borderRadius:8,border:`1px solid ${T.border}`,background:T.surface,color:page===totalPages?T.border:T.navy,cursor:page===totalPages?"default":"pointer",fontSize:13,fontWeight:700}}>▶</button>
+        </div>
+      )}
     </div>
   );
 };
