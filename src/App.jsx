@@ -2151,6 +2151,84 @@ const StudentCertView = ({profile}) => {
     {key:"night",   label:"미라클나이트",icon:"🌙", iconBg:"#EEF0FF", v:myStat.night,   t:nightTotal,   color:"#6366F1"},
   ];
 
+  // ── 멘토 인사이트 메시지 풀
+  const totalPct   = pct(myStat.total, grandTotal);
+  const weeksLeft  = Math.max(0, 7 - currentWeekIdx);
+  const actPcts    = [
+    {label:"미라클모닝",   p: pct(myStat.morning, morningTotal)},
+    {label:"카페 인증",    p: pct(myStat.naver,   naverTotal)},
+    {label:"미라클나이트", p: pct(myStat.night,   nightTotal)},
+  ];
+  const weakest    = [...actPcts].sort((a,b)=>a.p-b.p)[0];
+  const strongest  = [...actPcts].sort((a,b)=>b.p-a.p)[0];
+  const perWeekNeeded = weeksLeft > 0 ? Math.ceil(remaining / weeksLeft) : remaining;
+  const thisWeekPct = weeklyData[currentWeekIdx]?.pct ?? 0;
+
+  const mentorPool = [
+    // 순위
+    ...(myRank===1                                    ? ["현재 클래스 1위! 이 기세를 끝까지 유지해보세요. 🏆"] : []),
+    ...(myRank===2                                    ? [`1위와 ${ranked[0].total-myStat.total}회 차이예요. 따라잡을 수 있어요!`] : []),
+    ...(myRank===3                                    ? ["TOP 3! 지금 이 자리를 지키는 것도 실력이에요."] : []),
+    ...(myRank>3 && myRank<=Math.ceil(ROSTER2.length*.2) ? [`상위 20% 안에 있어요. 조금만 더 하면 TOP 3도 보여요.`] : []),
+    // 약점/강점 활동
+    ...(weakest.p < 40 && grandTotal>0               ? [`${weakest.label} 달성률이 ${weakest.p}%로 가장 낮아요. 여기에 집중해보세요.`] : []),
+    ...(weakest.p>=40 && weakest.p<60                ? [`${weakest.label}을 조금만 더 챙기면 전체 균형이 맞춰져요.`] : []),
+    ...(strongest.p===100 && grandTotal>0            ? [`${strongest.label}은 완벽 달성이에요! 이 습관이 전체 성과를 이끌고 있어요. ✅`] : []),
+    ...(strongest.p>=80 && strongest.p<100           ? [`${strongest.label}은 ${strongest.p}% 달성! 이 활동의 루틴이 잘 잡혀있어요.`] : []),
+    // 달성률 구간
+    ...(totalPct>=80                                  ? ["목표 80%를 달성했어요! 이제 남은 기간 자신의 기록에 도전하세요. 🎯"] : []),
+    ...(totalPct>=60 && totalPct<80                   ? [`목표까지 ${80-totalPct}%p만 남았어요. 이 페이스면 충분히 닿아요.`] : []),
+    ...(totalPct>=40 && totalPct<60                   ? ["절반 고지를 넘었어요. 지금의 속도로 꾸준히 가면 달라져요."] : []),
+    ...(totalPct>=10 && totalPct<40                   ? ["하루하루 인증이 쌓이고 있어요. 지금 만드는 습관이 결과예요."] : []),
+    ...(totalPct<10 && myStat.total===0               ? ["아직 첫 인증을 기다리고 있어요. 오늘 딱 하나만 해볼까요?"] : []),
+    ...(totalPct<10 && myStat.total>0                 ? [`시작했어요! ${myStat.total}회가 쌓였어요. 다음 한 번이 루틴을 만들어요.`] : []),
+    // 주차
+    ...(currentWeekIdx<=1                             ? ["프로젝트 초반이에요. 지금 만드는 루틴이 나머지 주를 결정해요."] : []),
+    ...(currentWeekIdx>=2 && currentWeekIdx<=4        ? [`${currentWeekIdx+1}주차 중반, 여기서 무너지지 않는 게 진짜 실력이에요.`] : []),
+    ...(currentWeekIdx>=5 && weeksLeft>0              ? [`마지막 스퍼트 구간이에요. 지금 만드는 성과가 최종 결과예요.`] : []),
+    ...(weeksLeft===0                                 ? ["마지막 주예요. 오늘 하는 인증 하나하나가 기록이에요."] : []),
+    // 이번 주
+    ...(thisWeekPct>=80                               ? [`이번 주 ${thisWeekPct}%! 이번 주 정말 잘하고 있어요. 🌟`] : []),
+    ...(thisWeekPct===0 && currentWeekIdx>0           ? ["이번 주 인증이 아직 없어요. 지금 바로 시작할 수 있어요."] : []),
+    // 클래스 비교
+    ...(myStat.total>avgTotal*1.5 && avgTotal>0       ? ["클래스 평균의 1.5배 이상을 달성 중이에요. 탁월한 성과예요! ✨"] : []),
+    ...(myStat.total>avgTotal && myStat.total<=avgTotal*1.5 && avgTotal>0 ? [`클래스 평균보다 ${myStat.total-avgTotal}회 앞서 있어요.`] : []),
+    ...(myStat.total<avgTotal && avgTotal>0           ? [`평균까지 ${avgTotal-myStat.total}회예요. 오늘 조금 더 채워볼까요?`] : []),
+    ...(myStat.total===avgTotal && avgTotal>0         ? ["클래스 평균 딱 그 자리에 있어요. 한 발 더 내딛어볼까요?"] : []),
+  ];
+  const mentorMsg = mentorPool.length > 0
+    ? mentorPool[(myStat.total + myRank + currentWeekIdx) % mentorPool.length]
+    : "꾸준히 인증하는 것 자체가 이미 대단한 일이에요.";
+
+  // ── 마스터리 도전 메시지 풀
+  const masteryPool = [
+    ...(remaining===0 ? [
+      "🎉 목표 80% 달성! 이제 100%를 향해 달려가세요!",
+      "완주했어요! 8주 프로젝트의 진짜 승자예요. 🏅",
+      "목표를 넘었어요. 새로운 기준을 세워봐요.",
+    ] : []),
+    ...(remaining>0 && remaining<=3 ? [
+      `거의 다 왔어요! 단 ${remaining}회만 더하면 목표 달성이에요.`,
+      `${remaining}회, 손에 잡힐 듯한 거리예요.`,
+    ] : []),
+    ...(remaining>3 && remaining<=7 ? [
+      `${remaining}회. 매일 하나씩이면 이번 주 안에 달성이에요.`,
+      `한 주만 더 집중하면 목표에 닿아요. ${remaining}회 남았어요.`,
+    ] : []),
+    ...(remaining>7 && weeksLeft>0 ? [
+      `남은 ${weeksLeft}주 동안 주당 ${perWeekNeeded}회씩 하면 목표에 닿아요.`,
+      ...(perWeekNeeded<=3 ? [`주당 ${perWeekNeeded}회, 충분히 할 수 있는 양이에요.`] : []),
+      ...(perWeekNeeded>5  ? ["지금부터 매일 인증하면 목표를 달성할 수 있어요."] : []),
+      `현재 ${totalPct}%, 목표 80%까지 ${remaining}회 남아있어요.`,
+    ] : []),
+    ...(remaining>7 && weeksLeft===0 ? [
+      `마지막 주, ${remaining}회 남았어요. 끝까지 포기하지 마세요.`,
+    ] : []),
+  ];
+  const masteryMsg = masteryPool.length > 0
+    ? masteryPool[(myStat.total + currentWeekIdx) % masteryPool.length]
+    : `목표 80%까지 ${remaining}회 남았어요.`;
+
   return (
     <div style={{display:"grid", gap:12}}>
 
@@ -2413,22 +2491,12 @@ const StudentCertView = ({profile}) => {
       <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
         <div style={{borderRadius:14, background:"#1E2255", padding:"16px 18px", color:"#fff"}}>
           <div style={{fontSize:13, fontWeight:700, marginBottom:6}}>💡 멘토 인사이트</div>
-          <div style={{fontSize:12, opacity:0.75, lineHeight:1.7}}>
-            {myStat.total > avgTotal
-              ? `클래스 평균보다 ${myStat.total - avgTotal}회 더 달성했어요. 이 흐름을 유지하세요!`
-              : myStat.total === 0
-              ? "아직 인증 기록이 없어요. 첫 번째 인증을 시작해보세요!"
-              : `클래스 평균까지 ${avgTotal - myStat.total}회 남았어요. 조금만 더 힘내세요!`}
-          </div>
+          <div style={{fontSize:12, opacity:0.8, lineHeight:1.8}}>{mentorMsg}</div>
         </div>
         <div style={{borderRadius:14, background:"linear-gradient(135deg,#F68B1E,#FFA94D)", padding:"16px 18px", color:"#fff"}}>
           <div style={{fontSize:13, fontWeight:700, marginBottom:6}}>🎯 마스터리 도전!</div>
-          <div style={{fontSize:12, opacity:0.9, lineHeight:1.7, marginBottom:6}}>
-            {remaining === 0
-              ? "🎉 목표 달성! 최고의 성과예요!"
-              : `목표 80% 달성까지 ${remaining}회 남았어요.`}
-          </div>
-          <div style={{fontSize:11, opacity:0.8}}>전체 {grandTotal}회 중 {myStat.total}회 완료</div>
+          <div style={{fontSize:12, opacity:0.9, lineHeight:1.8, marginBottom:6}}>{masteryMsg}</div>
+          <div style={{fontSize:11, opacity:0.7}}>전체 {grandTotal}회 중 {myStat.total}회 완료</div>
         </div>
       </div>
 
