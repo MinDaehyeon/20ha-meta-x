@@ -2036,7 +2036,7 @@ const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChild
       ) : selChild ? (<>
         {/* 자녀 뷰 탭 */}
         <div style={{display:"flex",gap:2,marginBottom:16,background:T.surfaceAlt,borderRadius:10,padding:4,width:"fit-content"}}>
-          {[{v:"dashboard",label:"📊 대시보드"},{v:"history",label:"📅 학습 기록"}].map(({v,label})=>(
+          {[{v:"dashboard",label:"🧠 메타인지 현황"},{v:"history",label:"📅 학습 기록"}].map(({v,label})=>(
             <button key={v} onClick={()=>setChildView(v)}
               style={{padding:"7px 16px",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,
                 background:childView===v?T.navy:"transparent",color:childView===v?T.white:T.muted,transition:"all 0.15s"}}>
@@ -2078,6 +2078,7 @@ const ROSTER2 = [
   {name:"박선율",  phone:"010-2776-9111"}, {name:"한채린",  phone:"010-5298-7970"},
   {name:"오수빈",  phone:"010-3286-6880"}, {name:"남희수",  phone:"010-8965-5948"},
   {name:"김가인",  phone:"010-4549-0142"}, {name:"양은정",  phone:"010-7232-0795"},
+  {name:"테스트학생", phone:"010-0000-0000"},
 ];
 const _genDates = (days) => {
   const result = [];
@@ -2095,12 +2096,170 @@ const ROSTER2_DAY_KO        = ['일','월','화','수','목','금','토'];
 const roster2FmtKey = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 const roster2Fmt    = (dt) => `${dt.getMonth()+1}/${dt.getDate()}`;
 
+// 2기 출석 데이터 모듈 상수 (학생 인증 현황 + 관리자 명단 공용)
+const INIT_ATTENDANCE2 = {"36-나-2026-05-17":true,"27-나-2026-05-17":true,"4-나-2026-05-17":true,"9-나-2026-05-17":true,"0-나-2026-05-17":true,"6-나-2026-05-17":true,"19-나-2026-05-17":true,"3-나-2026-05-17":true,"5-나-2026-05-17":true,"37-나-2026-05-17":true,"31-나-2026-05-17":true,"7-나-2026-05-17":true,"13-나-2026-05-17":true,"8-나-2026-05-17":true,"15-나-2026-05-17":true,"33-나-2026-05-17":true,"1-나-2026-05-17":true,"10-나-2026-05-17":true,"25-나-2026-05-17":true,"29-나-2026-05-17":true,"32-나-2026-05-17":true,"11-나-2026-05-17":true,"12-나-2026-05-17":true,"28-나-2026-05-17":true,"26-나-2026-05-17":true,"22-나-2026-05-17":true,"30-나-2026-05-17":true,"24-나-2026-05-17":true,"38-나-2026-05-17":true,"17-나-2026-05-17":true,"2-나-2026-05-17":true,"40-나-2026-05-17":true,"16-나-2026-05-17":true,"23-나-2026-05-17":true,"35-나-2026-05-17":true,"4-M-2026-05-18":true,"11-M-2026-05-18":true,"6-M-2026-05-18":true,"23-M-2026-05-18":true,"17-M-2026-05-18":true,"36-M-2026-05-18":true,"39-M-2026-05-18":true,"10-M-2026-05-18":true,"8-M-2026-05-18":true,"33-M-2026-05-18":true,"27-M-2026-05-18":true,"24-M-2026-05-18":true,"19-M-2026-05-18":true,"20-M-2026-05-18":true,"2-M-2026-05-18":true,"3-M-2026-05-18":true,"22-M-2026-05-18":true,"26-M-2026-05-18":true,"34-M-2026-05-18":true,"12-M-2026-05-18":true,"25-M-2026-05-18":true,"28-M-2026-05-18":true,"18-M-2026-05-18":true,"31-M-2026-05-18":true,"9-M-2026-05-18":true,"16-M-2026-05-18":true,"0-M-2026-05-18":true,"32-M-2026-05-18":true,"30-M-2026-05-18":true,"1-M-2026-05-18":true,"29-M-2026-05-18":true,"15-M-2026-05-18":true,"18-나-2026-05-18":true,"36-나-2026-05-18":true,"23-나-2026-05-18":true,"32-나-2026-05-18":true,"35-나-2026-05-18":true,"4-나-2026-05-18":true,"10-나-2026-05-18":true,"3-나-2026-05-18":true,"12-나-2026-05-18":true,"16-나-2026-05-18":true,"2-나-2026-05-18":true,"11-나-2026-05-18":true,"0-나-2026-05-18":true,"8-나-2026-05-18":true,"19-나-2026-05-18":true,"7-나-2026-05-18":true,"31-나-2026-05-18":true,"17-나-2026-05-18":true,"20-나-2026-05-18":true,"9-나-2026-05-18":true,"13-나-2026-05-18":true,"33-나-2026-05-18":true,"25-나-2026-05-18":true,"30-나-2026-05-18":true,"1-나-2026-05-18":true,"39-나-2026-05-18":true,"28-나-2026-05-18":true,"15-나-2026-05-18":true,"22-나-2026-05-18":true,"37-나-2026-05-18":true,"21-나-2026-05-18":true,"41-나-2026-05-18":true,"38-나-2026-05-18":true,"34-나-2026-05-18":true,"27-나-2026-05-18":true,"6-나-2026-05-18":true,"14-나-2026-05-18":true,"24-나-2026-05-18":true,"26-나-2026-05-18":true,"40-나-2026-05-18":true,"5-나-2026-05-18":true,"36-나-2026-05-19":true,"23-나-2026-05-19":true,"40-나-2026-05-19":true,"32-나-2026-05-19":true,"37-나-2026-05-19":true,"0-나-2026-05-19":true,"17-나-2026-05-19":true,"9-나-2026-05-19":true,"25-나-2026-05-19":true,"2-나-2026-05-19":true,"33-나-2026-05-19":true,"35-나-2026-05-19":true,"14-나-2026-05-19":true,"21-나-2026-05-19":true,"4-나-2026-05-19":true,"1-나-2026-05-19":true,"24-나-2026-05-19":true,"15-나-2026-05-19":true,"20-나-2026-05-19":true,"39-나-2026-05-19":true,"8-나-2026-05-19":true,"34-나-2026-05-19":true,"29-나-2026-05-19":true,"5-나-2026-05-19":true,"13-나-2026-05-19":true,"10-나-2026-05-19":true,"19-나-2026-05-19":true,"30-나-2026-05-19":true,"6-나-2026-05-19":true,"28-나-2026-05-19":true,"11-나-2026-05-19":true,"3-나-2026-05-19":true,"18-나-2026-05-19":true,"7-나-2026-05-19":true,"41-나-2026-05-19":true,"26-나-2026-05-19":true,"12-나-2026-05-19":true,"22-나-2026-05-19":true,"10-M-2026-05-20":true,"36-M-2026-05-20":true,"8-M-2026-05-20":true,"23-M-2026-05-20":true,"6-M-2026-05-20":true,"3-M-2026-05-20":true,"40-M-2026-05-20":true,"12-M-2026-05-20":true,"35-M-2026-05-20":true,"4-M-2026-05-20":true,"19-M-2026-05-20":true,"21-M-2026-05-20":true,"9-M-2026-05-20":true,"18-M-2026-05-20":true,"33-M-2026-05-20":true,"24-M-2026-05-20":true,"0-M-2026-05-20":true,"2-M-2026-05-20":true,"39-M-2026-05-20":true,"15-M-2026-05-20":true,"16-M-2026-05-20":true,"20-M-2026-05-20":true,"1-M-2026-05-20":true,"31-M-2026-05-20":true,"14-M-2026-05-20":true,"37-M-2026-05-20":true,"41-M-2026-05-20":true,"30-M-2026-05-20":true,"26-M-2026-05-20":true,"28-M-2026-05-20":true,"38-M-2026-05-20":true,"34-M-2026-05-20":true,"22-M-2026-05-20":true,
+  // 테스트학생 (idx=42) 더미 데이터
+  "42-나-2026-05-17":true,
+  "42-N-2026-05-17":true,
+  "42-M-2026-05-18":true,"42-나-2026-05-18":true,
+  "42-나-2026-05-19":true,
+  "42-N-2026-05-20":true,"42-M-2026-05-20":true,
+};
+
+// ══════════════════════════════════════════════════════
+// 학생: 20HA 인증 현황 탭
+// ══════════════════════════════════════════════════════
+const StudentCertView = ({profile}) => {
+  const fk = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  const myIdx = ROSTER2.findIndex(s => s.name === profile.name);
+
+  const naverTotal   = ROSTER2_NAVER_DATES.length;    // 16
+  const morningTotal = ROSTER2_MORNING_DATES.length;  // 24
+  const nightTotal   = ROSTER2_NIGHT_DATES.length;    // 48
+  const grandTotal   = naverTotal + morningTotal + nightTotal; // 88
+
+  const allStats = ROSTER2.map((s, i) => {
+    const n  = ROSTER2_NAVER_DATES.filter(dt => INIT_ATTENDANCE2[`${i}-N-${fk(dt)}`]).length;
+    const m  = ROSTER2_MORNING_DATES.filter(dt => INIT_ATTENDANCE2[`${i}-M-${fk(dt)}`]).length;
+    const na = ROSTER2_NIGHT_DATES.filter(dt => INIT_ATTENDANCE2[`${i}-나-${fk(dt)}`]).length;
+    return {name: s.name, naver: n, morning: m, night: na, total: n + m + na};
+  });
+  const myStat = myIdx >= 0 ? allStats[myIdx] : {naver:0, morning:0, night:0, total:0};
+  const ranked = [...allStats].sort((a, b) => b.total - a.total);
+  const myRank = myIdx >= 0 ? ranked.findIndex(s => s.name === profile.name) + 1 : null;
+  const top5   = ranked.slice(0, 5);
+
+  const pct = (v, t) => t > 0 ? Math.round(v / t * 100) : 0;
+
+  const ProgressBar = ({value, total, color}) => (
+    <div style={{flex:1, height:8, background:T.surfaceAlt, borderRadius:4, overflow:"hidden"}}>
+      <div style={{width:`${pct(value,total)}%`, height:"100%", background:color, borderRadius:4, transition:"width 0.6s"}}/>
+    </div>
+  );
+
+  // 이번 주 (오늘 기준)
+  const today = new Date();
+  const weekStart = new Date(today); weekStart.setDate(today.getDate() - today.getDay());
+  const thisWeek = Array.from({length:7}, (_, i) => { const d = new Date(weekStart); d.setDate(weekStart.getDate()+i); return d; });
+
+  return (
+    <div style={{display:"grid", gap:16}}>
+      {/* 내 인증 현황 */}
+      <Card>
+        <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16}}>
+          <div style={{fontSize:15, fontWeight:800, color:T.navy}}>🏅 내 인증 현황</div>
+          {myRank && <span style={{fontSize:13, fontWeight:800, color:T.orange}}>{myRank}위 / {ROSTER2.length}명</span>}
+        </div>
+        {myIdx < 0 ? (
+          <div style={{textAlign:"center", color:T.muted, fontSize:13, padding:"20px 0"}}>2기 명단에 등록되지 않은 계정입니다.</div>
+        ) : (
+          <div style={{display:"grid", gap:12}}>
+            <div style={{background:T.surfaceAlt, borderRadius:12, padding:"14px 16px"}}>
+              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8}}>
+                <span style={{fontSize:13, fontWeight:700, color:T.navy}}>종합 달성률</span>
+                <span style={{fontSize:26, fontWeight:900, color:T.navy}}>{pct(myStat.total, grandTotal)}<span style={{fontSize:13, fontWeight:400}}>%</span></span>
+              </div>
+              <ProgressBar value={myStat.total} total={grandTotal} color={T.navy}/>
+              <div style={{fontSize:11, color:T.muted, marginTop:6, textAlign:"right"}}>{myStat.total} / {grandTotal}회</div>
+            </div>
+            {[
+              {label:"📰 네이버 인증", v:myStat.naver,   t:naverTotal,   color:"#4F46E5"},
+              {label:"🌅 미라클모닝",  v:myStat.morning, t:morningTotal, color:"#EA580C"},
+              {label:"🌙 미라클나이트",v:myStat.night,   t:nightTotal,   color:"#16A34A"},
+            ].map(({label,v,t,color}) => (
+              <div key={label} style={{display:"flex", alignItems:"center", gap:10}}>
+                <div style={{minWidth:116, fontSize:12, fontWeight:700, color}}>{label}</div>
+                <ProgressBar value={v} total={t} color={color}/>
+                <div style={{minWidth:68, textAlign:"right", fontSize:12, fontWeight:700, color}}>
+                  {v}/{t} <span style={{fontWeight:400, color:T.muted}}>({pct(v,t)}%)</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* 이번 주 현황 */}
+      <Card>
+        <div style={{fontSize:15, fontWeight:800, color:T.navy, marginBottom:12}}>📅 이번 주 현황</div>
+        <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:6, textAlign:"center"}}>
+          {thisWeek.map((d, i) => {
+            const dk = fk(d);
+            const isToday = d.toDateString() === today.toDateString();
+            const hasN  = myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-N-${dk}`];
+            const hasM  = myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-M-${dk}`];
+            const hasNa = myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-나-${dk}`];
+            return (
+              <div key={i} style={{borderRadius:10, padding:"8px 4px",
+                background: isToday ? T.navy : T.surfaceAlt,
+                border:`1px solid ${isToday ? T.navy : T.border}`}}>
+                <div style={{fontSize:10, fontWeight:700, color: isToday ? T.white : T.muted, marginBottom:2}}>{ROSTER2_DAY_KO[i]}</div>
+                <div style={{fontSize:11, color: isToday ? "rgba(255,255,255,0.7)" : T.muted, marginBottom:4}}>{d.getMonth()+1}/{d.getDate()}</div>
+                <div style={{display:"flex", flexDirection:"column", gap:2, alignItems:"center", minHeight:36}}>
+                  {hasN  && <span style={{fontSize:9, fontWeight:700, color:"#4F46E5", background:"#EEF2FF", borderRadius:3, padding:"1px 4px"}}>N</span>}
+                  {hasM  && <span style={{fontSize:9, fontWeight:700, color:"#EA580C", background:"#FFF7ED", borderRadius:3, padding:"1px 4px"}}>M</span>}
+                  {hasNa && <span style={{fontSize:9, fontWeight:700, color:"#16A34A", background:"#F0FDF4", borderRadius:3, padding:"1px 4px"}}>나</span>}
+                  {!hasN && !hasM && !hasNa && <span style={{fontSize:14, color: isToday?"rgba(255,255,255,0.2)":T.border}}>—</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* 인증 Best */}
+      <Card>
+        <div style={{fontSize:15, fontWeight:800, color:T.navy, marginBottom:14}}>🏆 인증 Best</div>
+        <div style={{display:"grid", gap:8}}>
+          {top5.map((s, rank) => {
+            const isMe = s.name === profile.name;
+            return (
+              <div key={rank} style={{display:"flex", alignItems:"center", gap:12,
+                background: isMe?"#EEF2FF": rank===0?"#FFFBEB":T.surfaceAlt,
+                border:`1px solid ${isMe?"#C7D2FE":rank===0?"#FDE68A":T.border}`,
+                borderRadius:10, padding:"10px 14px"}}>
+                <div style={{fontSize:18, minWidth:28, textAlign:"center"}}>
+                  {rank===0?"🥇":rank===1?"🥈":rank===2?"🥉":<span style={{fontSize:13,fontWeight:800,color:T.muted}}>{rank+1}</span>}
+                </div>
+                <div style={{fontWeight:800, color:T.navy, flex:1}}>
+                  {s.name}{isMe && <span style={{fontSize:11, color:"#4F46E5", fontWeight:700, marginLeft:6}}>(나)</span>}
+                </div>
+                <div style={{display:"flex", gap:8, fontSize:11, color:T.muted}}>
+                  <span style={{color:"#4F46E5"}}>N {s.naver}</span>
+                  <span style={{color:"#EA580C"}}>M {s.morning}</span>
+                  <span style={{color:"#16A34A"}}>나 {s.night}</span>
+                </div>
+                <div style={{fontWeight:900, fontSize:15, color:rank===0?T.orange:T.navy, minWidth:44, textAlign:"right"}}>
+                  {pct(s.total, grandTotal)}<span style={{fontSize:11, fontWeight:400}}>%</span>
+                </div>
+              </div>
+            );
+          })}
+          {myRank && myRank > 5 && (<>
+            <div style={{textAlign:"center", color:T.muted, fontSize:12}}>···</div>
+            <div style={{display:"flex", alignItems:"center", gap:12, background:"#EEF2FF", border:"1px solid #C7D2FE", borderRadius:10, padding:"10px 14px"}}>
+              <div style={{fontSize:13, fontWeight:800, color:"#4F46E5", minWidth:28, textAlign:"center"}}>{myRank}</div>
+              <div style={{fontWeight:800, color:T.navy, flex:1}}>{profile.name}<span style={{fontSize:11,color:"#4F46E5",fontWeight:700,marginLeft:6}}>(나)</span></div>
+              <div style={{display:"flex",gap:8,fontSize:11,color:T.muted}}>
+                <span style={{color:"#4F46E5"}}>N {myStat.naver}</span>
+                <span style={{color:"#EA580C"}}>M {myStat.morning}</span>
+                <span style={{color:"#16A34A"}}>나 {myStat.night}</span>
+              </div>
+              <div style={{fontWeight:900,fontSize:15,color:T.navy,minWidth:44,textAlign:"right"}}>{pct(myStat.total,grandTotal)}<span style={{fontSize:11,fontWeight:400}}>%</span></div>
+            </div>
+          </>)}
+        </div>
+      </Card>
+    </div>
+  );
+};
+
 // ══════════════════════════════════════════════════════
 const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
-  const [adminTab, setAdminTab] = useState("users"); // "users" | "dashboard" | "cert" | "roster2"
+  const [adminTab, setAdminTab] = useState("users");
   const [rosterSearch, setRosterSearch] = useState("");
   const [rosterSort, setRosterSort] = useState({by:"name",dir:"asc"});
-  const [attendance2, setAttendance2] = useState({"36-나-2026-05-17":true,"27-나-2026-05-17":true,"4-나-2026-05-17":true,"9-나-2026-05-17":true,"0-나-2026-05-17":true,"6-나-2026-05-17":true,"19-나-2026-05-17":true,"3-나-2026-05-17":true,"5-나-2026-05-17":true,"37-나-2026-05-17":true,"31-나-2026-05-17":true,"7-나-2026-05-17":true,"13-나-2026-05-17":true,"8-나-2026-05-17":true,"15-나-2026-05-17":true,"33-나-2026-05-17":true,"1-나-2026-05-17":true,"10-나-2026-05-17":true,"25-나-2026-05-17":true,"29-나-2026-05-17":true,"32-나-2026-05-17":true,"11-나-2026-05-17":true,"12-나-2026-05-17":true,"28-나-2026-05-17":true,"26-나-2026-05-17":true,"22-나-2026-05-17":true,"30-나-2026-05-17":true,"24-나-2026-05-17":true,"38-나-2026-05-17":true,"17-나-2026-05-17":true,"2-나-2026-05-17":true,"40-나-2026-05-17":true,"16-나-2026-05-17":true,"23-나-2026-05-17":true,"35-나-2026-05-17":true,"4-M-2026-05-18":true,"11-M-2026-05-18":true,"6-M-2026-05-18":true,"23-M-2026-05-18":true,"17-M-2026-05-18":true,"36-M-2026-05-18":true,"39-M-2026-05-18":true,"10-M-2026-05-18":true,"8-M-2026-05-18":true,"33-M-2026-05-18":true,"27-M-2026-05-18":true,"24-M-2026-05-18":true,"19-M-2026-05-18":true,"20-M-2026-05-18":true,"2-M-2026-05-18":true,"3-M-2026-05-18":true,"22-M-2026-05-18":true,"26-M-2026-05-18":true,"34-M-2026-05-18":true,"12-M-2026-05-18":true,"25-M-2026-05-18":true,"28-M-2026-05-18":true,"18-M-2026-05-18":true,"31-M-2026-05-18":true,"9-M-2026-05-18":true,"16-M-2026-05-18":true,"0-M-2026-05-18":true,"32-M-2026-05-18":true,"30-M-2026-05-18":true,"1-M-2026-05-18":true,"29-M-2026-05-18":true,"15-M-2026-05-18":true,"18-나-2026-05-18":true,"36-나-2026-05-18":true,"23-나-2026-05-18":true,"32-나-2026-05-18":true,"35-나-2026-05-18":true,"4-나-2026-05-18":true,"10-나-2026-05-18":true,"3-나-2026-05-18":true,"12-나-2026-05-18":true,"16-나-2026-05-18":true,"2-나-2026-05-18":true,"11-나-2026-05-18":true,"0-나-2026-05-18":true,"8-나-2026-05-18":true,"19-나-2026-05-18":true,"7-나-2026-05-18":true,"31-나-2026-05-18":true,"17-나-2026-05-18":true,"20-나-2026-05-18":true,"9-나-2026-05-18":true,"13-나-2026-05-18":true,"33-나-2026-05-18":true,"25-나-2026-05-18":true,"30-나-2026-05-18":true,"1-나-2026-05-18":true,"39-나-2026-05-18":true,"28-나-2026-05-18":true,"15-나-2026-05-18":true,"22-나-2026-05-18":true,"37-나-2026-05-18":true,"21-나-2026-05-18":true,"41-나-2026-05-18":true,"38-나-2026-05-18":true,"34-나-2026-05-18":true,"27-나-2026-05-18":true,"6-나-2026-05-18":true,"14-나-2026-05-18":true,"24-나-2026-05-18":true,"26-나-2026-05-18":true,"40-나-2026-05-18":true,"5-나-2026-05-18":true,"36-나-2026-05-19":true,"23-나-2026-05-19":true,"40-나-2026-05-19":true,"32-나-2026-05-19":true,"37-나-2026-05-19":true,"0-나-2026-05-19":true,"17-나-2026-05-19":true,"9-나-2026-05-19":true,"25-나-2026-05-19":true,"2-나-2026-05-19":true,"33-나-2026-05-19":true,"35-나-2026-05-19":true,"14-나-2026-05-19":true,"21-나-2026-05-19":true,"4-나-2026-05-19":true,"1-나-2026-05-19":true,"24-나-2026-05-19":true,"15-나-2026-05-19":true,"20-나-2026-05-19":true,"39-나-2026-05-19":true,"8-나-2026-05-19":true,"34-나-2026-05-19":true,"29-나-2026-05-19":true,"5-나-2026-05-19":true,"13-나-2026-05-19":true,"10-나-2026-05-19":true,"19-나-2026-05-19":true,"30-나-2026-05-19":true,"6-나-2026-05-19":true,"28-나-2026-05-19":true,"11-나-2026-05-19":true,"3-나-2026-05-19":true,"18-나-2026-05-19":true,"7-나-2026-05-19":true,"41-나-2026-05-19":true,"26-나-2026-05-19":true,"12-나-2026-05-19":true,"22-나-2026-05-19":true,"10-M-2026-05-20":true,"36-M-2026-05-20":true,"8-M-2026-05-20":true,"23-M-2026-05-20":true,"6-M-2026-05-20":true,"3-M-2026-05-20":true,"40-M-2026-05-20":true,"12-M-2026-05-20":true,"35-M-2026-05-20":true,"4-M-2026-05-20":true,"19-M-2026-05-20":true,"21-M-2026-05-20":true,"9-M-2026-05-20":true,"18-M-2026-05-20":true,"33-M-2026-05-20":true,"24-M-2026-05-20":true,"0-M-2026-05-20":true,"2-M-2026-05-20":true,"39-M-2026-05-20":true,"15-M-2026-05-20":true,"16-M-2026-05-20":true,"20-M-2026-05-20":true,"1-M-2026-05-20":true,"31-M-2026-05-20":true,"14-M-2026-05-20":true,"37-M-2026-05-20":true,"41-M-2026-05-20":true,"30-M-2026-05-20":true,"26-M-2026-05-20":true,"28-M-2026-05-20":true,"38-M-2026-05-20":true,"34-M-2026-05-20":true,"22-M-2026-05-20":true});
+  const [attendance2, setAttendance2] = useState(INIT_ATTENDANCE2);
   const [sel, setSel]           = useState("전체");
   const [editStudent, setEditStudent] = useState(null);
   const [saving, setSaving]     = useState(false);
@@ -2109,7 +2268,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh}) => {
   const [detailStudent, setDetailStudent] = useState(null);
 
   // 기수 데이터 (회원 관리·2기 명단 공용)
-  const ROSTER2_NAMES = new Set(["강예나","김가흔","김은채","김태준","박재현","손연재","윤준원","최지유","배정윤","심수윤","한설아","강가인","권민유","권순혁","최유주","김도현","김시원","김시윤","김아란","김준범","김지우","김호진","나지성","문지유","박지우","서소윤","서지우","송민건","양소윤","오수연","우정훈","윤서준","이유빈","이홍윤","임다은","정유진","박선율","한채린","오수빈","남희수","김가인","양은정"]);
+  const ROSTER2_NAMES = new Set(["강예나","김가흔","김은채","김태준","박재현","손연재","윤준원","최지유","배정윤","심수윤","한설아","강가인","권민유","권순혁","최유주","김도현","김시원","김시윤","김아란","김준범","김지우","김호진","나지성","문지유","박지우","서소윤","서지우","송민건","양소윤","오수연","우정훈","윤서준","이유빈","이홍윤","임다은","정유진","박선율","한채린","오수빈","남희수","김가인","양은정","테스트학생"]);
   // 다중 기수 지원: DB 학생은 1기 기본, 2기 명단 포함 시 둘 다
   const getCohorts = (profile) => {
     if (profile.role !== "student") return [];
@@ -3934,8 +4093,9 @@ export default function App() {
   const getInitialView = () => {
     const path = window.location.pathname;
     if(path === "/history") return "history";
+    if(path === "/cert") return "cert";
     if(path === "/input") return "input";
-    return "dashboard";
+    return "cert";
   };
   const [view, setView]           = useState(getInitialView);
   const [showInput, setShowInput] = useState(window.location.pathname === "/input");
@@ -3944,7 +4104,7 @@ export default function App() {
 
   // URL ↔ 상태 동기화
   const navigate = (v, input=false) => {
-    const path = input ? "/input" : v === "history" ? "/history" : "/";
+    const path = input ? "/input" : v === "history" ? "/history" : v === "cert" ? "/cert" : "/";
     window.history.pushState({ view:v, input }, "", path);
     setView(v);
     setShowInput(input);
@@ -3953,8 +4113,8 @@ export default function App() {
   useEffect(() => {
     const onPop = (e) => {
       const s = e.state;
-      if(s) { setView(s.view||"dashboard"); setShowInput(s.input||false); }
-      else   { setView("dashboard"); setShowInput(false); }
+      if(s) { setView(s.view||"cert"); setShowInput(s.input||false); }
+      else   { setView("cert"); setShowInput(false); }
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -4109,7 +4269,11 @@ export default function App() {
     ? [{ key:"dashboard", label:"진단 센터", icon:"🔍" }, { key:"history", label:"전체 기록", icon:"📅" }]
     : isParent
       ? [{ key:"dashboard", label:"자녀 현황", icon:"👨‍👩‍👧" }]
-      : [{ key:"dashboard", label:"대시보드", icon:"📊" }, { key:"history", label:"학습 기록", icon:"📅" }];
+      : [
+          { key:"cert",      label:"20HA 인증", icon:"🏅" },
+          { key:"dashboard", label:"메타인지",  icon:"🧠" },
+          { key:"history",   label:"학습 기록", icon:"📅" },
+        ];
   const pendingCount = allProfiles.filter(p => (p.role==="student"||p.role==="parent") && p.approval_status==="pending").length;
 
   return (
@@ -4199,6 +4363,8 @@ export default function App() {
               onSave={() => { navigate(view, false); refreshData(); }}
               onCancel={() => navigate(view, false)}/>
           </div>
+        ) : view === "cert" && !isAdmin && !isParent ? (
+          <StudentCertView profile={profile}/>
         ) : view === "dashboard" ? (
           isAdmin
             ? <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData}/>
