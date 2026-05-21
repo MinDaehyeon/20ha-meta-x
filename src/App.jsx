@@ -4156,11 +4156,18 @@ const BottomNav = ({nav,view,showInput,onNavigate,isAdmin}) => (
 // ══════════════════════════════════════════════════════
 // SIDE NAVIGATION
 // ══════════════════════════════════════════════════════
-const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, onShowInput, onLogout, onShowProfile, pendingCount}) => (
+const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, onShowInput, onLogout, onShowProfile, pendingCount, onToggle}) => (
   <div style={{
     width:240, background:"#191D54", position:"fixed", top:0, left:0, bottom:0,
     display:"flex", flexDirection:"column", zIndex:200, overflowY:"auto"
   }}>
+    {/* 닫기 버튼 — 우측 외곽에 플로팅 */}
+    <button onClick={onToggle} title="메뉴 닫기"
+      style={{position:"absolute", top:18, right:-12, width:24, height:24, borderRadius:"50%",
+        background:"#fff", border:"1px solid #E2E6F3", cursor:"pointer",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        boxShadow:"0 2px 8px rgba(0,0,0,0.18)", fontSize:11, color:"#191D54",
+        zIndex:201, lineHeight:1}}>◀</button>
     {/* 로고 + 프로필 */}
     <div style={{padding:"20px 20px 16px", borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
       <Logo size="md" dark onClick={()=>onNavigate(nav[0]?.key||"cert", false)}/>
@@ -4244,6 +4251,7 @@ export default function App() {
   const [allProfiles, setAllProfiles] = useState([]);
   const [children, setChildren]   = useState([]); // [{profile, logs}]
   const [selChildId, setSelChildId] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const getInitialView = () => {
     const path = window.location.pathname;
     if(path === "/history") return "history";
@@ -4433,7 +4441,7 @@ export default function App() {
   return (
     <div style={{ display:"flex", minHeight:"100vh", background:T.bg, fontFamily:"'Noto Sans KR',sans-serif", color:T.text, overflowX:"hidden" }}>
       {/* 좌측 사이드바 — 데스크톱 전용 */}
-      {!isMobile && (
+      {!isMobile && sidebarOpen && (
         <SideNav
           nav={NAV}
           view={view}
@@ -4446,11 +4454,22 @@ export default function App() {
           onLogout={handleLogout}
           onShowProfile={() => setShowProfileModal(true)}
           pendingCount={pendingCount}
+          onToggle={() => setSidebarOpen(false)}
         />
       )}
 
+      {/* 사이드바 닫힌 상태 — 열기 버튼 */}
+      {!isMobile && !sidebarOpen && (
+        <button onClick={() => setSidebarOpen(true)} title="메뉴 열기"
+          style={{position:"fixed", left:0, top:"50%", transform:"translateY(-50%)",
+            width:20, height:52, background:"#191D54", border:"none",
+            borderRadius:"0 10px 10px 0", cursor:"pointer", zIndex:201,
+            display:"flex", alignItems:"center", justifyContent:"center",
+            color:"#fff", fontSize:12, boxShadow:"2px 0 10px rgba(0,0,0,0.18)"}}>▶</button>
+      )}
+
       {/* 메인 영역 */}
-      <div style={{ flex:1, marginLeft: isMobile ? 0 : 240, minHeight:"100vh", display:"flex", flexDirection:"column" }}>
+      <div style={{ flex:1, marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 0), minHeight:"100vh", display:"flex", flexDirection:"column", transition:"margin-left 0.2s ease" }}>
         {/* 상단바 */}
         <div style={{ position:"sticky", top:0, zIndex:100, borderBottom:`1px solid ${T.border}`, background:T.surface, boxShadow:"0 1px 4px rgba(25,29,84,0.05)" }}>
           <div style={{ display:"flex", alignItems:"center", height:isMobile?56:58, gap:12, padding:`0 ${isMobile?16:24}px` }}>
