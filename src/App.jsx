@@ -2059,6 +2059,7 @@ const StudentCertView = ({profile}) => {
 
   // 주차별 달성률 (8주, 시작: 2026-05-17 일요일)
   const WEEK_START = new Date(2026, 4, 17);
+  const currentWeekIdx = Math.min(7, Math.max(0, Math.floor((today - WEEK_START) / 604800000)));
   const weeklyData = Array.from({length:8}, (_, w) => {
     const allDates = [
       ...ROSTER2_NAVER_DATES.filter(dt => Math.floor((dt-WEEK_START)/604800000)===w).map(dt=>({dt,type:"N"})),
@@ -2067,7 +2068,7 @@ const StudentCertView = ({profile}) => {
     ];
     const possible = allDates.length;
     const done = myIdx >= 0 ? allDates.filter(({dt,type}) => INIT_ATTENDANCE2[`${myIdx}-${type}-${fk(dt)}`]).length : 0;
-    return {w:w+1, possible, done, pct: possible>0 ? Math.round(done/possible*100) : 0};
+    return {w:w+1, possible, done, pct: possible>0 ? Math.round(done/possible*100) : 0, isCurrent: w===currentWeekIdx};
   });
 
   // 목표까지 남은 횟수 (목표 80%)
@@ -2148,20 +2149,21 @@ const StudentCertView = ({profile}) => {
       <Card>
         <div style={{fontSize:14, fontWeight:800, color:T.navy, marginBottom:14}}>📈 주차별 달성률</div>
         <div style={{display:"flex", gap:6, alignItems:"flex-end", height:80}}>
-          {weeklyData.map(({w, pct:p, done, possible}) => {
-            const isPast = possible > 0;
-            const isCurrent = isPast && weeklyData.find(x=>x.w===w+1)?.possible===0 || w===7;
+          {weeklyData.map(({w, pct:p, isCurrent}) => {
+            const isFuture = w - 1 > currentWeekIdx;
             return (
               <div key={w} style={{flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4}}>
-                <div style={{fontSize:9, fontWeight:700, color: p>0?T.navy:T.muted}}>{p>0?`${p}%`:""}</div>
+                <div style={{fontSize:9, fontWeight:700, color: isCurrent?T.orange: p>0?T.navy:T.muted}}>{isCurrent?"현재": p>0?`${p}%`:""}</div>
                 <div style={{width:"100%", background:T.surfaceAlt, borderRadius:4, overflow:"hidden", height:60, display:"flex", alignItems:"flex-end"}}>
                   <div style={{
-                    width:"100%", background: isCurrent?"#F68B1E":p>=80?"#16A34A":p>=50?"#4F46E5":T.muted,
-                    height:`${Math.max(isPast?4:0, p)}%`, borderRadius:4, transition:"height 0.5s",
-                    opacity: isPast?1:0.3,
+                    width:"100%",
+                    background: isCurrent?T.orange: p>=80?"#16A34A": p>=50?"#4F46E5": p>0?T.muted:"transparent",
+                    height:`${isCurrent ? Math.max(4,p) : isFuture ? 0 : Math.max(p>0?4:0, p)}%`,
+                    borderRadius:4, transition:"height 0.5s",
+                    opacity: isFuture ? 0.2 : 1,
                   }}/>
                 </div>
-                <div style={{fontSize:9, color:T.muted, fontWeight:700}}>{w}주</div>
+                <div style={{fontSize:9, fontWeight:700, color: isCurrent?T.orange:T.muted}}>{w}주</div>
               </div>
             );
           })}
