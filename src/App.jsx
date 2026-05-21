@@ -2273,7 +2273,9 @@ const StudentCertView = ({profile}) => {
                             const prevWs = i>0 ? weekStarts[i-1] : null;
                             const showMonth = i===0 || ws.getMonth() !== prevWs.getMonth();
                             return(
-                              <td key={i} style={{textAlign:"center",fontSize:9,color:T.muted,fontWeight:600,paddingBottom:1,whiteSpace:"nowrap"}}>
+                              <td key={i} style={{textAlign:"center",fontSize:9,color:T.muted,fontWeight:600,paddingBottom:1,whiteSpace:"nowrap",
+                                background: currentWeekIdx===i ? "rgba(246,139,30,0.07)" : "transparent",
+                                borderRadius: currentWeekIdx===i ? "8px 8px 0 0" : 0}}>
                                 {showMonth ? `${ws.getMonth()+1}월` : ""}
                               </td>
                             );
@@ -2283,17 +2285,13 @@ const StudentCertView = ({profile}) => {
                         <tr>
                           <td style={{width:labelW,paddingBottom:6}}/>
                           {Array.from({length:8},(_,i)=>(
-                            <td key={i} style={{textAlign:"center",paddingBottom:6}}>
-                              <div style={{
-                                display:"inline-block",
-                                background: currentWeekIdx===i ? T.orange : "transparent",
-                                color: currentWeekIdx===i ? "#fff" : T.muted,
+                            <td key={i} style={{textAlign:"center",paddingBottom:6,
+                              background: currentWeekIdx===i ? "rgba(246,139,30,0.07)" : "transparent"}}>
+                              <span style={{
+                                color: currentWeekIdx===i ? T.orange : T.muted,
                                 fontWeight: currentWeekIdx===i ? 800 : 600,
                                 fontSize: isMobile ? 9 : 10,
-                                borderRadius: 6,
-                                padding: currentWeekIdx===i ? "2px 5px" : "2px 2px",
-                                whiteSpace:"nowrap"
-                              }}>{i+1}주</div>
+                              }}>{i+1}주</span>
                             </td>
                           ))}
                         </tr>
@@ -2307,8 +2305,10 @@ const StudentCertView = ({profile}) => {
                             {weekStarts.map((wStart,wIdx)=>{
                               const wEnd=new Date(wStart.getTime()+7*86400000);
                               const wDates=[...dates].filter(dt=>dt>=wStart&&dt<wEnd).sort((a,b)=>a-b);
+                              const isCurrentWeek = wIdx===currentWeekIdx;
                               return(
-                                <td key={wIdx} style={{verticalAlign:"middle",padding:"2px 0"}}>
+                                <td key={wIdx} style={{verticalAlign:"middle",padding:"3px 2px",
+                                  background: isCurrentWeek ? "rgba(246,139,30,0.07)" : "transparent"}}>
                                   <div style={{display:"flex",flexWrap:"wrap",gap:2,justifyContent:"center"}}>
                                     {wDates.length===0
                                       ? <div style={{width:cell,height:cell,borderRadius:4,background:T.surfaceAlt,border:`1px solid ${T.border}`}}/>
