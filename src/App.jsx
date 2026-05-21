@@ -4028,7 +4028,7 @@ const LogHistory = ({logs, onDelete, isAdmin, allProfiles}) => {
           </div>
         </div>
         <NavyNum value={ei.toFixed(1)} unit="EI" size={20} color={EI_COLOR(ei)}/>
-        {isAdmin&&<button onClick={()=>onDelete(log.id)} style={{background:"none",border:"none",color:T.muted,cursor:"pointer",fontSize:18,padding:4,flexShrink:0}}>✕</button>}
+        {isAdmin&&<button onClick={()=>{if(window.confirm(`${log.date} · ${log.subject} 기록을 삭제하시겠습니까?\n삭제 후 복구가 불가능합니다.`)) onDelete(log.id);}} style={{background:"none",border:"none",color:T.muted,cursor:"pointer",fontSize:18,padding:4,flexShrink:0}}>✕</button>}
       </Card>
     );
   };
