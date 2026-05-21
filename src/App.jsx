@@ -4418,6 +4418,14 @@ export default function App() {
 
   const refreshData = () => { if(session) loadUserData(session); };
 
+  // 2기 아닌 학생이 /cert에 접근한 경우 dashboard로 보정
+  useEffect(() => {
+    if(authState !== "ready" || !profile) return;
+    if(profile.role !== "student") return;
+    const in2ki = ROSTER2.some(s => s.name === profile.name);
+    if(!in2ki && view === "cert") navigate("dashboard", false);
+  }, [authState, profile?.name, view]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setAuthState("unauthenticated");
@@ -4481,14 +4489,16 @@ export default function App() {
 
   const isAdmin  = profile.role === "admin";
   const isParent = profile.role === "parent";
+  // 20HA 2기 소속 여부 (학생 전용)
+  const isIn2ki  = !isAdmin && !isParent && ROSTER2.some(s => s.name === profile.name);
   const NAV = isAdmin
     ? [{ key:"dashboard", label:"진단 센터", icon:"🔍" }, { key:"history", label:"전체 기록", icon:"📅" }]
     : isParent
       ? [{ key:"dashboard", label:"자녀 현황", icon:"👨‍👩‍👧" }]
       : [
-          { key:"cert",      label:"20HA 인증", icon:"🏅" },
-          { key:"dashboard", label:"메타인지",  icon:"🧠" },
-          { key:"history",   label:"학습 기록", icon:"📅" },
+          ...(isIn2ki ? [{ key:"cert", label:"20HA 2기 인증현황", icon:"🏅" }] : []),
+          { key:"dashboard", label:"메타인지 분석", icon:"🧠" },
+          { key:"history",   label:"학습 기록",     icon:"📅" },
         ];
   const pendingCount = allProfiles.filter(p => (p.role==="student"||p.role==="parent") && p.approval_status==="pending").length;
 
@@ -4572,7 +4582,7 @@ export default function App() {
                 onSave={() => { navigate(view, false); refreshData(); }}
                 onCancel={() => navigate(view, false)}/>
             </div>
-          ) : view === "cert" && !isAdmin && !isParent ? (
+          ) : view === "cert" && !isAdmin && !isParent && isIn2ki ? (
             <StudentCertView profile={profile}/>
           ) : view === "dashboard" ? (
             isAdmin
