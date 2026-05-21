@@ -2077,109 +2077,76 @@ const StudentCertView = ({profile}) => {
   const remaining = Math.max(0, targetCount - myStat.total);
 
   const pct = (v, t) => t > 0 ? Math.round(v / t * 100) : 0;
-
-  // 이번 주 (오늘 기준)
   const today = new Date();
   const weekStart = new Date(today); weekStart.setDate(today.getDate() - today.getDay());
   const thisWeek = Array.from({length:7}, (_, i) => { const d = new Date(weekStart); d.setDate(weekStart.getDate()+i); return d; });
 
-  return (
-    <div style={{display:"grid", gap:14}}>
+  const CATS = [
+    {key:"naver",   label:"카페 인증",   v:myStat.naver,   avg:avgNaver,   t:naverTotal,   color:"#4F46E5", bg:"#EEF2FF"},
+    {key:"morning", label:"미라클모닝",  v:myStat.morning, avg:avgMorning, t:morningTotal, color:"#EA580C", bg:"#FFF7ED"},
+    {key:"night",   label:"미라클나이트",v:myStat.night,   avg:avgNight,   t:nightTotal,   color:"#16A34A", bg:"#F0FDF4"},
+  ];
 
-      {/* ① 상단 KPI 2열 */}
-      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
-        <Card style={{padding:"18px 20px", textAlign:"center"}}>
-          <div style={{fontSize:11, fontWeight:700, color:T.muted, marginBottom:6}}>종합 달성률</div>
-          <div style={{fontSize:38, fontWeight:900, color:T.navy, lineHeight:1}}>
-            {pct(myStat.total, grandTotal)}<span style={{fontSize:16, fontWeight:400}}>%</span>
+  return (
+    <div style={{display:"grid", gap:12}}>
+
+      {/* ① 히어로 카드 — 그라디언트 배경 */}
+      <div style={{borderRadius:16, background:"linear-gradient(135deg,#191D54 0%,#3D4499 100%)", padding:"20px 24px", color:"#fff"}}>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start"}}>
+          <div>
+            <div style={{fontSize:11, fontWeight:600, opacity:0.6, marginBottom:4, letterSpacing:"0.06em"}}>20HA 2기 인증 현황</div>
+            <div style={{display:"flex", alignItems:"baseline", gap:6}}>
+              <span style={{fontSize:48, fontWeight:900, lineHeight:1}}>{pct(myStat.total, grandTotal)}</span>
+              <span style={{fontSize:18, fontWeight:400, opacity:0.7}}>%</span>
+            </div>
+            <div style={{fontSize:12, opacity:0.55, marginTop:4}}>{myStat.total}회 달성 · 전체 {grandTotal}회</div>
           </div>
-          <div style={{fontSize:11, color:T.muted, marginTop:6}}>{myStat.total} / {grandTotal}회</div>
-          <div style={{height:5, background:T.surfaceAlt, borderRadius:3, marginTop:10, overflow:"hidden"}}>
-            <div style={{width:`${pct(myStat.total,grandTotal)}%`, height:"100%", background:T.navy, borderRadius:3}}/>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:11, fontWeight:600, opacity:0.6, marginBottom:4}}>클래스 순위</div>
+            <div style={{fontSize:36, fontWeight:900, color:T.orangeLight, lineHeight:1}}>{myRank ?? "—"}<span style={{fontSize:14, fontWeight:400, color:"rgba(255,255,255,0.5)"}}>위</span></div>
+            <div style={{fontSize:11, opacity:0.5, marginTop:4}}>/ {ROSTER2.length}명</div>
           </div>
-        </Card>
-        <Card style={{padding:"18px 20px", textAlign:"center"}}>
-          <div style={{fontSize:11, fontWeight:700, color:T.muted, marginBottom:6}}>클래스 순위</div>
-          <div style={{fontSize:38, fontWeight:900, color:T.orange, lineHeight:1}}>
-            {myRank ?? "—"}<span style={{fontSize:16, fontWeight:400, color:T.muted}}>위</span>
-          </div>
-          <div style={{fontSize:11, color:T.muted, marginTop:6}}>전체 {ROSTER2.length}명 중</div>
-          <div style={{fontSize:12, fontWeight:700, color: remaining===0 ? T.success : T.navy, marginTop:10}}>
-            {remaining===0 ? "🎉 목표 달성!" : `목표 80%까지 ${remaining}회 남음`}
-          </div>
-        </Card>
+        </div>
+        {/* 진행 트랙 */}
+        <div style={{marginTop:16, height:6, background:"rgba(255,255,255,0.15)", borderRadius:3, overflow:"hidden", position:"relative"}}>
+          <div style={{position:"absolute", left:`${80}%`, top:-2, bottom:-2, width:2, background:"rgba(255,255,255,0.4)", borderRadius:1}}/>
+          <div style={{height:"100%", width:`${pct(myStat.total,grandTotal)}%`, background:"linear-gradient(90deg,#F68B1E,#FFA94D)", borderRadius:3, transition:"width 0.8s"}}/>
+        </div>
+        <div style={{display:"flex", justifyContent:"space-between", marginTop:6, fontSize:10, opacity:0.5}}>
+          <span>0%</span>
+          <span style={{color:T.orangeLight, fontWeight:700, opacity:1}}>
+            {remaining===0 ? "🎉 목표 달성!" : `목표 80% · 앞으로 ${remaining}회`}
+          </span>
+          <span>100%</span>
+        </div>
       </div>
 
-      {/* ② 항목별 현황 — 나 vs 클래스 평균 */}
-      <Card>
-        <div style={{fontSize:14, fontWeight:800, color:T.navy, marginBottom:14}}>📊 항목별 현황</div>
-        <div style={{display:"grid", gap:12}}>
-          {[
-            {label:"카페 인증",  v:myStat.naver,   avg:avgNaver,   t:naverTotal,   color:"#4F46E5"},
-            {label:"미라클모닝", v:myStat.morning, avg:avgMorning, t:morningTotal, color:"#EA580C"},
-            {label:"미라클나이트",v:myStat.night,  avg:avgNight,   t:nightTotal,   color:"#16A34A"},
-          ].map(({label,v,avg,t,color}) => (
-            <div key={label}>
-              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5}}>
-                <span style={{fontSize:12, fontWeight:700, color}}>{label}</span>
-                <div style={{display:"flex", gap:12, fontSize:11}}>
-                  <span style={{color, fontWeight:700}}>나 {v}/{t}회 ({pct(v,t)}%)</span>
-                  <span style={{color:T.muted}}>평균 {avg}회 ({pct(avg,t)}%)</span>
-                </div>
-              </div>
-              {/* 내 달성 바 */}
-              <div style={{position:"relative", height:10, background:T.surfaceAlt, borderRadius:5, overflow:"hidden"}}>
-                <div style={{position:"absolute", left:0, top:0, height:"100%", width:`${pct(avg,t)}%`, background:color+"30", borderRadius:5}}/>
-                <div style={{position:"absolute", left:0, top:0, height:"100%", width:`${pct(v,t)}%`, background:color, borderRadius:5, transition:"width 0.6s"}}/>
-              </div>
-              {/* 평균 마커 */}
-              <div style={{position:"relative", height:10, marginTop:-10}}>
-                <div style={{position:"absolute", left:`${pct(avg,t)}%`, top:0, height:10, width:2, background:color+"80", transform:"translateX(-50%)"}}/>
-              </div>
+      {/* ② 항목별 3칸 — 나 vs 평균 수치 카드 */}
+      <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8}}>
+        {CATS.map(({label, v, avg, t, color, bg}) => (
+          <div key={label} style={{borderRadius:12, background:bg, border:`1px solid ${color}20`, padding:"12px 14px"}}>
+            <div style={{fontSize:11, fontWeight:700, color, marginBottom:8}}>{label}</div>
+            <div style={{display:"flex", alignItems:"baseline", gap:3, marginBottom:2}}>
+              <span style={{fontSize:24, fontWeight:900, color, lineHeight:1}}>{v}</span>
+              <span style={{fontSize:11, color, opacity:0.6}}>/{t}회</span>
             </div>
-          ))}
-          <div style={{fontSize:10, color:T.muted, marginTop:2}}>
-            <span style={{display:"inline-block", width:24, height:3, background:"#aaa", verticalAlign:"middle", borderRadius:2, marginRight:4}}/>
-            진한 막대 = 나, 연한 막대 = 클래스 평균
+            <div style={{fontSize:10, color, fontWeight:700, marginBottom:6}}>{pct(v,t)}%</div>
+            <div style={{height:3, background:`${color}20`, borderRadius:2, overflow:"hidden"}}>
+              <div style={{height:"100%", width:`${pct(v,t)}%`, background:color, borderRadius:2}}/>
+            </div>
+            <div style={{fontSize:9, color, opacity:0.5, marginTop:5}}>클래스 평균 {avg}회 ({pct(avg,t)}%)</div>
           </div>
-        </div>
-      </Card>
+        ))}
+      </div>
 
-      {/* ③ 주차별 달성률 바차트 */}
-      <Card>
-        <div style={{fontSize:14, fontWeight:800, color:T.navy, marginBottom:14}}>📈 주차별 달성률</div>
-        <div style={{display:"flex", gap:6, alignItems:"flex-end", height:80}}>
-          {weeklyData.map(({w, pct:p, isCurrent}) => {
-            const isFuture = w - 1 > currentWeekIdx;
-            return (
-              <div key={w} style={{flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4}}>
-                <div style={{fontSize:9, fontWeight:700, color: isCurrent?T.orange: p>0?T.navy:T.muted}}>{isCurrent?"현재": p>0?`${p}%`:""}</div>
-                <div style={{width:"100%", background:T.surfaceAlt, borderRadius:4, overflow:"hidden", height:60, display:"flex", alignItems:"flex-end"}}>
-                  <div style={{
-                    width:"100%",
-                    background: isCurrent?T.orange: p>=80?"#16A34A": p>=50?"#4F46E5": p>0?T.muted:"transparent",
-                    height:`${isCurrent ? Math.max(4,p) : isFuture ? 0 : Math.max(p>0?4:0, p)}%`,
-                    borderRadius:4, transition:"height 0.5s",
-                    opacity: isFuture ? 0.2 : 1,
-                  }}/>
-                </div>
-                <div style={{fontSize:9, fontWeight:700, color: isCurrent?T.orange:T.muted}}>{w}주</div>
-              </div>
-            );
-          })}
+      {/* ③ 이번 주 + 8주 진도 한 카드에 */}
+      <Card style={{padding:"16px 18px"}}>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12}}>
+          <span style={{fontSize:13, fontWeight:800, color:T.navy}}>📅 이번 주</span>
+          <span style={{fontSize:11, color:T.muted}}>{currentWeekIdx+1}주차 / 8주</span>
         </div>
-        <div style={{display:"flex", gap:12, marginTop:8, fontSize:10, color:T.muted}}>
-          <span>■ <span style={{color:"#16A34A"}}>80%+</span></span>
-          <span>■ <span style={{color:"#4F46E5"}}>50%+</span></span>
-          <span>■ <span style={{color:T.muted}}>50% 미만</span></span>
-          <span>■ <span style={{color:T.orange}}>현재 주차</span></span>
-        </div>
-      </Card>
-
-      {/* ④ 이번 주 현황 */}
-      <Card>
-        <div style={{fontSize:14, fontWeight:800, color:T.navy, marginBottom:10}}>📅 이번 주 현황</div>
-        <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:5}}>
+        {/* 이번 주 7일 */}
+        <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:5, marginBottom:14}}>
           {thisWeek.map((d, i) => {
             const dk = fk(d);
             const isToday = d.toDateString() === today.toDateString();
@@ -2189,77 +2156,91 @@ const StudentCertView = ({profile}) => {
             const hasNa = myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-나-${dk}`];
             const hasAny = hasN || hasM || hasNa;
             return (
-              <div key={i} style={{borderRadius:8, padding:"6px 3px", textAlign:"center",
-                background: isToday?T.navy: hasAny?"#F0FDF4": isPast?"#FEF2F2":T.surfaceAlt,
-                border:`1px solid ${isToday?T.navy: hasAny?"#BBF7D0": isPast?"#FECACA":T.border}`}}>
-                <div style={{fontSize:9, fontWeight:700, color: isToday?T.white: T.muted}}>{ROSTER2_DAY_KO[i]}</div>
-                <div style={{fontSize:10, color: isToday?"rgba(255,255,255,0.7)":T.muted, marginBottom:3}}>{d.getMonth()+1}/{d.getDate()}</div>
-                <div style={{display:"flex", flexDirection:"column", gap:2, alignItems:"center", minHeight:30}}>
-                  {hasN  && <span style={{fontSize:7, fontWeight:700, color:"#4F46E5", background:"#EEF2FF", borderRadius:2, padding:"1px 4px"}}>카페</span>}
-                  {hasM  && <span style={{fontSize:7, fontWeight:700, color:"#EA580C", background:"#FFF7ED", borderRadius:2, padding:"1px 4px"}}>모닝</span>}
-                  {hasNa && <span style={{fontSize:7, fontWeight:700, color:"#16A34A", background:"#F0FDF4", borderRadius:2, padding:"1px 4px"}}>나이트</span>}
-                  {!hasAny && isPast && <span style={{fontSize:12, color:"#FCA5A5"}}>✗</span>}
-                  {!hasAny && !isPast && !isToday && <span style={{fontSize:10, color:T.border}}>—</span>}
-                  {isToday && !hasAny && <span style={{fontSize:9, color:"rgba(255,255,255,0.5)"}}>오늘</span>}
+              <div key={i} style={{textAlign:"center"}}>
+                <div style={{fontSize:9, fontWeight:700, color:isToday?T.navy:T.muted, marginBottom:3}}>{ROSTER2_DAY_KO[i]}</div>
+                <div style={{
+                  borderRadius:8, padding:"5px 2px",
+                  background: isToday?T.navy: hasAny?"#ECFDF5": isPast?"#FEF2F2":T.surfaceAlt,
+                  border:`1px solid ${isToday?T.navy: hasAny?"#6EE7B7": isPast?"#FECACA":T.border}`,
+                  minHeight:44, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2
+                }}>
+                  <div style={{fontSize:9, color:isToday?"rgba(255,255,255,0.7)":T.muted}}>{d.getMonth()+1}/{d.getDate()}</div>
+                  {hasN  && <div style={{width:6,height:6,borderRadius:"50%",background:"#4F46E5"}}/>}
+                  {hasM  && <div style={{width:6,height:6,borderRadius:"50%",background:"#EA580C"}}/>}
+                  {hasNa && <div style={{width:6,height:6,borderRadius:"50%",background:"#16A34A"}}/>}
+                  {!hasAny && isPast  && <span style={{fontSize:10, color:"#FCA5A5", fontWeight:700}}>✗</span>}
+                  {!hasAny && !isPast && !isToday && <span style={{fontSize:10, color:T.border}}>·</span>}
                 </div>
               </div>
             );
           })}
         </div>
+        {/* 8주 점 진도 */}
+        <div style={{borderTop:`1px solid ${T.border}`, paddingTop:10}}>
+          <div style={{fontSize:10, fontWeight:700, color:T.muted, marginBottom:7}}>8주 진도</div>
+          <div style={{display:"flex", gap:6, alignItems:"center"}}>
+            {weeklyData.map(({w, pct:p, isCurrent}) => {
+              const isFuture = w-1 > currentWeekIdx;
+              const dotColor = isCurrent ? T.orange : p>=80 ? "#16A34A" : p>=50 ? "#4F46E5" : p>0 ? T.muted : T.border;
+              const size = isCurrent ? 14 : 10;
+              return (
+                <div key={w} style={{flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3}}>
+                  <div style={{width:size, height:size, borderRadius:"50%", background: isFuture?"transparent":dotColor,
+                    border:`2px solid ${isFuture?T.border:dotColor}`, transition:"all 0.3s"}}/>
+                  <span style={{fontSize:8, color:isCurrent?T.orange:T.muted, fontWeight:isCurrent?800:400}}>{w}주</span>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{display:"flex", gap:10, marginTop:8, fontSize:9, color:T.muted}}>
+            <span>● <span style={{color:T.orange}}>현재</span></span>
+            <span>● <span style={{color:"#16A34A"}}>80%↑</span></span>
+            <span>● <span style={{color:"#4F46E5"}}>50%↑</span></span>
+            <span>○ 예정</span>
+          </div>
+        </div>
       </Card>
 
-      {/* ⑤ 인증 Best — 컴팩트 테이블 */}
-      <Card>
-        <div style={{fontSize:14, fontWeight:800, color:T.navy, marginBottom:10}}>🏆 인증 Best</div>
-        <div style={{display:"grid", gap:4}}>
-          {/* 헤더 */}
-          <div style={{display:"grid", gridTemplateColumns:"28px 1fr 110px 50px", gap:8, padding:"0 8px", marginBottom:4}}>
-            {["순위","이름","카페·모닝·나이트","달성률"].map(h=>(
-              <div key={h} style={{fontSize:10, fontWeight:700, color:T.muted}}>{h}</div>
-            ))}
-          </div>
+      {/* ④ 순위표 — inline mini-bar */}
+      <Card style={{padding:"16px 18px"}}>
+        <div style={{fontSize:13, fontWeight:800, color:T.navy, marginBottom:10}}>🏆 순위표</div>
+        <div style={{display:"grid", gap:2}}>
           {top10.map((s, rank) => {
             const isMe = s.name === profile.name;
+            const barPct = pct(s.total, grandTotal);
             return (
-              <div key={rank} style={{display:"grid", gridTemplateColumns:"28px 1fr 110px 50px", gap:8,
-                padding:"7px 8px", borderRadius:8, alignItems:"center",
+              <div key={rank} style={{display:"flex", alignItems:"center", gap:8, padding:"6px 8px", borderRadius:7,
                 background: isMe?"#EEF2FF": rank===0?"#FFFBEB":"transparent",
                 border:`1px solid ${isMe?"#C7D2FE": rank===0?"#FDE68A":"transparent"}`}}>
-                <div style={{fontSize:rank<3?14:11, textAlign:"center"}}>
-                  {rank===0?"🥇":rank===1?"🥈":rank===2?"🥉":<span style={{fontWeight:800,color:T.muted}}>{rank+1}</span>}
+                <div style={{width:20, textAlign:"center", fontSize:rank<3?13:10, flexShrink:0}}>
+                  {rank===0?"🥇":rank===1?"🥈":rank===2?"🥉":<span style={{fontWeight:700,color:T.muted}}>{rank+1}</span>}
                 </div>
-                <div style={{fontSize:12, fontWeight:isMe?800:600, color:T.navy, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
-                  {s.name}{isMe&&<span style={{fontSize:10,color:"#4F46E5",marginLeft:4}}>(나)</span>}
+                <div style={{fontSize:12, fontWeight:isMe?800:500, color:T.navy, width:70, flexShrink:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+                  {s.name}{isMe&&<span style={{fontSize:9,color:"#4F46E5",marginLeft:3}}>(나)</span>}
                 </div>
-                <div style={{fontSize:10, color:T.muted, display:"flex", gap:4}}>
-                  <span style={{color:"#4F46E5"}}>{s.naver}</span>
-                  <span>·</span>
-                  <span style={{color:"#EA580C"}}>{s.morning}</span>
-                  <span>·</span>
-                  <span style={{color:"#16A34A"}}>{s.night}</span>
+                {/* 인라인 미니 바 */}
+                <div style={{flex:1, height:4, background:T.surfaceAlt, borderRadius:2, overflow:"hidden"}}>
+                  <div style={{height:"100%", width:`${barPct}%`, borderRadius:2,
+                    background: isMe?"#4F46E5": rank===0?"#F68B1E":T.muted}}/>
                 </div>
-                <div style={{fontSize:12, fontWeight:800, color:rank===0?T.orange:T.navy, textAlign:"right"}}>
-                  {pct(s.total,grandTotal)}%
+                <div style={{width:34, textAlign:"right", fontSize:11, fontWeight:800, flexShrink:0,
+                  color: isMe?"#4F46E5": rank===0?T.orange:T.navy}}>
+                  {barPct}%
                 </div>
               </div>
             );
           })}
-          {myRank && myRank > 10 && (
-            <>
-              <div style={{textAlign:"center",color:T.muted,fontSize:11,padding:"2px 0"}}>···</div>
-              <div style={{display:"grid", gridTemplateColumns:"28px 1fr 110px 50px", gap:8,
-                padding:"7px 8px", borderRadius:8, alignItems:"center", background:"#EEF2FF", border:"1px solid #C7D2FE"}}>
-                <div style={{fontSize:11,fontWeight:800,color:"#4F46E5",textAlign:"center"}}>{myRank}</div>
-                <div style={{fontSize:12,fontWeight:800,color:T.navy}}>{profile.name}<span style={{fontSize:10,color:"#4F46E5",marginLeft:4}}>(나)</span></div>
-                <div style={{fontSize:10,color:T.muted,display:"flex",gap:4}}>
-                  <span style={{color:"#4F46E5"}}>{myStat.naver}</span>·
-                  <span style={{color:"#EA580C"}}>{myStat.morning}</span>·
-                  <span style={{color:"#16A34A"}}>{myStat.night}</span>
-                </div>
-                <div style={{fontSize:12,fontWeight:800,color:T.navy,textAlign:"right"}}>{pct(myStat.total,grandTotal)}%</div>
+          {myRank && myRank > 10 && (<>
+            <div style={{textAlign:"center",color:T.muted,fontSize:10,padding:"2px 0"}}>···</div>
+            <div style={{display:"flex", alignItems:"center", gap:8, padding:"6px 8px", borderRadius:7, background:"#EEF2FF", border:"1px solid #C7D2FE"}}>
+              <div style={{width:20, textAlign:"center", fontSize:10, fontWeight:800, color:"#4F46E5", flexShrink:0}}>{myRank}</div>
+              <div style={{fontSize:12, fontWeight:800, color:T.navy, width:70, flexShrink:0}}>{profile.name}<span style={{fontSize:9,color:"#4F46E5",marginLeft:3}}>(나)</span></div>
+              <div style={{flex:1, height:4, background:T.surfaceAlt, borderRadius:2, overflow:"hidden"}}>
+                <div style={{height:"100%", width:`${pct(myStat.total,grandTotal)}%`, background:"#4F46E5", borderRadius:2}}/>
               </div>
-            </>
-          )}
+              <div style={{width:34, textAlign:"right", fontSize:11, fontWeight:800, color:"#4F46E5", flexShrink:0}}>{pct(myStat.total,grandTotal)}%</div>
+            </div>
+          </>)}
         </div>
       </Card>
     </div>
