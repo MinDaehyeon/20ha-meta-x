@@ -4764,7 +4764,7 @@ export default function App() {
   const pendingCount = allProfiles.filter(p => (p.role==="student"||p.role==="parent") && p.approval_status==="pending").length;
 
   return (
-    <div style={{ display:"flex", minHeight:"100vh", background:T.bg, fontFamily:"'Noto Sans KR',sans-serif", color:T.text, overflowX:"hidden" }}>
+    <div style={{ display:"flex", minHeight:"100vh", background:T.bg, fontFamily:"'Noto Sans KR',sans-serif", color:T.text }}>
       {/* 좌측 사이드바 — 데스크톱 전용 */}
       {!isMobile && (
         <SideNav
@@ -4828,7 +4828,7 @@ export default function App() {
         </div>
 
         {/* 페이지 콘텐츠 */}
-        <div style={{ padding: isMobile ? "16px 12px 100px" : "28px 32px 60px" }}>
+        <div style={{ padding: isMobile ? "16px 12px 100px" : "28px 32px 60px", overflowX:"auto" }}>
           {showInput ? (
             <div>
               <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
