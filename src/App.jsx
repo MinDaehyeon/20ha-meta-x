@@ -2240,7 +2240,7 @@ const StudentCertView = ({profile}) => {
             <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:9,
               background:isMe?"#EEF2FF":rank===0?"#FFFBEB":"transparent",
               border:`1px solid ${isMe?"#C7D2FE":rank===0?"#FDE68A":"transparent"}`}}>
-              <span style={{fontSize:16,width:20,textAlign:"center",flexShrink:0}}>{medals[rank]}</span>
+              <span style={{fontSize:22,width:24,textAlign:"center",flexShrink:0}}>{medals[rank]}</span>
               <div style={{width:26,height:26,borderRadius:"50%",background:abg,display:"flex",alignItems:"center",justifyContent:"center",border:`2px solid ${isMe?"#191D54":rank===0?"#F68B1E":"transparent"}`,flexShrink:0}}>
                 <span style={{fontSize:9,fontWeight:800,color:"#fff"}}>{s.name.charAt(0)}</span>
               </div>
@@ -2253,31 +2253,74 @@ const StudentCertView = ({profile}) => {
         };
         return(<>
           <Card style={{padding:"16px 18px"}}>
-            <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:12}}>📅 8주 전체 일정</div>
-            {ACTIVITIES.map(({label,dates,type,color})=>(
-              <div key={label} style={{marginBottom:12}}>
-                <div style={{fontSize:11,fontWeight:700,color,marginBottom:6}}>● {label} <span style={{fontWeight:400,color:T.muted}}>({dates.length}회)</span></div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                  {[...dates].sort((a,b)=>a-b).map((dt,i)=>{
-                    const dk=fk(dt);
-                    const done=myIdx>=0&&INIT_ATTENDANCE2[`${myIdx}-${type}-${dk}`];
-                    const isPast=dt<today;
-                    return(
-                      <div key={i} style={{
-                        padding:"3px 8px",borderRadius:6,fontSize:10,fontWeight:done?700:400,whiteSpace:"nowrap",
-                        background:done?color:isPast?`${color}12`:T.surfaceAlt,
-                        border:`1px solid ${done?color:isPast?`${color}30`:T.border}`,
-                        color:done?"#fff":isPast?color:T.muted
-                      }}>
-                        {dt.getMonth()+1}/{dt.getDate()}{done?" ✓":!isPast?" ·":""}
-                      </div>
-                    );
-                  })}
-                </div>
+            <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:14}}>📅 8주 전체 일정</div>
+            {/* 주차 × 활동 히트맵 그리드 */}
+            <div style={{overflowX:"auto"}}>
+              <table style={{borderCollapse:"separate",borderSpacing:"4px",width:"100%",minWidth:500}}>
+                <thead>
+                  <tr>
+                    <td style={{width:74,fontSize:10,color:T.muted,fontWeight:700,paddingBottom:4}}/>
+                    {Array.from({length:8},(_,i)=>(
+                      <td key={i} style={{textAlign:"center",fontSize:10,color:currentWeekIdx===i?T.orange:T.muted,fontWeight:currentWeekIdx===i?800:600,paddingBottom:4,whiteSpace:"nowrap"}}>
+                        {i+1}주{currentWeekIdx===i&&" ◀"}
+                      </td>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {ACTIVITIES.map(({label,dates,type,color})=>(
+                    <tr key={label}>
+                      <td style={{fontSize:11,fontWeight:700,color,paddingRight:8,whiteSpace:"nowrap",verticalAlign:"middle"}}>● {label}</td>
+                      {Array.from({length:8},(_,wIdx)=>{
+                        const wStart=new Date(WEEK_START.getTime()+wIdx*7*86400000);
+                        const wEnd=new Date(wStart.getTime()+7*86400000);
+                        const wDates=[...dates].filter(dt=>dt>=wStart&&dt<wEnd).sort((a,b)=>a-b);
+                        return(
+                          <td key={wIdx} style={{verticalAlign:"middle",padding:"2px 0"}}>
+                            <div style={{display:"flex",flexWrap:"wrap",gap:2,justifyContent:"center"}}>
+                              {wDates.length===0
+                                ? <div style={{width:22,height:22,borderRadius:5,background:T.surfaceAlt,border:`1px solid ${T.border}`}}/>
+                                : wDates.map((dt,i)=>{
+                                    const dk=fk(dt);
+                                    const done=myIdx>=0&&INIT_ATTENDANCE2[`${myIdx}-${type}-${dk}`];
+                                    const isPast=dt<today;
+                                    return(
+                                      <div key={i} title={`${dt.getMonth()+1}/${dt.getDate()}`} style={{
+                                        width:22,height:22,borderRadius:5,
+                                        background:done?color:isPast?`${color}18`:"#F0F2FA",
+                                        border:`1px solid ${done?color:isPast?`${color}40`:"#E2E6F3"}`,
+                                        display:"flex",alignItems:"center",justifyContent:"center",
+                                        fontSize:8,fontWeight:700,
+                                        color:done?"#fff":isPast?color:"#C8CEED"
+                                      }}>
+                                        {dt.getDate()}
+                                      </div>
+                                    );
+                                  })
+                              }
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* 범례 */}
+            <div style={{display:"flex",gap:14,marginTop:12,flexWrap:"wrap",alignItems:"center"}}>
+              <div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:T.muted}}>
+                <div style={{width:12,height:12,borderRadius:3,background:"#03C75A"}}/> 완료
               </div>
-            ))}
-            <div style={{fontSize:10,color:T.muted,opacity:0.6,paddingTop:10,borderTop:`1px solid ${T.border}`}}>
-              ⚠️ 인증 데이터는 실시간 반영이 아니며, 최대 1일 소요될 수 있습니다.
+              <div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:T.muted}}>
+                <div style={{width:12,height:12,borderRadius:3,background:"#E2E6F3",border:"1px solid #C8CEED"}}/> 미완료
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:T.muted}}>
+                <div style={{width:12,height:12,borderRadius:3,background:"#F0F2FA",border:"1px solid #E2E6F3"}}/> 예정
+              </div>
+              <div style={{marginLeft:"auto",fontSize:10,color:T.muted,opacity:0.6}}>
+                ⚠️ 인증 데이터는 실시간으로 반영되지 않을 수 있습니다.
+              </div>
             </div>
           </Card>
 
