@@ -1071,17 +1071,12 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
 
   const STEPS=["① 기본 정보","② 메타인지"];
   return(
-    <div style={{maxWidth:640,margin:"0 auto"}}>
-      <div style={{display:"flex",gap:6,marginBottom:20}}>
-        {STEPS.map((s,i)=>(
-          <div key={i} onClick={()=>setStep(i)} style={{flex:1,textAlign:"center",padding:"9px 4px",borderRadius:10,cursor:"pointer",fontSize:12,fontWeight:700,
-            background:i===step?T.navy:T.surfaceAlt,color:i===step?T.white:T.muted,border:`1px solid ${i===step?T.navy:T.border}`}}>{s}</div>
-        ))}
-      </div>
+    <div style={{maxWidth:820,margin:"0 auto"}}>
+      {/* 진행 인디케이터 제거 — 단일 페이지 레이아웃 */}
 
       {err&&<div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:10,padding:"10px 16px",color:T.danger,fontSize:13,marginBottom:12}}>{err}</div>}
 
-      {step===0&&(
+      {(step===0||true)&&(
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {/* 카드1: 날짜 · 과목 */}
           <Card>
@@ -1216,7 +1211,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
         </div>
       )}
 
-      {step===1&&(
+      {(step===1||true)&&(
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <Card>
             <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:14}}>🧠 CO-IN Filter</div>
@@ -1294,14 +1289,18 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
       <div style={{fontSize:11,color:T.muted,textAlign:"center",marginTop:16,marginBottom:6}}>
         ⚠️ 저장된 데이터는 수정할 수 없습니다. 입력 내용을 다시 한번 확인해 주세요.
       </div>
-      <div style={{display:"flex",gap:10}}>
-        {step>0&&<button onClick={()=>{setErr("");setStep(s=>s-1);}} style={{...css.btnGhost,flex:1}}>← 이전</button>}
-        {step<1
-          ?<button onClick={()=>{setErr("");setStep(s=>s+1);}} style={{...css.btnPrimary,flex:2}}>다음 →</button>
-          :<button onClick={save} disabled={saving||saveWarnings.length>0} style={{...css.btnOrange,flex:2,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:saveWarnings.length>0?0.4:1}}>
-            {saving?<><Spinner size={16} color="#fff"/>저장 중...</>:"💾 오늘의 학습 저장"}
-          </button>}
-        <button onClick={onCancel} style={{...css.btnGhost,padding:"12px 14px"}}>취소</button>
+      {/* 하단 CTA 배너 */}
+      <div style={{borderRadius:12, background:"linear-gradient(135deg,#191D54,#3D4499)", padding:"16px 20px", color:"#fff", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12}}>
+        <div>
+          <div style={{fontSize:13, fontWeight:700, marginBottom:2}}>📊 진도를 업데이트할 준비가 됐나요?</div>
+          <div style={{fontSize:11, opacity:0.7}}>입력 데이터는 매주 학습 인사이트 생성에 사용됩니다.</div>
+        </div>
+        <div style={{display:"flex", gap:8, flexShrink:0}}>
+          <button onClick={onCancel} style={{background:"rgba(255,255,255,0.15)", border:"1px solid rgba(255,255,255,0.3)", borderRadius:8, padding:"9px 16px", color:"#fff", fontSize:13, cursor:"pointer", fontWeight:600}}>취소</button>
+          <button onClick={save} disabled={saving||saveWarnings.length>0} style={{background:"#F68B1E", border:"none", borderRadius:8, padding:"9px 20px", color:"#fff", fontSize:13, cursor:"pointer", fontWeight:800, display:"flex", alignItems:"center", gap:6, opacity:saveWarnings.length>0?0.4:1}}>
+            {saving?<><Spinner size={14} color="#fff"/>저장 중...</>:"💾 저장"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -2082,10 +2081,24 @@ const StudentCertView = ({profile}) => {
 
   const pct = (v, t) => t > 0 ? Math.round(v / t * 100) : 0;
 
+  // 오늘 각 카테고리 상태 계산
+  const todayKey = fk(today);
+  const getActivityStatus = (dates, attendanceKey) => {
+    const isScheduled = dates.some(dt => fk(dt) === todayKey);
+    if (isScheduled) {
+      return myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-${attendanceKey}-${todayKey}`] ? "완료" : "진행중";
+    }
+    const hasFuture = dates.some(dt => dt > today);
+    return hasFuture ? "예정" : "종료";
+  };
+  const statusNaver   = getActivityStatus(ROSTER2_NAVER_DATES,   "N");
+  const statusMorning = getActivityStatus(ROSTER2_MORNING_DATES, "M");
+  const statusNight   = getActivityStatus(ROSTER2_NIGHT_DATES,   "나");
+
   const CATS = [
-    {key:"naver",   label:"카페 인증",   v:myStat.naver,   avg:avgNaver,   t:naverTotal,   color:"#4F46E5", bg:"#EEF2FF"},
-    {key:"morning", label:"미라클모닝",  v:myStat.morning, avg:avgMorning, t:morningTotal, color:"#EA580C", bg:"#FFF7ED"},
-    {key:"night",   label:"미라클나이트",v:myStat.night,   avg:avgNight,   t:nightTotal,   color:"#16A34A", bg:"#F0FDF4"},
+    {key:"naver",   label:"카페 인증",   icon:"☕", v:myStat.naver,   avg:avgNaver,   t:naverTotal,   color:"#4F46E5", bg:"#EEF2FF", status:statusNaver},
+    {key:"morning", label:"미라클모닝",  icon:"☀️", v:myStat.morning, avg:avgMorning, t:morningTotal, color:"#EA580C", bg:"#FFF7ED", status:statusMorning},
+    {key:"night",   label:"미라클나이트",icon:"🌙", v:myStat.night,   avg:avgNight,   t:nightTotal,   color:"#16A34A", bg:"#F0FDF4", status:statusNight},
   ];
 
   return (
@@ -2122,22 +2135,31 @@ const StudentCertView = ({profile}) => {
         </div>
       </div>
 
-      {/* ② 항목별 3칸 — 나 vs 평균 수치 카드 */}
+      {/* ② 항목별 3칸 — 상태 배지 카드 */}
       <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8}}>
-        {CATS.map(({label, v, avg, t, color, bg}) => (
-          <div key={label} style={{borderRadius:12, background:bg, border:`1px solid ${color}20`, padding:"12px 14px"}}>
-            <div style={{fontSize:11, fontWeight:700, color, marginBottom:8}}>{label}</div>
-            <div style={{display:"flex", alignItems:"baseline", gap:3, marginBottom:2}}>
-              <span style={{fontSize:24, fontWeight:900, color, lineHeight:1}}>{v}</span>
-              <span style={{fontSize:11, color, opacity:0.6}}>/{t}회</span>
+        {CATS.map(({label, icon, v, avg, t, color, bg, status}) => {
+          const sColor = status==="완료" ? "#16A34A" : status==="진행중" ? "#F68B1E" : "#8B91C0";
+          const sBg    = status==="완료" ? "#F0FDF4" : status==="진행중" ? "#FFF7ED" : "#F7F8FC";
+          const sIcon  = status==="완료" ? "✓" : status==="진행중" ? "⏳" : "⏰";
+          return (
+            <div key={label} style={{borderRadius:14, background:"#FFFFFF", border:`1px solid #E2E6F3`, padding:"14px 12px", boxShadow:"0 1px 4px rgba(25,29,84,0.06)"}}>
+              <div style={{fontSize:20, marginBottom:6, lineHeight:1}}>{icon}</div>
+              <div style={{fontSize:11, fontWeight:700, color:"#191D54", marginBottom:8}}>{label}</div>
+              <div style={{display:"inline-flex", alignItems:"center", gap:3, background:sBg, border:`1px solid ${sColor}30`, borderRadius:20, padding:"3px 9px", marginBottom:8}}>
+                <span style={{fontSize:9}}>{sIcon}</span>
+                <span style={{fontSize:10, fontWeight:700, color:sColor}}>{status}</span>
+              </div>
+              <div style={{display:"flex", alignItems:"baseline", gap:2, marginBottom:4}}>
+                <span style={{fontSize:20, fontWeight:900, color, lineHeight:1}}>{v}</span>
+                <span style={{fontSize:10, color, opacity:0.6}}>/{t}회</span>
+              </div>
+              <div style={{height:3, background:`${color}20`, borderRadius:2, overflow:"hidden"}}>
+                <div style={{height:"100%", width:`${pct(v,t)}%`, background:color, borderRadius:2}}/>
+              </div>
+              <div style={{fontSize:9, color:"#8B91C0", marginTop:4}}>클래스 평균 {avg}회</div>
             </div>
-            <div style={{fontSize:10, color, fontWeight:700, marginBottom:6}}>{pct(v,t)}%</div>
-            <div style={{height:3, background:`${color}20`, borderRadius:2, overflow:"hidden"}}>
-              <div style={{height:"100%", width:`${pct(v,t)}%`, background:color, borderRadius:2}}/>
-            </div>
-            <div style={{fontSize:9, color, opacity:0.5, marginTop:5}}>클래스 평균 {avg}회 ({pct(avg,t)}%)</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ③ 이번 주 + 8주 진도 한 카드에 */}
@@ -2202,24 +2224,34 @@ const StudentCertView = ({profile}) => {
         </div>
       </Card>
 
-      {/* ④ 순위표 — inline mini-bar */}
+      {/* ④ 클래스 랭킹 */}
       <Card style={{padding:"16px 18px"}}>
-        <div style={{fontSize:13, fontWeight:800, color:T.navy, marginBottom:10}}>🏆 순위표</div>
-        <div style={{display:"grid", gap:2}}>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12}}>
+          <span style={{fontSize:13, fontWeight:800, color:T.navy}}>🏆 클래스 랭킹</span>
+          {myRank && myRank <= Math.ceil(ROSTER2.length * 0.05) + 1 && (
+            <span style={{fontSize:10, fontWeight:700, background:T.gradOrange, color:"#fff", borderRadius:20, padding:"3px 10px"}}>TOP 5%</span>
+          )}
+        </div>
+        <div style={{display:"grid", gap:3}}>
           {top10.map((s, rank) => {
             const isMe = s.name === profile.name;
             const barPct = pct(s.total, grandTotal);
+            const avatarBg = isMe ? "#191D54" : rank===0 ? "#F68B1E" : rank===1 ? "#6B7280" : rank===2 ? "#B45309" : "#E2E6F3";
+            const avatarColor = rank < 3 || isMe ? "#fff" : "#8B91C0";
             return (
-              <div key={rank} style={{display:"flex", alignItems:"center", gap:8, padding:"6px 8px", borderRadius:7,
+              <div key={rank} style={{display:"flex", alignItems:"center", gap:8, padding:"7px 8px", borderRadius:8,
                 background: isMe?"#EEF2FF": rank===0?"#FFFBEB":"transparent",
                 border:`1px solid ${isMe?"#C7D2FE": rank===0?"#FDE68A":"transparent"}`}}>
-                <div style={{width:20, textAlign:"center", fontSize:rank<3?13:10, flexShrink:0}}>
+                <div style={{width:18, textAlign:"center", fontSize:rank<3?13:10, flexShrink:0}}>
                   {rank===0?"🥇":rank===1?"🥈":rank===2?"🥉":<span style={{fontWeight:700,color:T.muted}}>{rank+1}</span>}
                 </div>
-                <div style={{fontSize:12, fontWeight:isMe?800:500, color:T.navy, width:70, flexShrink:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+                {/* 원형 아바타 */}
+                <div style={{width:26, height:26, borderRadius:"50%", background:avatarBg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, border:`2px solid ${isMe?"#191D54":rank===0?"#F68B1E":T.border}`}}>
+                  <span style={{fontSize:9, fontWeight:800, color:avatarColor}}>{s.name.charAt(0)}</span>
+                </div>
+                <div style={{fontSize:12, fontWeight:isMe?800:500, color:T.navy, width:62, flexShrink:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
                   {s.name}{isMe&&<span style={{fontSize:9,color:"#4F46E5",marginLeft:3}}>(나)</span>}
                 </div>
-                {/* 인라인 미니 바 */}
                 <div style={{flex:1, height:4, background:T.surfaceAlt, borderRadius:2, overflow:"hidden"}}>
                   <div style={{height:"100%", width:`${barPct}%`, borderRadius:2,
                     background: isMe?"#4F46E5": rank===0?"#F68B1E":T.muted}}/>
@@ -2233,15 +2265,41 @@ const StudentCertView = ({profile}) => {
           })}
           {myRank && myRank > 10 && (<>
             <div style={{textAlign:"center",color:T.muted,fontSize:10,padding:"2px 0"}}>···</div>
-            <div style={{display:"flex", alignItems:"center", gap:8, padding:"6px 8px", borderRadius:7, background:"#EEF2FF", border:"1px solid #C7D2FE"}}>
-              <div style={{width:20, textAlign:"center", fontSize:10, fontWeight:800, color:"#4F46E5", flexShrink:0}}>{myRank}</div>
-              <div style={{fontSize:12, fontWeight:800, color:T.navy, width:70, flexShrink:0}}>{profile.name}<span style={{fontSize:9,color:"#4F46E5",marginLeft:3}}>(나)</span></div>
+            <div style={{display:"flex", alignItems:"center", gap:8, padding:"7px 8px", borderRadius:8, background:"#EEF2FF", border:"1px solid #C7D2FE"}}>
+              <div style={{width:18, textAlign:"center", fontSize:10, fontWeight:800, color:"#4F46E5", flexShrink:0}}>{myRank}</div>
+              <div style={{width:26, height:26, borderRadius:"50%", background:"#191D54", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, border:"2px solid #191D54"}}>
+                <span style={{fontSize:9, fontWeight:800, color:"#fff"}}>{profile.name.charAt(0)}</span>
+              </div>
+              <div style={{fontSize:12, fontWeight:800, color:T.navy, width:62, flexShrink:0}}>{profile.name}<span style={{fontSize:9,color:"#4F46E5",marginLeft:3}}>(나)</span></div>
               <div style={{flex:1, height:4, background:T.surfaceAlt, borderRadius:2, overflow:"hidden"}}>
                 <div style={{height:"100%", width:`${pct(myStat.total,grandTotal)}%`, background:"#4F46E5", borderRadius:2}}/>
               </div>
               <div style={{width:34, textAlign:"right", fontSize:11, fontWeight:800, color:"#4F46E5", flexShrink:0}}>{pct(myStat.total,grandTotal)}%</div>
             </div>
           </>)}
+        </div>
+
+        {/* 하단 CTA 카드들 */}
+        <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginTop:12}}>
+          <div style={{borderRadius:12, background:"#1E2255", padding:"14px 16px", color:"#fff"}}>
+            <div style={{fontSize:12, fontWeight:700, marginBottom:4}}>💡 멘토 인사이트</div>
+            <div style={{fontSize:11, opacity:0.7, lineHeight:1.6}}>
+              {myStat.total > avgTotal
+                ? `클래스 평균보다 ${myStat.total - avgTotal}회 더 달성했어요. 이 흐름을 유지하세요!`
+                : myStat.total === 0
+                ? "아직 인증 기록이 없어요. 첫 번째 인증을 시작해보세요!"
+                : `클래스 평균까지 ${avgTotal - myStat.total}회 남았어요. 조금만 더 힘내세요!`}
+            </div>
+          </div>
+          <div style={{borderRadius:12, background:"linear-gradient(135deg,#F68B1E,#FFA94D)", padding:"14px 16px", color:"#fff"}}>
+            <div style={{fontSize:12, fontWeight:700, marginBottom:4}}>🎯 마스터리 도전!</div>
+            <div style={{fontSize:11, opacity:0.9, lineHeight:1.6, marginBottom:8}}>
+              {remaining === 0
+                ? "🎉 목표 달성! 최고의 성과예요!"
+                : `목표 80% 달성까지 ${remaining}회 남았어요.`}
+            </div>
+            <div style={{fontSize:10, opacity:0.8}}>전체 {grandTotal}회 중 {myStat.total}회 완료</div>
+          </div>
         </div>
       </Card>
     </div>
