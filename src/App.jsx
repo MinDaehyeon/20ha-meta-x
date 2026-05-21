@@ -3124,23 +3124,16 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
 
         return (
           <div>
-            {/* 서브탭 + 크롤링 버튼 */}
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-              {[{k:"attendance",l:"📋 출석표"},{k:"records",l:"📝 인증글 관리"},{k:"roster",l:"👥 명단 관리"}].map(({k,l})=>(
-                <button key={k} onClick={()=>setCertSubTab(k)}
-                  style={{...certSubTab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>{l}</button>
-              ))}
-              <div style={{marginLeft:"auto"}}>
-                <button onClick={triggerCrawl} disabled={crawlRunning}
-                  style={{...css.btnOrange,padding:"7px 16px",fontSize:13,background:"#059669",opacity:crawlRunning?0.6:1}}>
-                  {crawlRunning?"⏳ 실행 중...":"🔄 지금 크롤링"}
-                </button>
-              </div>
+            {/* 우측 크롤링 버튼만 */}
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,justifyContent:"flex-end"}}>
+              <button onClick={triggerCrawl} disabled={crawlRunning}
+                style={{...css.btnOrange,padding:"7px 16px",fontSize:13,background:"#059669",opacity:crawlRunning?0.6:1}}>
+                {crawlRunning?"⏳ 실행 중...":"🔄 지금 크롤링"}
+              </button>
             </div>
 
-            {/* ── 출석표 서브탭 ── */}
-            {certSubTab==="attendance"&&(
-              <div>
+            {/* ── 출석표 ── */}
+            <div>
                 {/* 날짜 범위 선택 */}
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14,flexWrap:"wrap"}}>
                   <label style={{fontSize:12,color:T.muted,fontWeight:700}}>기간</label>
@@ -3330,10 +3323,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                   </div>
                 )}
               </div>
-            )}
 
-            {/* ── 인증글 관리 서브탭 ── */}
-            {certSubTab==="records"&&(
+            {/* ── 인증글 관리 (숨김) ── */}
+            {false&&certSubTab==="records"&&(
               <div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
                   {Object.entries(STATUS_LABELS).map(([k,l])=>(
@@ -3441,8 +3433,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
               </div>
             )}
 
-            {/* ── 명단 관리 서브탭 ── */}
-            {certSubTab==="roster"&&(
+            {/* ── 명단 관리 (숨김) ── */}
+            {false&&certSubTab==="roster"&&(
               <div>
                 <div style={{marginBottom:12}}>
                   <button onClick={()=>{setRosterAddMode(true);setRosterEditRow(null);}}
@@ -4550,9 +4542,10 @@ export default function App() {
   const getInitialView = () => {
     const path = window.location.pathname;
     if(path === "/history") return "history";
-    if(path === "/cert") return "cert";
-    if(path === "/input") return "input";
-    return "cert";
+    if(path === "/cert")    return "cert";
+    if(path === "/input")   return "input";
+    if(path === "/users")   return "users";
+    return "dashboard";
   };
   const [view, setView]           = useState(getInitialView);
   const [showInput, setShowInput] = useState(window.location.pathname === "/input");
@@ -4561,7 +4554,7 @@ export default function App() {
 
   // URL ↔ 상태 동기화
   const navigate = (v, input=false) => {
-    const path = input ? "/input" : v === "history" ? "/history" : v === "cert" ? "/cert" : "/";
+    const path = input ? "/input" : v === "history" ? "/history" : v === "cert" ? "/cert" : v === "users" ? "/users" : "/";
     window.history.pushState({ view:v, input }, "", path);
     setView(v);
     setShowInput(input);
@@ -4570,8 +4563,12 @@ export default function App() {
   useEffect(() => {
     const onPop = (e) => {
       const s = e.state;
-      if(s) { setView(s.view||"cert"); setShowInput(s.input||false); }
-      else   { setView("cert"); setShowInput(false); }
+      const path = window.location.pathname;
+      if(s) { setView(s.view||"dashboard"); setShowInput(s.input||false); }
+      else if(path==="/cert")    { setView("cert");    setShowInput(false); }
+      else if(path==="/users")   { setView("users");   setShowInput(false); }
+      else if(path==="/history") { setView("history"); setShowInput(false); }
+      else                       { setView("dashboard"); setShowInput(false); }
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -4659,13 +4656,23 @@ export default function App() {
 
   const refreshData = () => { if(session) loadUserData(session); };
 
-  // 2기 아닌 학생이 /cert에 접근한 경우 dashboard로 보정
+  // 역할별 초기 화면 보정
   useEffect(() => {
     if(authState !== "ready" || !profile) return;
-    if(profile.role !== "student") return;
     const in2ki = ROSTER2.some(s => s.name === profile.name);
-    if(!in2ki && view === "cert") navigate("dashboard", false);
-  }, [authState, profile?.name, view]);
+    // 관리자: 항상 users(회원 관리) 시작
+    if(profile.role === "admin" && (view === "cert" || view === "dashboard")) {
+      navigate("users", false); return;
+    }
+    // 2기 학생: cert 시작
+    if(profile.role === "student" && in2ki && view === "dashboard") {
+      navigate("cert", false); return;
+    }
+    // 2기 아닌 학생이 cert 접근 시 dashboard로
+    if(profile.role === "student" && !in2ki && view === "cert") {
+      navigate("dashboard", false);
+    }
+  }, [authState, profile?.id]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
