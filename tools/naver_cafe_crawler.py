@@ -1,9 +1,10 @@
 """
 네이버 카페 인증글 크롤러
-카페: https://cafe.naver.com/f-e/cafes/31045190/menus/161
+카페: https://cafe.naver.com/f-e/cafes/31045190/menus/165
 - JSON API 사용 (쿠키/로그인 불필요)
 - 이미 크롤링된 URL 스킵
 - 양식 미준수 글도 수집 (is_valid_format=false)
+- 매칭: parsed_name + parsed_code(전화 뒷4자리) → cert_students
 """
 
 import os
@@ -16,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 CAFE_CLUB_ID  = os.environ.get("NAVER_CAFE_ID", "31045190")
-BOARD_MENU_ID = os.environ.get("NAVER_BOARD_ID", "161")
+BOARD_MENU_ID = os.environ.get("NAVER_BOARD_ID", "165")  # 변경: 2기 인증글 게시판
 SUPABASE_URL  = os.environ["SUPABASE_URL"]
 SERVICE_KEY   = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 CRAWL_DAYS    = int(os.environ.get("CRAWL_DAYS", "30"))
@@ -42,34 +43,33 @@ API_HEADERS = {
 }
 
 
-# ── 프로필 조회 (대조용) ────────────────────────────────────────────────────
+# ── 학생 명단 조회 (cert_students 기반) ───────────────────────────────────
 
-def fetch_profiles():
-    """닉네임 → {name, grade} 매핑 반환"""
+def fetch_students():
+    """cert_students에서 전화 뒷4자리 → {id, name} 매핑 반환"""
     r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/profiles"
-        f"?select=naver_nickname,name,grade"
-        f"&role=eq.student&approval_status=eq.approved&is_test=eq.false",
+        f"{SUPABASE_URL}/rest/v1/cert_students?select=id,name,phone&sort_order=lt.43",
         headers={"apikey": SERVICE_KEY, "Authorization": f"Bearer {SERVICE_KEY}"},
         timeout=15,
     )
     if r.status_code != 200:
-        print(f"[supabase] 프로필 조회 실패: {r.status_code}")
+        print(f"[supabase] 학생 조회 실패: {r.status_code}")
         return {}
-    profiles = {}
+
+    students = {}  # code(뒷4자리) → {id, name}
     for row in r.json():
-        nn = row.get("naver_nickname")
-        if nn:
-            profiles[nn] = {
-                "name": row.get("name", "") or "",
-                "grade": row.get("grade", "") or "",
-            }
-    print(f"[supabase] 프로필 로드: {len(profiles)}명")
-    return profiles
+        phone = (row.get("phone") or "").replace("-", "")
+        code = phone[-4:] if len(phone) >= 4 else ""
+        name = row.get("name", "")
+        if code and name:
+            students[code] = {"id": row["id"], "name": name}
+    print(f"[supabase] 학생 로드: {len(students)}명 (코드 기반)")
+    return students
 
 
-def check_title_match(title, nickname, profiles):
-    """제목 파싱 후 프로필과 대조. (parsed_name, parsed_grade, parsed_code, status) 반환"""
+def check_title_match(title, nickname, students):
+    """제목 파싱 후 cert_students와 대조.
+    (parsed_name, parsed_grade, parsed_code, status) 반환"""
     m = TITLE_INFO_PATTERN.search(title)
     if not m:
         return None, None, None, "parse_failed"
@@ -78,19 +78,17 @@ def check_title_match(title, nickname, profiles):
     parsed_grade = m.group(2).strip()
     parsed_code  = m.group(3).strip()
 
-    profile = profiles.get(nickname)
-    if not profile:
+    student = students.get(parsed_code)
+    if not student:
         return parsed_name, parsed_grade, parsed_code, "no_profile"
 
-    if profile["name"] and profile["name"] != parsed_name:
+    if student["name"] and student["name"] != parsed_name:
         return parsed_name, parsed_grade, parsed_code, "name_mismatch"
-    if profile["grade"] and profile["grade"] != parsed_grade:
-        return parsed_name, parsed_grade, parsed_code, "grade_mismatch"
 
     return parsed_name, parsed_grade, parsed_code, "matched"
 
 
-def update_existing_title_checks(profiles):
+def update_existing_title_checks(students):
     """기존 저장된 글의 title_match_status가 unchecked인 것을 일괄 업데이트"""
     r = requests.get(
         f"{SUPABASE_URL}/rest/v1/cafe_certifications"
@@ -107,7 +105,7 @@ def update_existing_title_checks(profiles):
     updated = 0
     for row in rows:
         pname, pgrade, pcode, status = check_title_match(
-            row["post_title"] or "", row["naver_nickname"], profiles
+            row["post_title"] or "", row["naver_nickname"], students
         )
         patch = requests.patch(
             f"{SUPABASE_URL}/rest/v1/cafe_certifications?id=eq.{row['id']}",
@@ -145,7 +143,7 @@ def fetch_existing_urls():
 
 # ── 크롤링 ─────────────────────────────────────────────────────────────────
 
-def crawl_board(existing_urls, profiles):
+def crawl_board(existing_urls, students):
     cutoff = datetime.now(KST) - timedelta(days=CRAWL_DAYS)
     posts = []
     page = 1
@@ -193,7 +191,7 @@ def crawl_board(existing_urls, profiles):
             title = a.get("subject", "")
             nickname = a.get("writerNickname", "unknown")
 
-            pname, pgrade, pcode, match_status = check_title_match(title, nickname, profiles)
+            pname, pgrade, pcode, match_status = check_title_match(title, nickname, students)
 
             posts.append({
                 "naver_nickname": nickname,
@@ -244,14 +242,14 @@ def upsert_to_supabase(posts):
 # ── 실행 ───────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    profiles = fetch_profiles()
+    students = fetch_students()
 
     existing_urls = fetch_existing_urls()
     print(f"[supabase] 기존 저장: {len(existing_urls)}건")
 
     # 기존 unchecked 레코드 title 대조 업데이트
-    update_existing_title_checks(profiles)
+    update_existing_title_checks(students)
 
     # 신규 글 크롤링 및 저장
-    posts = crawl_board(existing_urls, profiles)
+    posts = crawl_board(existing_urls, students)
     upsert_to_supabase(posts)

@@ -2622,6 +2622,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
   const [certNickEdit, setCertNickEdit] = useState({}); // {profile_id: editing_value}
   const [invalidCerts, setInvalidCerts] = useState([]);
   const [certSubTab, setCertSubTab] = useState("roster"); // "roster" | "records"
+  const [certScoreEdit, setCertScoreEdit] = useState(null); // {id, value}
+  const [certScoreSaving, setCertScoreSaving] = useState(false);
+  const [lastCrawledAt, setLastCrawledAt] = useState(null);
   const [certRecords, setCertRecords] = useState([]);
   const [certRecordsLoading, setCertRecordsLoading] = useState(false);
   const [certStatusFilter, setCertStatusFilter] = useState("all");
@@ -2697,10 +2700,26 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
     setCertRecordsLoading(true);
     const {data} = await supabase.rpc("get_cert_records", {
       p_status: status==="all" ? null : status,
-      p_limit: 300,
+      p_limit: 500,
     });
-    setCertRecords(data||[]);
+    const records = data||[];
+    setCertRecords(records);
+    // 최근 크롤링 시간
+    if(records.length > 0) {
+      const maxAt = records.reduce((m,r)=> (r.crawled_at||"") > m ? (r.crawled_at||"") : m, "");
+      if(maxAt) setLastCrawledAt(maxAt);
+    }
     setCertRecordsLoading(false);
+  };
+
+  const updateCertScore = async (certId, scoreVal) => {
+    setCertScoreSaving(true);
+    const score = scoreVal==="" ? null : Number(scoreVal);
+    await supabase.rpc("update_cert_score", {p_cert_id: certId, p_score: score});
+    setCertScoreEdit(null);
+    setCertScoreSaving(false);
+    // 해당 record만 로컬 업데이트
+    setCertRecords(prev => prev.map(r => r.id===certId ? {...r, score} : r));
   };
 
   const updateCertRecord = async (id, updates) => {
@@ -3058,9 +3077,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
       {/* ── 진단 센터 탭 ── */}
       {/* ── 인증 현황 탭 ── */}
       {adminTab==="cert"&&(()=>{
-        // ── 카페 인증 매칭 헬퍼 ──
+        // ── 헬퍼 ──
         const kstDateStr = ts => {
-          const k = new Date(new Date(ts).getTime() + 9*60*60*1000);
+          const k = new Date(new Date(ts).getTime() + 9*3600*1000);
           return `${k.getUTCFullYear()}-${String(k.getUTCMonth()+1).padStart(2,'0')}-${String(k.getUTCDate()).padStart(2,'0')}`;
         };
         const studentHasCert = (student, date) => {
@@ -3068,6 +3087,19 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
           const nicks = student.naver_nicknames || [];
           if (!nicks.length) return false;
           return attendanceCerts.some(c => nicks.includes(c.naver_nickname) && kstDateStr(c.posted_at) === dk);
+        };
+        const getSessionInfo = (posted_at) => {
+          const postStr = kstDateStr(posted_at);
+          for (let i = ROSTER2_NAVER_DATES.length - 1; i >= 0; i--) {
+            const certStr = roster2FmtKey(ROSTER2_NAVER_DATES[i]);
+            if (postStr >= certStr) return { sessionNum: i+1, isLate: postStr > certStr };
+          }
+          return { sessionNum: null, isLate: false };
+        };
+        const fmtCrawledAt = ts => {
+          if (!ts) return null;
+          const k = new Date(new Date(ts).getTime() + 9*3600*1000);
+          return `${k.getUTCMonth()+1}/${k.getUTCDate()} ${String(k.getUTCHours()).padStart(2,'0')}:${String(k.getUTCMinutes()).padStart(2,'0')}`;
         };
 
         const CELL_W = 28;
@@ -3082,7 +3114,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                 <button key={k} onClick={()=>setCertSubTab(k)}
                   style={{...certSubTab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>{l}</button>
               ))}
-              <div style={{marginLeft:"auto"}}>
+              <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
+                {lastCrawledAt&&(
+                  <span style={{fontSize:11,color:T.muted}}>최근: {fmtCrawledAt(lastCrawledAt)}</span>
+                )}
                 <button onClick={triggerCrawl} disabled={crawlRunning}
                   style={{...css.btnOrange,padding:"7px 16px",fontSize:13,background:"#059669",opacity:crawlRunning?0.6:1}}>
                   {crawlRunning?"⏳ 실행 중...":"🔄 지금 크롤링"}
@@ -3094,7 +3129,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
             {certSubTab==="roster"&&(
               <div>
                 <div style={{fontSize:12,color:T.muted,marginBottom:10}}>
-                  총 {certStudents.length}명 · 닉네임 셀 클릭 시 편집 가능 (여러 개 등록 가능)
+                  총 {certStudents.length}명 · 닉네임은 크롤링 시 제목 파싱으로 자동 등록됩니다
                 </div>
                 <Card style={{padding:0,overflow:"hidden"}}>
                   {/* 상단 스크롤바 */}
@@ -3143,53 +3178,16 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                                 <div style={{fontSize:12,fontWeight:800,color:T.navy,textAlign:"center",lineHeight:1.3}}>{s.name}</div>
                                 <div style={{fontSize:9,color:T.muted,textAlign:"center",fontFamily:"monospace",marginTop:1}}>{s.phone||"-"}</div>
                               </td>
-                              {/* 닉네임 (클릭 편집) */}
+                              {/* 닉네임 (읽기 전용 — 크롤링 시 자동 등록) */}
                               <td style={{width:140,minWidth:140,padding:"4px 8px",borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,background:rowBg,verticalAlign:"middle"}}>
-                                {isEd?(
-                                  <div>
-                                    <div style={{display:"flex",flexWrap:"wrap",gap:3,marginBottom:4}}>
-                                      {(rosterEditRow.naver_nicknames||[]).map((nick,ni)=>(
-                                        <span key={ni} style={{display:"inline-flex",alignItems:"center",gap:2,fontSize:10,padding:"2px 5px",borderRadius:8,background:"#EEF2FF",color:"#4F46E5",border:"1px solid #C7D2FE"}}>
-                                          {nick}
-                                          <span onClick={()=>setRosterEditRow(p=>({...p,naver_nicknames:p.naver_nicknames.filter((_,i)=>i!==ni)}))} style={{cursor:"pointer",fontSize:12,color:"#9CA3AF",lineHeight:1,marginLeft:1}}>✕</span>
-                                        </span>
-                                      ))}
-                                    </div>
-                                    <div style={{display:"flex",gap:3,marginBottom:4}}>
-                                      <input placeholder="닉네임 추가 후 Enter"
-                                        value={rosterEditRow._newNick||""}
-                                        onChange={e=>setRosterEditRow(p=>({...p,_newNick:e.target.value}))}
-                                        onKeyDown={e=>{
-                                          if(e.key==="Enter"&&(rosterEditRow._newNick||"").trim()){
-                                            const nick=(rosterEditRow._newNick||"").trim();
-                                            setRosterEditRow(p=>({...p,naver_nicknames:[...(p.naver_nicknames||[]),nick],_newNick:""}));
-                                            e.preventDefault();
-                                          }
-                                        }}
-                                        style={{...css.input,flex:1,padding:"3px 5px",fontSize:10}}/>
-                                      <button onClick={()=>{
-                                        const nick=(rosterEditRow._newNick||"").trim();
-                                        if(nick) setRosterEditRow(p=>({...p,naver_nicknames:[...(p.naver_nicknames||[]),nick],_newNick:""}));
-                                      }} style={{...css.btnOrange,padding:"2px 6px",fontSize:11}}>+</button>
-                                    </div>
-                                    <div style={{display:"flex",gap:3}}>
-                                      <button onClick={()=>upsertCertStudent({id:s.id,name:s.name,phone:s.phone,naver_nicknames:rosterEditRow.naver_nicknames||[]})}
-                                        style={{...css.btnOrange,padding:"3px 8px",fontSize:10}}>저장</button>
-                                      <button onClick={()=>setRosterEditRow(null)}
-                                        style={{...css.btnOutline,padding:"3px 6px",fontSize:10}}>취소</button>
-                                    </div>
-                                  </div>
-                                ):(
-                                  <div style={{display:"flex",alignItems:"center",gap:3,flexWrap:"wrap",cursor:"pointer",minHeight:28}}
-                                    onClick={()=>setRosterEditRow({id:s.id,name:s.name,phone:s.phone||"",naver_nicknames:nicks.slice(),_newNick:""})}>
-                                    {nicks.length===0
-                                      ? <span style={{fontSize:10,color:T.muted,fontStyle:"italic"}}>클릭하여 추가</span>
-                                      : nicks.map((nick,ni)=>(
-                                          <span key={ni} style={{fontSize:10,padding:"2px 5px",borderRadius:8,background:"#EEF2FF",color:"#4F46E5",border:"1px solid #C7D2FE"}}>{nick}</span>
-                                        ))
-                                    }
-                                  </div>
-                                )}
+                                <div style={{display:"flex",alignItems:"center",gap:3,flexWrap:"wrap",minHeight:28}}>
+                                  {nicks.length===0
+                                    ? <span style={{fontSize:10,color:T.muted,fontStyle:"italic"}}>자동 등록 예정</span>
+                                    : nicks.map((nick,ni)=>(
+                                        <span key={ni} style={{fontSize:10,padding:"2px 5px",borderRadius:8,background:"#EEF2FF",color:"#4F46E5",border:"1px solid #C7D2FE"}}>{nick}</span>
+                                      ))
+                                  }
+                                </div>
                               </td>
                               {/* 인증 합계 */}
                               <td style={{width:36,minWidth:36,textAlign:"center",verticalAlign:"middle",background:"#EEF2FF",borderBottom:`1px solid ${T.border}`,borderLeft:`2px solid #4F46E5`,height:36}}>
@@ -3233,15 +3231,17 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
             {certSubTab==="records"&&(
               <div>
                 <div style={{fontSize:12,color:T.muted,marginBottom:10}}>
-                  총 {certRecords.length}건 · 제목 클릭 시 네이버 카페 원문으로 이동
+                  총 {certRecords.length}건 · 제목 클릭 → 원문 이동 · 점수 셀 클릭 → 입력
                 </div>
                 {certRecordsLoading?(
                   <div style={{textAlign:"center",padding:40,color:T.muted,fontSize:13}}>불러오는 중...</div>
                 ):(
                   <Card style={{padding:0,overflow:"hidden"}}>
-                    <div style={{display:"grid",gridTemplateColumns:"3fr 1fr 0.7fr",background:T.navy,padding:"10px 14px",gap:8}}>
-                      {["제목 (클릭 시 원문 이동)","닉네임","작성일"].map(h=>(
-                        <div key={h} style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)"}}>{h}</div>
+                    {/* 헤더 */}
+                    <div style={{display:"grid",gridTemplateColumns:"50px 80px 55px 60px 1fr 90px 65px 58px",
+                      background:T.navy,padding:"9px 12px",gap:6,alignItems:"center"}}>
+                      {["글번호","학생","회차","정시여부","제목","닉네임","작성일","점수"].map(h=>(
+                        <div key={h} style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:h==="글번호"||h==="회차"||h==="정시여부"||h==="점수"?"center":"left"}}>{h}</div>
                       ))}
                     </div>
                     {certRecords.length===0&&(
@@ -3249,24 +3249,77 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                         크롤링된 글이 없습니다. 우측 상단 "지금 크롤링" 버튼을 눌러주세요.
                       </div>
                     )}
-                    {certRecords.map((rec,i)=>(
-                      <div key={rec.id} style={{display:"grid",gridTemplateColumns:"3fr 1fr 0.7fr",
-                        padding:"10px 14px",gap:8,borderTop:`1px solid ${T.border}`,
-                        background:i%2===0?T.white:"#F9FAFB",alignItems:"center"}}>
-                        <div style={{fontSize:12}}>
-                          <a href={rec.post_url} target="_blank" rel="noreferrer"
-                            style={{color:T.navy,textDecoration:"none",fontWeight:600,lineHeight:1.5,display:"block",wordBreak:"break-word"}}
-                            onMouseOver={e=>e.currentTarget.style.color=T.orange}
-                            onMouseOut={e=>e.currentTarget.style.color=T.navy}>
-                            {rec.post_title}
-                          </a>
+                    {certRecords.map((rec,i)=>{
+                      const {sessionNum, isLate} = getSessionInfo(rec.posted_at);
+                      const rowBg = i%2===0?T.white:"#F9FAFB";
+                      const isScoreEdit = certScoreEdit?.id === rec.id;
+                      return (
+                        <div key={rec.id} style={{display:"grid",gridTemplateColumns:"50px 80px 55px 60px 1fr 90px 65px 58px",
+                          padding:"8px 12px",gap:6,borderTop:`1px solid ${T.border}`,
+                          background:rowBg,alignItems:"center"}}>
+                          {/* 글번호 */}
+                          <div style={{fontSize:11,color:T.muted,textAlign:"center",fontFamily:"monospace"}}>{rec.id}</div>
+                          {/* 학생 */}
+                          <div style={{fontSize:12,fontWeight:700,color:rec.matched_student_name?T.navy:T.muted}}>
+                            {rec.matched_student_name||"—"}
+                          </div>
+                          {/* 회차 */}
+                          <div style={{textAlign:"center",fontSize:11,fontWeight:700,color:sessionNum?T.navy:T.muted}}>
+                            {sessionNum ? `${sessionNum}회` : "—"}
+                          </div>
+                          {/* 정시여부 */}
+                          <div style={{textAlign:"center",fontSize:11}}>
+                            {sessionNum===null
+                              ? <span style={{color:T.muted}}>—</span>
+                              : isLate
+                                ? <span style={{color:"#B45309",fontWeight:700}}>⚠️ 지각</span>
+                                : <span style={{color:"#065F46",fontWeight:700}}>✅ 정시</span>
+                            }
+                          </div>
+                          {/* 제목 (링크) */}
+                          <div style={{fontSize:11,overflow:"hidden"}}>
+                            <a href={rec.post_url} target="_blank" rel="noreferrer"
+                              style={{color:T.navy,textDecoration:"none",fontWeight:600,
+                                display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}
+                              title={rec.post_title}
+                              onMouseOver={e=>e.currentTarget.style.color=T.orange}
+                              onMouseOut={e=>e.currentTarget.style.color=T.navy}>
+                              {rec.post_title}
+                            </a>
+                          </div>
+                          {/* 닉네임 */}
+                          <div style={{fontSize:11,color:T.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{rec.naver_nickname}</div>
+                          {/* 작성일 */}
+                          <div style={{fontSize:11,color:T.muted,textAlign:"center"}}>
+                            {(()=>{const k=new Date(new Date(rec.posted_at).getTime()+9*3600*1000);return`${k.getUTCMonth()+1}/${k.getUTCDate()}`;})()}
+                          </div>
+                          {/* 점수 (클릭 편집) */}
+                          <div style={{textAlign:"center"}}>
+                            {isScoreEdit?(
+                              <input autoFocus type="number" min="0" max="100"
+                                value={certScoreEdit.value}
+                                onChange={e=>setCertScoreEdit(p=>({...p,value:e.target.value}))}
+                                onBlur={()=>updateCertScore(rec.id,certScoreEdit.value)}
+                                onKeyDown={e=>{
+                                  if(e.key==="Enter") updateCertScore(rec.id,certScoreEdit.value);
+                                  if(e.key==="Escape") setCertScoreEdit(null);
+                                }}
+                                style={{...css.input,width:44,padding:"2px 4px",fontSize:11,textAlign:"center"}}
+                              />
+                            ):(
+                              <div onClick={()=>setCertScoreEdit({id:rec.id,value:rec.score!==null&&rec.score!==undefined?String(rec.score):""})}
+                                style={{cursor:"pointer",fontSize:12,fontWeight:700,padding:"3px 0",
+                                  color:rec.score!==null&&rec.score!==undefined?T.navy:T.muted,
+                                  borderRadius:4,border:"1px dashed transparent"}}
+                                onMouseOver={e=>e.currentTarget.style.borderColor="#D1D5DB"}
+                                onMouseOut={e=>e.currentTarget.style.borderColor="transparent"}>
+                                {rec.score!==null&&rec.score!==undefined ? rec.score : "—"}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div style={{fontSize:12,color:T.muted}}>{rec.naver_nickname}</div>
-                        <div style={{fontSize:11,color:T.muted}}>
-                          {new Date(rec.posted_at).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"})}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </Card>
                 )}
               </div>
