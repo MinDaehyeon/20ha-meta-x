@@ -4303,9 +4303,30 @@ const AttendanceUploadView = ({onRefresh}) => {
           Zoom 참가자 CSV를 업로드하면 자동으로 날짜/회차/세션을 판별해 출석을 정리합니다.
           미리보기 후 <b>저장</b>을 눌러야 DB에 반영됩니다.
         </div>
-        <input ref={fileRef} type="file" accept=".csv,text/csv"
-          onChange={e=>{const f=e.target.files?.[0]; if(f) handleFile(f);}}
-          style={{padding:"8px",fontSize:13}}/>
+        {/* 드래그 드롭 + 클릭 영역 */}
+        <label htmlFor="attendance-csv-input"
+          onDragOver={e=>{e.preventDefault();e.currentTarget.style.background="#EEF2FF";e.currentTarget.style.borderColor="#4F46E5";}}
+          onDragLeave={e=>{e.currentTarget.style.background="#F8FAFC";e.currentTarget.style.borderColor="#CBD5E1";}}
+          onDrop={e=>{
+            e.preventDefault();
+            e.currentTarget.style.background="#F8FAFC";
+            e.currentTarget.style.borderColor="#CBD5E1";
+            const f = e.dataTransfer.files?.[0];
+            if(f) handleFile(f);
+          }}
+          style={{
+            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+            gap:10,padding:"32px 20px",borderRadius:12,
+            border:"2px dashed #CBD5E1",background:"#F8FAFC",
+            cursor:"pointer",transition:"all .15s",
+          }}>
+          <div style={{fontSize:36,opacity:0.6}}>📄</div>
+          <div style={{fontSize:14,fontWeight:700,color:T.navy}}>CSV 파일을 여기로 드래그하거나 클릭해서 선택</div>
+          <div style={{fontSize:11,color:T.muted}}>참가자 명단 CSV (Zoom 내보내기)</div>
+          <input ref={fileRef} id="attendance-csv-input" type="file" accept=".csv,text/csv"
+            onChange={e=>{const f=e.target.files?.[0]; if(f) handleFile(f);}}
+            style={{display:"none"}}/>
+        </label>
       </Card>
 
       {parsed && (
