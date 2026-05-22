@@ -243,7 +243,7 @@ def crawl_board(existing_urls, students):
                 continue
 
             article_id = a["articleId"]
-            post_url = f"https://cafe.naver.com/{CAFE_CLUB_ID}/{article_id}"
+            post_url = f"https://cafe.naver.com/f-e/cafes/{CAFE_CLUB_ID}/articles/{article_id}"
 
             if post_url in existing_urls:
                 continue
