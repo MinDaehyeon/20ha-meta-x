@@ -4626,6 +4626,7 @@ const ManjeomQuestionsTab = () => {
     return true;
   });
 
+  const MCQ_DEFAULT_CHOICES = ["①","②","③","④","⑤"];
   const blank = () => ({
     id:null, q_type:"short", prompt:"", image_url:"",
     choices:["",""], answers:[""], tags:[],
@@ -4633,15 +4634,22 @@ const ManjeomQuestionsTab = () => {
   });
 
   const startNew = () => setEditing(blank());
-  const startEdit = (q) => setEditing({
-    ...q,
-    choices: q.choices || ["",""],
-    answers: q.answers || [""],
-    tags: q.tags || [],
-    _correctIdx: q.q_type==="mcq" && q.answers
-      ? q.answers.map(a => (q.choices||[]).indexOf(a)).filter(i=>i>=0)
-      : [],
-  });
+  const startEdit = (q) => {
+    // mcq 정답은 정렬된 콤마 결합 문자열 1개로 저장됨 (예: "①,③")
+    let correctIdx = [];
+    if(q.q_type === "mcq" && Array.isArray(q.answers) && q.answers.length > 0){
+      const canonical = String(q.answers[0] || "");
+      const tokens = canonical.split(",").map(s=>s.trim()).filter(Boolean);
+      correctIdx = tokens.map(t => (q.choices||[]).indexOf(t)).filter(i => i >= 0);
+    }
+    setEditing({
+      ...q,
+      choices: q.choices || ["",""],
+      answers: q.answers || [""],
+      tags: q.tags || [],
+      _correctIdx: correctIdx,
+    });
+  };
 
   const upload = async (file) => {
     if(!file) return;
@@ -4669,7 +4677,9 @@ const ManjeomQuestionsTab = () => {
       if(cleanChoices.length < 2){ alert("보기를 2개 이상 입력해주세요."); return; }
       const corr = (editing._correctIdx||[]).filter(i => i < cleanChoices.length);
       if(corr.length === 0){ alert("정답 보기를 1개 이상 선택해주세요."); return; }
-      answers = corr.map(i => cleanChoices[i]);
+      // 다중 정답 가능 — 정렬된 콤마 결합 한 문자열로 저장 (예: "①,③")
+      const canonical = [...corr].sort((a,b)=>a-b).map(i => cleanChoices[i]).join(",");
+      answers = [canonical];
       editing.choices = cleanChoices;
     }
 
@@ -4765,7 +4775,13 @@ const ManjeomQuestionsTab = () => {
               {[{v:"short",l:"단답형"},{v:"mcq",l:"객관식"}].map(({v,l})=>(
                 <label key={v} style={{display:"flex",alignItems:"center",gap:4,fontSize:12,cursor:"pointer"}}>
                   <input type="radio" name="qtype" checked={editing.q_type===v}
-                    onChange={()=>setEditing(e=>({...e,q_type:v}))}/>{l}
+                    onChange={()=>setEditing(e=>{
+                      // 객관식 전환 시 보기를 ①~⑤ 5개로 기본 채움 (보기 내용은 이미지에 포함)
+                      if(v==="mcq" && (e.choices.length<2 || e.choices.every(c=>!c?.trim()))){
+                        return {...e,q_type:v,choices:[...MCQ_DEFAULT_CHOICES],_correctIdx:[]};
+                      }
+                      return {...e,q_type:v};
+                    })}/>{l}
                 </label>
               ))}
             </div>
@@ -4817,35 +4833,55 @@ const ManjeomQuestionsTab = () => {
               </div>
             ) : (
               <div>
-                <label style={css.label}>보기 (2~5개, 정답 보기는 좌측 체크박스로 선택 — 복수 가능)</label>
-                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                <label style={css.label}>
+                  객관식 정답 (기본 5개 ①~⑤ · 이미지에 보기 내용 포함 · 정답 번호만 체크 — 복수 가능)
+                </label>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                   {editing.choices.map((c,i)=>(
-                    <div key={i} style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <label key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",
+                      border:`2px solid ${(editing._correctIdx||[]).includes(i)?"#16A34A":T.border}`,
+                      borderRadius:10,
+                      background:(editing._correctIdx||[]).includes(i)?"#F0FDF4":T.surfaceAlt,
+                      cursor:"pointer",minWidth:64,justifyContent:"center"}}>
                       <input type="checkbox" checked={(editing._correctIdx||[]).includes(i)}
                         onChange={e=>setEditing(ed=>{
                           const set = new Set(ed._correctIdx||[]);
                           if(e.target.checked) set.add(i); else set.delete(i);
                           return {...ed,_correctIdx:[...set]};
                         })}/>
-                      <span style={{fontSize:12,color:T.muted,width:20}}>{"①②③④⑤"[i]||(i+1)}</span>
-                      <input value={c} onChange={e=>{
-                        const next=[...editing.choices]; next[i]=e.target.value;
-                        setEditing({...editing,choices:next});
-                      }} placeholder={`보기 ${i+1}`}
-                      style={{...css.input,padding:"8px 12px",fontSize:13}}/>
-                      <button style={{...css.btnGhost,padding:"6px 10px",fontSize:11}}
-                        onClick={()=>setEditing(ed=>({
-                          ...ed,
-                          choices:ed.choices.filter((_,idx)=>idx!==i),
-                          _correctIdx:(ed._correctIdx||[]).filter(x=>x!==i).map(x=>x>i?x-1:x),
-                        }))}>✕</button>
-                    </div>
+                      <span style={{fontSize:16,fontWeight:800,color:T.navy}}>{c || ("①②③④⑤"[i]||(i+1))}</span>
+                    </label>
                   ))}
-                  {editing.choices.length < 5 && (
-                    <button style={{...css.btnOutline,alignSelf:"flex-start",padding:"6px 14px",fontSize:11}}
-                      onClick={()=>setEditing(e=>({...e,choices:[...e.choices,""]}))}>+ 보기 추가</button>
-                  )}
                 </div>
+                <details style={{marginTop:10}}>
+                  <summary style={{fontSize:11,color:T.muted,cursor:"pointer"}}>보기 텍스트도 입력하기 (선택, 보통 이미지에 포함됨)</summary>
+                  <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:8}}>
+                    {editing.choices.map((c,i)=>(
+                      <div key={i} style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <span style={{fontSize:12,color:T.muted,width:20}}>{"①②③④⑤"[i]||(i+1)}</span>
+                        <input value={c} onChange={e=>{
+                          const next=[...editing.choices]; next[i]=e.target.value;
+                          setEditing({...editing,choices:next});
+                        }} placeholder={`보기 ${i+1} (선택)`}
+                        style={{...css.input,padding:"6px 10px",fontSize:12}}/>
+                        <button style={{...css.btnGhost,padding:"4px 8px",fontSize:11}}
+                          onClick={()=>setEditing(ed=>({
+                            ...ed,
+                            choices:ed.choices.filter((_,idx)=>idx!==i),
+                            _correctIdx:(ed._correctIdx||[]).filter(x=>x!==i).map(x=>x>i?x-1:x),
+                          }))}>✕</button>
+                      </div>
+                    ))}
+                    {editing.choices.length < 5 && (
+                      <button style={{...css.btnOutline,alignSelf:"flex-start",padding:"5px 12px",fontSize:11}}
+                        onClick={()=>setEditing(e=>{
+                          const i=e.choices.length;
+                          const lbl="①②③④⑤"[i]||String(i+1);
+                          return {...e,choices:[...e.choices, lbl]};
+                        })}>+ 보기 추가</button>
+                    )}
+                  </div>
+                </details>
               </div>
             )}
 
@@ -5470,21 +5506,58 @@ const ManjeomStudentView = ({profile}) => {
                     disabled={isPassed}
                     placeholder="정답 입력"
                     style={{...css.input,padding:"10px 14px",maxWidth:400}}/>
-                ) : (
-                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                    {(q.choices||[]).map((c,ci)=>(
-                      <label key={ci} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",
-                        border:`1px solid ${answers[q.id]===c?T.navy:T.border}`,borderRadius:8,
-                        background:answers[q.id]===c?"#EEF2FF":T.surfaceAlt,cursor:isPassed?"default":"pointer"}}>
-                        <input type="radio" name={`q-${q.id}`} value={c} checked={answers[q.id]===c}
-                          disabled={isPassed}
-                          onChange={()=>setAnswers(a=>({...a,[q.id]:c}))}/>
-                        <span style={{fontSize:11,color:T.muted,width:18}}>{"①②③④⑤"[ci]||(ci+1)}</span>
-                        <span style={{fontSize:13,color:T.navy}}>{c}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
+                ) : (() => {
+                  const choices = q.choices || [];
+                  const labelOnly = choices.every((c,ci)=> !c || c === ("①②③④⑤"[ci]||String(ci+1)));
+                  // 학생 답은 "①,③" 형식 정렬된 콤마 결합 문자열. 다중 선택 가능 (체크박스).
+                  const selectedSet = new Set(
+                    String(answers[q.id]||"").split(",").map(s=>s.trim()).filter(Boolean)
+                  );
+                  const toggle = (val) => {
+                    if(isPassed) return;
+                    const next = new Set(selectedSet);
+                    if(next.has(val)) next.delete(val); else next.add(val);
+                    // 보기 순서 기준으로 정렬해 콤마 결합
+                    const sortedVal = choices.filter(c => next.has(c)).join(",");
+                    setAnswers(a => ({...a, [q.id]: sortedVal}));
+                  };
+                  return labelOnly ? (
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      {choices.map((c,ci)=>{
+                        const display = c || ("①②③④⑤"[ci]||String(ci+1));
+                        const checked = selectedSet.has(display);
+                        return (
+                          <label key={ci} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                            padding:"10px 18px",minWidth:64,
+                            border:`2px solid ${checked?T.navy:T.border}`,borderRadius:10,
+                            background:checked?"#EEF2FF":T.surfaceAlt,cursor:isPassed?"default":"pointer"}}>
+                            <input type="checkbox" checked={checked}
+                              disabled={isPassed}
+                              onChange={()=>toggle(display)}/>
+                            <span style={{fontSize:16,fontWeight:800,color:T.navy}}>{display}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {choices.map((c,ci)=>{
+                        const checked = selectedSet.has(c);
+                        return (
+                          <label key={ci} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",
+                            border:`1px solid ${checked?T.navy:T.border}`,borderRadius:8,
+                            background:checked?"#EEF2FF":T.surfaceAlt,cursor:isPassed?"default":"pointer"}}>
+                            <input type="checkbox" checked={checked}
+                              disabled={isPassed}
+                              onChange={()=>toggle(c)}/>
+                            <span style={{fontSize:11,color:T.muted,width:18}}>{"①②③④⑤"[ci]||(ci+1)}</span>
+                            <span style={{fontSize:13,color:T.navy}}>{c}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
