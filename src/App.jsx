@@ -5498,17 +5498,33 @@ const ManjeomStudentView = ({profile}) => {
     setFeedback(null);
   };
 
+  const encourageByAttempt = (n) => {
+    if(n <= 1) return { title:"아직 만점이 아니에요", body:"의심되는 답부터 차분히 다시 살펴봐 주세요." };
+    if(n === 2) return { title:"한 번 더 도전!", body:"이번엔 잠깐 호흡 고르고 한 문제씩 천천히 다시 봐 볼까요?" };
+    if(n === 3) return { title:"좋아요, 잘하고 있어요", body:"답을 너무 빨리 바꾸지 말고, 왜 그 답인지 한 번 더 생각해 봐요." };
+    if(n <= 5) return { title:"거의 다 왔어요", body:"틀린 문제는 적어도 한 문제 이상이에요. 처음부터 다시 한 번 천천히 짚어보면 보일 거예요." };
+    if(n <= 8) return { title:"잠깐 쉬어가도 돼요", body:"눈을 잠깐 쉬게 한 다음, 새 마음으로 한 번 더 봐 볼까요? 만점은 가까이 있어요." };
+    return { title:"포기하지 말아요", body:"여기까지 풀어낸 것만으로도 충분히 멋져요. 천천히, 한 문제씩, 한 번만 더 함께 봐 봐요." };
+  };
+
   const submit = async () => {
     setSubmitting(true);
     const {data, error} = await supabase.rpc("submit_manjeom_attempt",{p_test_id:active.test.id,p_answers:answers});
     setSubmitting(false);
     if(error){ alert("제출 실패: "+error.message); return; }
     if(data.is_pass){
-      setFeedback({type:"ok",text:`🎉 통과! ${data.attempt_no}번째 시도에 성공했어요.`});
+      setFeedback({
+        type:"ok",
+        attempt_no: data.attempt_no,
+        title: data.attempt_no === 1 ? "한 번에 통과!" : `${data.attempt_no}번 만에 통과!`,
+        body: data.attempt_no === 1
+          ? "완벽해요. 한 번에 만점, 정말 잘했어요!"
+          : "포기하지 않고 끝까지 풀어낸 게 진짜 멋져요. 만점 축하해요!",
+      });
       await loadList();
-      setTimeout(()=>{ setActive(null); setFeedback(null); }, 2500);
     } else {
-      setFeedback({type:"err",text:`❌ 아직 만점이 아니에요. 답을 다시 확인해 보세요. (시도 ${data.attempt_no}회)`});
+      const m = encourageByAttempt(data.attempt_no);
+      setFeedback({type:"err", attempt_no:data.attempt_no, title:m.title, body:m.body});
     }
   };
 
@@ -5524,27 +5540,33 @@ const ManjeomStudentView = ({profile}) => {
         {active.test.description && <div style={{fontSize:13,color:T.muted}}>{active.test.description}</div>}
 
         {feedback && (
-          <div onClick={()=>{ if(feedback.type==="err") setFeedback(null); }}
+          <div onClick={()=>setFeedback(null)}
             style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:1000,
               display:"flex",alignItems:"center",justifyContent:"center",padding:20,
               animation:"fadeIn 0.2s ease"}}>
             <div onClick={e=>e.stopPropagation()}
-              style={{background:T.surface,borderRadius:16,padding:"28px 32px",maxWidth:420,width:"100%",
+              style={{background:T.surface,borderRadius:16,padding:"32px 32px 28px",maxWidth:440,width:"100%",
                 textAlign:"center",boxShadow:"0 12px 40px rgba(0,0,0,0.3)",
                 border:`2px solid ${feedback.type==="ok"?"#86EFAC":"#FCA5A5"}`}}>
-              <div style={{fontSize:46,marginBottom:10}}>{feedback.type==="ok"?"🎉":"❌"}</div>
-              <div style={{fontSize:16,fontWeight:800,color:feedback.type==="ok"?"#16A34A":"#DC2626",marginBottom:8,whiteSpace:"pre-wrap"}}>
-                {feedback.text.replace(/^[🎉❌]\s*/, "")}
+              <div style={{fontSize:54,marginBottom:8}}>{feedback.type==="ok"?"🎉":"💭"}</div>
+              <div style={{fontSize:11,fontWeight:700,color:T.muted,marginBottom:6,letterSpacing:"0.04em"}}>
+                시도 {feedback.attempt_no}회
               </div>
-              {feedback.type==="err" && (
-                <>
-                  <div style={{fontSize:12,color:T.muted,marginBottom:18}}>
-                    답안은 그대로 남아 있어요. 의심되는 답을 고쳐서 다시 제출해 보세요.
-                  </div>
-                  <button style={{...css.btnOrange,padding:"10px 28px",fontSize:13}} onClick={()=>setFeedback(null)}>
-                    다시 풀기
-                  </button>
-                </>
+              <div style={{fontSize:18,fontWeight:800,color:feedback.type==="ok"?"#16A34A":T.navy,marginBottom:10}}>
+                {feedback.title}
+              </div>
+              <div style={{fontSize:13,color:T.muted,lineHeight:1.6,marginBottom:22,whiteSpace:"pre-wrap"}}>
+                {feedback.body}
+              </div>
+              {feedback.type==="err" ? (
+                <button style={{...css.btnOrange,padding:"11px 30px",fontSize:13}} onClick={()=>setFeedback(null)}>
+                  다시 풀기
+                </button>
+              ) : (
+                <button style={{...css.btnOrange,padding:"11px 30px",fontSize:13}}
+                  onClick={()=>{ setFeedback(null); setActive(null); }}>
+                  목록으로
+                </button>
               )}
             </div>
           </div>
