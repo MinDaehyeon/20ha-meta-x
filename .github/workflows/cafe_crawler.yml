@@ -21,8 +21,8 @@ jobs:
       - name: 크롤링 실행
         run: python tools/naver_cafe_crawler.py
         env:
-          NAVER_CAFE_ID: ${{ secrets.NAVER_CAFE_ID }}
-          NAVER_BOARD_ID: ${{ secrets.NAVER_BOARD_ID }}
+          NAVER_CAFE_ID: '31045190'
+          NAVER_BOARD_ID: '165'       # 20HA 2기 인증글 게시판
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           CRAWL_DAYS: '30'
