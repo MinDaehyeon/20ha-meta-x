@@ -3536,7 +3536,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                 ):(
                   <Card style={{padding:0,overflow:"hidden"}}>
                     {/* 헤더 */}
-                    <div style={{display:"grid",gridTemplateColumns:"50px 80px 55px 60px 1fr 90px 65px 70px",
+                    <div style={{display:"grid",gridTemplateColumns:"50px 80px 80px 60px 1fr 90px 65px 70px",
                       background:T.navy,padding:"9px 12px",gap:6,alignItems:"center"}}>
                       {["글번호","학생","회차","정시여부","제목","닉네임","작성일","점수"].map(h=>(
                         <div key={h} style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:h==="제목"?"left":"center"}}>{h}</div>
@@ -3553,7 +3553,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                       const articleId = rec.post_url ? rec.post_url.split("/").pop() : rec.id;
                       const hasScore = rec.completeness_score !== null && rec.completeness_score !== undefined;
                       return (
-                        <div key={rec.id} style={{display:"grid",gridTemplateColumns:"50px 80px 55px 60px 1fr 90px 65px 70px",
+                        <div key={rec.id} style={{display:"grid",gridTemplateColumns:"50px 80px 80px 60px 1fr 90px 65px 70px",
                           padding:"8px 12px",gap:6,borderTop:`1px solid ${T.border}`,
                           background:rowBg,alignItems:"center"}}>
                           {/* 글번호 */}
@@ -3562,9 +3562,16 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                           <div style={{fontSize:12,fontWeight:700,color:rec.matched_student_name?T.navy:T.muted,textAlign:"center"}}>
                             {rec.matched_student_name||"—"}
                           </div>
-                          {/* 회차 */}
+                          {/* 회차 + 날짜 */}
                           <div style={{textAlign:"center",fontSize:11,fontWeight:700,color:sessionNum?T.navy:T.muted}}>
-                            {sessionNum ? `${sessionNum}회` : "—"}
+                            {sessionNum
+                              ? <>
+                                  {sessionNum}회
+                                  <span style={{fontSize:10,fontWeight:400,color:T.muted,marginLeft:3}}>
+                                    ({(()=>{const d=ROSTER2_NAVER_DATES[sessionNum-1];return d?`${d.getMonth()+1}/${d.getDate()}`:"";})()})
+                                  </span>
+                                </>
+                              : "—"}
                           </div>
                           {/* 정시여부 */}
                           <div style={{textAlign:"center",fontSize:11}}>
