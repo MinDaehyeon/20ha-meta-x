@@ -2124,6 +2124,7 @@ const INIT_ATTENDANCE2 = {"36-나-2026-05-17":true,"27-나-2026-05-17":true,"4-�
 // ══════════════════════════════════════════════════════
 const StudentCertView = ({profile}) => {
   const [peerGrades, setPeerGrades] = useState({});
+  const [myCafeCerts, setMyCafeCerts] = useState([]);
   const isMobile = useMobile();
   useEffect(() => {
     supabase.from("profiles").select("name,grade,birth_year,birth_month")
@@ -2135,6 +2136,10 @@ const StudentCertView = ({profile}) => {
           setPeerGrades(map);
         }
       });
+    // 본인 카페 인증 글 (회차별 + 점수)
+    supabase.rpc("get_my_cafe_certs").then(({data}) => {
+      setMyCafeCerts(data || []);
+    });
   }, []);
 
   const fk = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
@@ -2327,12 +2332,17 @@ const StudentCertView = ({profile}) => {
           {/* 진행 바 + % */}
           <div style={{display:"flex",alignItems:"center",gap:16,marginTop:18}}>
             <div style={{flex:1,position:"relative"}}>
-              <div style={{height:8,background:"rgba(255,255,255,0.15)",borderRadius:4,overflow:"hidden",position:"relative"}}>
-                <div style={{position:"absolute",left:"80%",top:0,bottom:0,width:2,background:"rgba(255,255,255,0.35)",zIndex:1}}/>
+              <div style={{height:8,background:"rgba(255,255,255,0.15)",borderRadius:4,position:"relative"}}>
+                {/* 진행 채우기 (왼쪽부터) */}
                 <div style={{height:"100%",width:`${totalPct}%`,background:"linear-gradient(90deg,#fc9024,#ffb77e)",borderRadius:4,transition:"width 1s ease"}}/>
+                {/* 80% 목표 마커 — 강조 */}
+                <div style={{position:"absolute",left:"80%",top:-4,bottom:-4,width:3,background:"#fff",zIndex:2,boxShadow:"0 0 8px rgba(255,255,255,0.7)",borderRadius:2}}/>
               </div>
-              <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:10,color:"rgba(255,255,255,0.5)"}}>
-                <span>0%</span><span>목표 80%</span><span>100%</span>
+              {/* 라벨: 0% / 🎯 목표 80% (80% 위치) / 100% */}
+              <div style={{position:"relative",marginTop:8,height:14,fontSize:10,color:"rgba(255,255,255,0.5)"}}>
+                <span style={{position:"absolute",left:0}}>0%</span>
+                <span style={{position:"absolute",left:"80%",transform:"translateX(-50%)",color:"#fff",fontWeight:800,fontSize:11,whiteSpace:"nowrap"}}>🎯 목표 80%</span>
+                <span style={{position:"absolute",right:0}}>100%</span>
               </div>
             </div>
             <div style={{flexShrink:0,textAlign:"right"}}>
@@ -2383,24 +2393,27 @@ const StudentCertView = ({profile}) => {
         const sameGradeRanked = myGrade && Object.keys(peerGrades).length>0
           ? [...allStats].filter(s=>(peerGrades[s.name]||"")===myGrade).sort((a,b)=>b.total-a.total).slice(0,3)
           : [];
+        const meInTop3 = ranked.slice(0,3).some(s => s.name === profile.name);
+        const meInGradeTop3 = sameGradeRanked.some(s => s.name === profile.name);
         const ACTIVITIES = [
           {label:"미라클모닝", dates:ROSTER2_MORNING_DATES, type:"M",   color:"#EA580C"},
           {label:"카페 인증",  dates:ROSTER2_NAVER_DATES,   type:"N",   color:"#03C75A"},
           {label:"미라클나이트",dates:ROSTER2_NIGHT_DATES,   type:"나",  color:"#6366F1"},
         ];
-        const RankRow = ({s, rank, isMe}) => {
+        const RankRow = ({s, rank, isMe, highlightFirst}) => {
           const medalColors=["#F59E0B","#94A3B8","#B87333"];
+          const goldHL = rank===0 && highlightFirst;
           return(
             <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:9,
-              background:isMe?"#EEF2FF":rank===0?"#FFFBEB":"transparent",
-              border:`1px solid ${isMe?"#C7D2FE":rank===0?"#FDE68A":"transparent"}`}}>
+              background:isMe?"#EEF2FF":goldHL?"#FFFBEB":"transparent",
+              border:`1px solid ${isMe?"#C7D2FE":goldHL?"#FDE68A":"transparent"}`}}>
               <span style={{width:24,height:24,borderRadius:6,background:medalColors[rank]||"#CBD5E1",
                 display:"inline-flex",alignItems:"center",justifyContent:"center",
                 fontSize:11,fontWeight:900,color:"#fff",flexShrink:0}}>{rank+1}</span>
               <div style={{flex:1,fontSize:13,fontWeight:isMe?800:500,color:T.navy,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 {s.name}{isMe&&<span style={{fontSize:9,color:"#4F46E5",marginLeft:3}}>(나)</span>}
               </div>
-              <div style={{fontSize:12,fontWeight:800,color:isMe?"#4F46E5":rank===0?T.orange:T.navy,flexShrink:0}}>{pct(s.total,grandTotal)}%</div>
+              <div style={{fontSize:12,fontWeight:800,color:isMe?"#4F46E5":goldHL?T.orange:T.navy,flexShrink:0}}>{pct(s.total,grandTotal)}%</div>
             </div>
           );
         };
@@ -2525,7 +2538,9 @@ const StudentCertView = ({profile}) => {
                 <div style={{width:12,height:12,borderRadius:3,background:"#03C75A"}}/> 완료
               </div>
               <div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:T.muted}}>
-                <div style={{width:12,height:12,borderRadius:3,background:"#E2E6F3",border:"1px solid #C8CEED"}}/> 미완료
+                <div style={{width:12,height:12,borderRadius:3,border:"1px solid #C8CEED",position:"relative",overflow:"hidden"}}>
+                  <div style={{position:"absolute",top:"50%",left:"-5%",width:"110%",height:"1.5px",background:"#94A3B8",transform:"rotate(-45deg)",transformOrigin:"center"}}/>
+                </div> 미완료
               </div>
               <div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:T.muted}}>
                 <div style={{width:12,height:12,borderRadius:3,background:"#F0F2FA",border:"1px solid #E2E6F3"}}/> 예정
@@ -2536,13 +2551,91 @@ const StudentCertView = ({profile}) => {
             </div>
           </Card>
 
+          {/* ③-2 카페 인증 현황 (회차별 점수) */}
+          <Card style={{padding:"16px 18px"}}>
+            <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:14,display:"flex",alignItems:"center",gap:6}}>
+              📝 나의 카페 인증 현황
+              <span style={{fontSize:10,fontWeight:400,color:T.muted}}>· 회차별 점수 / 채점 상태</span>
+            </div>
+            {(()=>{
+              const kstStr = ts => {
+                const k = new Date(new Date(ts).getTime() + 9*3600*1000);
+                return `${k.getUTCFullYear()}-${String(k.getUTCMonth()+1).padStart(2,'0')}-${String(k.getUTCDate()).padStart(2,'0')}`;
+              };
+              // 회차별로 본인 cert 매칭 (지각도 해당 회차에 포함)
+              const sessionMap = {};
+              ROSTER2_NAVER_DATES.forEach((dt, idx) => {
+                sessionMap[idx] = {date: dt, cert: null, isLate: false};
+              });
+              myCafeCerts.forEach(c => {
+                const postStr = kstStr(c.posted_at);
+                for (let i = ROSTER2_NAVER_DATES.length - 1; i >= 0; i--) {
+                  const certStr = fk(ROSTER2_NAVER_DATES[i]);
+                  if (postStr >= certStr) {
+                    if (!sessionMap[i].cert) {
+                      sessionMap[i].cert = c;
+                      sessionMap[i].isLate = postStr > certStr;
+                    }
+                    break;
+                  }
+                }
+              });
+
+              const cols = isMobile ? 3 : 5;
+              return (
+                <div style={{display:"grid",gridTemplateColumns:`repeat(${cols},1fr)`,gap:8}}>
+                  {ROSTER2_NAVER_DATES.map((dt, idx) => {
+                    const sm = sessionMap[idx];
+                    const cert = sm.cert;
+                    const isLate = sm.isLate;
+                    const hasScore = cert && cert.completeness_score !== null && cert.completeness_score !== undefined;
+                    const submitted = !!cert;
+                    const dateLabel = `${dt.getMonth()+1}/${dt.getDate()}(${ROSTER2_DAY_KO[dt.getDay()]})`;
+                    return (
+                      <div key={idx} style={{
+                        padding:"10px 8px",
+                        borderRadius:10,
+                        border:`1px solid ${hasScore?"#86EFAC":submitted?"#FCD34D":"#E2E6F3"}`,
+                        background:hasScore?"#F0FDF4":submitted?"#FFFBEB":"#F8FAFC",
+                        textAlign:"center",
+                      }}>
+                        {/* 1행: 회차 + 날짜 */}
+                        <div style={{display:"flex",justifyContent:"center",alignItems:"baseline",gap:4,marginBottom:6}}>
+                          <span style={{fontSize:11,fontWeight:800,color:T.navy}}>{idx+1}회</span>
+                          <span style={{fontSize:10,color:T.muted}}>{dateLabel}</span>
+                        </div>
+                        {/* 2행: 상태/점수 */}
+                        {hasScore ? (
+                          <div>
+                            <div style={{fontSize:20,fontWeight:900,color:"#16A34A",lineHeight:1}}>
+                              {cert.completeness_score}<span style={{fontSize:11,fontWeight:600,color:"#16A34A",marginLeft:2}}>점</span>
+                            </div>
+                            {isLate && <div style={{fontSize:9,color:"#B45309",marginTop:3,fontWeight:600}}>⚠️ 지각</div>}
+                          </div>
+                        ) : submitted ? (
+                          <div>
+                            <div style={{fontSize:11,fontWeight:800,color:"#B45309"}}>제출 완료</div>
+                            <div style={{fontSize:9,color:T.muted,marginTop:2}}>채점 중...</div>
+                            {isLate && <div style={{fontSize:9,color:"#B45309",marginTop:2,fontWeight:600}}>⚠️ 지각</div>}
+                          </div>
+                        ) : (
+                          <div style={{fontSize:11,color:T.muted,fontWeight:600}}>미제출</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </Card>
+
           {/* ④ 랭킹 2열 */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <Card style={{padding:"14px 16px"}}>
               <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10,display:"flex",alignItems:"center",gap:5}}>{HI.trophy(14,T.navy)} 전체 BEST 3</div>
               <div style={{display:"grid",gap:5}}>
                 {ranked.slice(0,3).map((s,rank)=>(
-                  <RankRow key={rank} s={s} rank={rank} isMe={s.name===profile.name}/>
+                  <RankRow key={rank} s={s} rank={rank} isMe={s.name===profile.name} highlightFirst={meInTop3}/>
                 ))}
               </div>
             </Card>
@@ -2558,7 +2651,7 @@ const StudentCertView = ({profile}) => {
               ) : (
                 <div style={{display:"grid",gap:5}}>
                   {sameGradeRanked.map((s,rank)=>(
-                    <RankRow key={rank} s={s} rank={rank} isMe={s.name===profile.name}/>
+                    <RankRow key={rank} s={s} rank={rank} isMe={s.name===profile.name} highlightFirst={meInGradeTop3}/>
                   ))}
                 </div>
               )}
@@ -2716,18 +2809,18 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
     setCertRecordsLoading(false);
   };
 
-  const updateCertScores = async (certId, complianceVal, completenessVal) => {
+  const updateCertScore = async (certId, scoreVal) => {
     setCertScoreSaving(true);
-    const compliance   = complianceVal==="" || complianceVal==null ? null : Number(complianceVal);
-    const completeness = completenessVal==="" || completenessVal==null ? null : Number(completenessVal);
+    const score = scoreVal==="" || scoreVal==null ? null : Number(scoreVal);
+    // 단일 점수 — completeness_score만 사용 (compliance는 null로 리셋)
     await supabase.rpc("update_cert_scores", {
       p_cert_id: certId,
-      p_compliance: compliance,
-      p_completeness: completeness,
+      p_compliance: null,
+      p_completeness: score,
     });
     setCertScoreSaving(false);
-    setCertRecords(prev => prev.map(r => r.id===certId ? {...r, compliance_score: compliance, completeness_score: completeness} : r));
-    setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, compliance_score: compliance, completeness_score: completeness} : c));
+    setCertRecords(prev => prev.map(r => r.id===certId ? {...r, completeness_score: score, compliance_score: null} : r));
+    setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, completeness_score: score, compliance_score: null} : c));
   };
 
   const updateCertRecord = async (id, updates) => {
@@ -3150,7 +3243,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                   <div id="cert-top"
                     onScroll={e=>{const b=document.getElementById('cert-body');if(b)b.scrollLeft=e.target.scrollLeft;}}
                     style={{overflowX:"auto",overflowY:"hidden",height:14,borderBottom:`1px solid ${T.border}`,cursor:"ew-resize"}}>
-                    <div style={{width:32+100+140+36+38+38+ROSTER2_NAVER_DATES.length*CELL_W+20,height:1}}/>
+                    <div style={{width:32+100+140+36+44+ROSTER2_NAVER_DATES.length*CELL_W+20,height:1}}/>
                   </div>
                   <div id="cert-body"
                     onScroll={e=>{const t=document.getElementById('cert-top');if(t)t.scrollLeft=e.target.scrollLeft;}}
@@ -3162,10 +3255,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                           <th rowSpan={2} style={{...stickyBase,left:32,width:100,minWidth:100,fontSize:11,color:T.muted,fontWeight:700,padding:"4px 6px",background:T.surfaceAlt,borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>이름 / 연락처</th>
                           <th rowSpan={2} style={{width:140,minWidth:140,fontSize:11,color:T.muted,fontWeight:700,padding:"4px 8px",background:T.surfaceAlt,borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>네이버 닉네임</th>
                           <th rowSpan={2} style={{width:36,minWidth:36,fontSize:9,fontWeight:700,color:"#4F46E5",background:"#EEF2FF",textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`2px solid #4F46E5`,verticalAlign:"middle"}}>인증<br/>합계</th>
-                          <th rowSpan={2} style={{width:38,minWidth:38,fontSize:9,fontWeight:700,color:"#4F46E5",background:"#F5F3FF",textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>이행도<br/>평균</th>
-                          <th rowSpan={2} style={{width:38,minWidth:38,fontSize:9,fontWeight:700,color:"#16A34A",background:"#F0FDF4",textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>완성도<br/>평균</th>
+                          <th rowSpan={2} style={{width:44,minWidth:44,fontSize:9,fontWeight:700,color:"#16A34A",background:"#F0FDF4",textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>점수<br/>평균</th>
                           <th colSpan={ROSTER2_NAVER_DATES.length} style={{background:"#EEF2FF",color:"#4F46E5",fontSize:11,fontWeight:800,textAlign:"center",padding:"4px 0",borderBottom:`1px solid ${T.border}`,borderLeft:`2px solid #4F46E5`}}>
-                            카페 인증 ({ROSTER2_NAVER_DATES.length}일) — 이행도 / 완성도
+                            카페 인증 ({ROSTER2_NAVER_DATES.length}일) — 완성도 점수
                           </th>
                         </tr>
                         <tr>
@@ -3186,17 +3278,11 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                             .map(dt => getStudentCertOnDate(s,dt))
                             .filter(Boolean);
                           const certCount = studentCerts.length;
-                          const complianceVals = studentCerts
-                            .map(c => c.compliance_score)
-                            .filter(v => v !== null && v !== undefined);
-                          const completenessVals = studentCerts
+                          const scoreVals = studentCerts
                             .map(c => c.completeness_score)
                             .filter(v => v !== null && v !== undefined);
-                          const avgComp = complianceVals.length
-                            ? Math.round(complianceVals.reduce((a,b)=>a+Number(b),0)/complianceVals.length)
-                            : null;
-                          const avgComplete = completenessVals.length
-                            ? Math.round(completenessVals.reduce((a,b)=>a+Number(b),0)/completenessVals.length)
+                          const avgScore = scoreVals.length
+                            ? Math.round(scoreVals.reduce((a,b)=>a+Number(b),0)/scoreVals.length)
                             : null;
                           const isEd = rosterEditRow?.id===s.id;
                           const rowBg = ri%2===0?T.surface:T.surfaceAlt;
@@ -3221,45 +3307,35 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                                 </div>
                               </td>
                               {/* 인증 합계 */}
-                              <td style={{width:36,minWidth:36,textAlign:"center",verticalAlign:"middle",background:"#EEF2FF",borderBottom:`1px solid ${T.border}`,borderLeft:`2px solid #4F46E5`,height:42}}>
+                              <td style={{width:36,minWidth:36,textAlign:"center",verticalAlign:"middle",background:"#EEF2FF",borderBottom:`1px solid ${T.border}`,borderLeft:`2px solid #4F46E5`,height:38}}>
                                 <div style={{fontSize:12,fontWeight:800,color:"#4F46E5"}}>{certCount}</div>
                                 <div style={{fontSize:8,color:"#6D28D9"}}>/{ROSTER2_NAVER_DATES.length}</div>
                               </td>
-                              {/* 이행도 평균 */}
-                              <td style={{width:38,minWidth:38,textAlign:"center",verticalAlign:"middle",background:"#F5F3FF",borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,height:42}}>
-                                <div style={{fontSize:12,fontWeight:800,color:avgComp!==null?"#4F46E5":T.muted}}>
-                                  {avgComp!==null ? avgComp : "—"}
+                              {/* 점수 평균 */}
+                              <td style={{width:44,minWidth:44,textAlign:"center",verticalAlign:"middle",background:"#F0FDF4",borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,height:38}}>
+                                <div style={{fontSize:13,fontWeight:800,color:avgScore!==null?"#16A34A":T.muted}}>
+                                  {avgScore!==null ? avgScore : "—"}
                                 </div>
                               </td>
-                              {/* 완성도 평균 */}
-                              <td style={{width:38,minWidth:38,textAlign:"center",verticalAlign:"middle",background:"#F0FDF4",borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,height:42}}>
-                                <div style={{fontSize:12,fontWeight:800,color:avgComplete!==null?"#16A34A":T.muted}}>
-                                  {avgComplete!==null ? avgComplete : "—"}
-                                </div>
-                              </td>
-                              {/* 날짜별 셀 — 이행도/완성도 두 점수 표시 */}
+                              {/* 날짜별 셀 — 완성도 점수 1개 */}
                               {ROSTER2_NAVER_DATES.map((dt,di)=>{
                                 const cert = getStudentCertOnDate(s,dt);
                                 const has = !!cert;
-                                const cv = has && cert.compliance_score !== null && cert.compliance_score !== undefined ? cert.compliance_score : null;
                                 const ev = has && cert.completeness_score !== null && cert.completeness_score !== undefined ? cert.completeness_score : null;
                                 return (
                                   <td key={di} style={{
-                                    width:CELL_W,minWidth:CELL_W,height:42,
+                                    width:CELL_W,minWidth:CELL_W,height:38,
                                     textAlign:"center",verticalAlign:"middle",
                                     borderBottom:`1px solid ${T.border}`,
                                     borderLeft:di===0?`2px solid #4F46E5`:`1px solid ${T.border}`,
                                     background:has?"#D1FAE5":rowBg,
-                                    padding:0,
                                   }}>
-                                    {has ? (
-                                      <div style={{display:"flex",flexDirection:"column",lineHeight:1.1,gap:1}}>
-                                        <span style={{fontSize:9,fontWeight:800,color:"#4F46E5"}}>{cv!==null ? cv : "·"}</span>
-                                        <span style={{fontSize:9,fontWeight:800,color:"#16A34A"}}>{ev!==null ? ev : "·"}</span>
-                                      </div>
-                                    ) : (
-                                      <span style={{fontSize:10,color:"#D1D5DB"}}>·</span>
-                                    )}
+                                    {has
+                                      ? (ev!==null
+                                          ? <span style={{fontSize:11,fontWeight:800,color:"#065F46"}}>{ev}</span>
+                                          : <span style={{fontSize:11,color:"#065F46"}}>✓</span>)
+                                      : <span style={{fontSize:10,color:"#D1D5DB"}}>·</span>
+                                    }
                                   </td>
                                 );
                               })}
@@ -3289,9 +3365,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                 ):(
                   <Card style={{padding:0,overflow:"hidden"}}>
                     {/* 헤더 */}
-                    <div style={{display:"grid",gridTemplateColumns:"50px 80px 55px 60px 1fr 90px 65px 90px",
+                    <div style={{display:"grid",gridTemplateColumns:"50px 80px 55px 60px 1fr 90px 65px 70px",
                       background:T.navy,padding:"9px 12px",gap:6,alignItems:"center"}}>
-                      {["글번호","학생","회차","정시여부","제목","닉네임","작성일","이행도 / 완성도"].map(h=>(
+                      {["글번호","학생","회차","정시여부","제목","닉네임","작성일","점수"].map(h=>(
                         <div key={h} style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:h==="제목"?"left":"center"}}>{h}</div>
                       ))}
                     </div>
@@ -3304,10 +3380,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                       const {sessionNum, isLate} = getSessionInfo(rec.posted_at);
                       const rowBg = i%2===0?T.white:"#F9FAFB";
                       const articleId = rec.post_url ? rec.post_url.split("/").pop() : rec.id;
-                      const hasComp = rec.compliance_score !== null && rec.compliance_score !== undefined;
-                      const hasComplete = rec.completeness_score !== null && rec.completeness_score !== undefined;
+                      const hasScore = rec.completeness_score !== null && rec.completeness_score !== undefined;
                       return (
-                        <div key={rec.id} style={{display:"grid",gridTemplateColumns:"50px 80px 55px 60px 1fr 90px 65px 90px",
+                        <div key={rec.id} style={{display:"grid",gridTemplateColumns:"50px 80px 55px 60px 1fr 90px 65px 70px",
                           padding:"8px 12px",gap:6,borderTop:`1px solid ${T.border}`,
                           background:rowBg,alignItems:"center"}}>
                           {/* 글번호 */}
@@ -3346,20 +3421,18 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                           <div style={{fontSize:11,color:T.muted,textAlign:"center"}}>
                             {(()=>{const k=new Date(new Date(rec.posted_at).getTime()+9*3600*1000);return`${k.getUTCMonth()+1}/${k.getUTCDate()}`;})()}
                           </div>
-                          {/* 점수 (이행도 / 완성도) — 클릭 → 모달 */}
+                          {/* 점수 (완성도, 100점) — 클릭 → 모달 */}
                           <div style={{textAlign:"center"}}>
                             <div onClick={()=>setCertScoreModal({
                                 id:rec.id, postTitle:rec.post_title,
-                                compliance:   hasComp     ? String(rec.compliance_score)   : "",
-                                completeness: hasComplete ? String(rec.completeness_score) : "",
+                                score: hasScore ? String(rec.completeness_score) : "",
                               })}
-                              style={{cursor:"pointer",fontSize:12,fontWeight:700,padding:"3px 4px",
-                                borderRadius:4,border:"1px dashed transparent",lineHeight:1.2}}
+                              style={{cursor:"pointer",fontSize:13,fontWeight:800,padding:"3px 4px",
+                                borderRadius:4,border:"1px dashed transparent",
+                                color: hasScore ? "#16A34A" : T.muted}}
                               onMouseOver={e=>e.currentTarget.style.borderColor="#D1D5DB"}
                               onMouseOut={e=>e.currentTarget.style.borderColor="transparent"}>
-                              <span style={{color:hasComp?"#4F46E5":T.muted}}>{hasComp ? rec.compliance_score : "—"}</span>
-                              <span style={{color:T.muted,margin:"0 4px"}}>/</span>
-                              <span style={{color:hasComplete?"#16A34A":T.muted}}>{hasComplete ? rec.completeness_score : "—"}</span>
+                              {hasScore ? rec.completeness_score : "—"}
                             </div>
                           </div>
                         </div>
@@ -3395,48 +3468,35 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
               );
             })()}
 
-            {/* ── 점수 입력 팝업 모달 (이행도 + 완성도) ── */}
+            {/* ── 점수 입력 팝업 모달 (완성도 100점) ── */}
             {certScoreModal && (
               <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}
                 onClick={()=>setCertScoreModal(null)}>
-                <div style={{background:T.white,borderRadius:16,padding:24,maxWidth:460,width:"90%",boxShadow:"0 8px 32px rgba(0,0,0,0.18)"}}
+                <div style={{background:T.white,borderRadius:16,padding:24,maxWidth:420,width:"90%",boxShadow:"0 8px 32px rgba(0,0,0,0.18)"}}
                   onClick={e=>e.stopPropagation()}>
                   <div style={{fontWeight:800,fontSize:15,color:T.navy,marginBottom:6}}>점수 입력</div>
                   <div style={{fontSize:12,color:T.muted,marginBottom:18,wordBreak:"break-word",lineHeight:1.4}}>
                     {certScoreModal.postTitle}
                   </div>
-                  <div style={{display:"flex",gap:12,marginBottom:18}}>
-                    <div style={{flex:1}}>
-                      <label style={{fontSize:11,fontWeight:700,color:"#4F46E5",display:"block",marginBottom:5}}>이행도 (0~100)</label>
-                      <input type="number" min="0" max="100" autoFocus
-                        value={certScoreModal.compliance}
-                        onChange={e=>setCertScoreModal(p=>({...p,compliance:e.target.value}))}
-                        onKeyDown={e=>{ if(e.key==="Escape") setCertScoreModal(null); }}
-                        style={{...css.input,width:"100%",padding:"9px 12px",fontSize:14,boxSizing:"border-box"}}
-                        placeholder="예: 85" />
-                    </div>
-                    <div style={{flex:1}}>
-                      <label style={{fontSize:11,fontWeight:700,color:"#16A34A",display:"block",marginBottom:5}}>완성도 (0~100)</label>
-                      <input type="number" min="0" max="100"
-                        value={certScoreModal.completeness}
-                        onChange={e=>setCertScoreModal(p=>({...p,completeness:e.target.value}))}
-                        onKeyDown={async e=>{
-                          if(e.key==="Enter"){
-                            await updateCertScores(certScoreModal.id, certScoreModal.compliance, certScoreModal.completeness);
-                            setCertScoreModal(null);
-                          }
-                          if(e.key==="Escape") setCertScoreModal(null);
-                        }}
-                        style={{...css.input,width:"100%",padding:"9px 12px",fontSize:14,boxSizing:"border-box"}}
-                        placeholder="예: 90" />
-                    </div>
-                  </div>
-                  <div style={{fontSize:10,color:T.muted,marginBottom:12}}>※ 비우고 확인 시 해당 점수 삭제</div>
+                  <label style={{fontSize:11,fontWeight:700,color:"#16A34A",display:"block",marginBottom:6}}>완성도 (0~100점)</label>
+                  <input type="number" min="0" max="100" autoFocus
+                    value={certScoreModal.score}
+                    onChange={e=>setCertScoreModal(p=>({...p,score:e.target.value}))}
+                    onKeyDown={async e=>{
+                      if(e.key==="Enter"){
+                        await updateCertScore(certScoreModal.id, certScoreModal.score);
+                        setCertScoreModal(null);
+                      }
+                      if(e.key==="Escape") setCertScoreModal(null);
+                    }}
+                    style={{...css.input,width:"100%",padding:"10px 14px",fontSize:15,marginBottom:6,boxSizing:"border-box"}}
+                    placeholder="예: 85" />
+                  <div style={{fontSize:10,color:T.muted,marginBottom:16}}>※ 비우고 확인 시 점수 삭제</div>
                   <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
                     <button onClick={()=>setCertScoreModal(null)}
                       style={{...css.btnOutline,padding:"7px 18px",fontSize:13}}>취소</button>
                     <button onClick={async()=>{
-                      await updateCertScores(certScoreModal.id, certScoreModal.compliance, certScoreModal.completeness);
+                      await updateCertScore(certScoreModal.id, certScoreModal.score);
                       setCertScoreModal(null);
                     }} disabled={certScoreSaving}
                       style={{...css.btnOrange,padding:"7px 18px",fontSize:13,opacity:certScoreSaving?0.6:1}}>
