@@ -2337,10 +2337,11 @@ const StudentCertView = ({profile}) => {
 
   // 주차별 달성률 (8주, 시작: 2026-05-17 일요일)
   const WEEK_START = new Date(2026, 4, 17);
+  const NAVER_WEEK_START = new Date(2026, 4, 20); // 카페 인증 주 시작 (수)
   const currentWeekIdx = Math.min(7, Math.max(0, Math.floor((today - WEEK_START) / 604800000)));
   const weeklyData = Array.from({length:8}, (_, w) => {
     const allDates = [
-      ...ROSTER2_NAVER_DATES.filter(dt => Math.floor((dt-WEEK_START)/604800000)===w).map(dt=>({dt,type:"N"})),
+      ...ROSTER2_NAVER_DATES.filter(dt => Math.floor((dt-NAVER_WEEK_START)/604800000)===w).map(dt=>({dt,type:"N"})),
       ...ROSTER2_MORNING_DATES.filter(dt => Math.floor((dt-WEEK_START)/604800000)===w).map(dt=>({dt,type:"M"})),
       ...ROSTER2_NIGHT_DATES.filter(dt => Math.floor((dt-WEEK_START)/604800000)===w).map(dt=>({dt,type:"나"})),
     ];
@@ -2716,8 +2717,12 @@ const StudentCertView = ({profile}) => {
                               ● {label}
                             </td>
                             {weekStarts.map((wStart,wIdx)=>{
-                              const wEnd=new Date(wStart.getTime()+7*86400000);
-                              const wDates=[...dates].filter(dt=>dt>=wStart&&dt<wEnd).sort((a,b)=>a-b);
+                              // 카페 인증(N)은 5/20 수요일 기준으로 주 분할 (수~화), 모닝/나잇은 일요일 기준
+                              const actualWStart = type==="N"
+                                ? new Date(NAVER_WEEK_START.getTime()+wIdx*7*86400000)
+                                : wStart;
+                              const wEnd=new Date(actualWStart.getTime()+7*86400000);
+                              const wDates=[...dates].filter(dt=>dt>=actualWStart&&dt<wEnd).sort((a,b)=>a-b);
                               const isCurrentWeek = wIdx===currentWeekIdx;
                               return(
                                 <td key={wIdx} style={{verticalAlign:"middle",
