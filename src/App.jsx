@@ -6503,7 +6503,7 @@ export default function App() {
             return [
               { header: true, label: `👤 ${cname}` },
               ...(childIs2ki ? [{ key:`child-cert-${cid}`,      label:"20HA 2기 인증현황", icon:"trophy"   }] : []),
-              { key:`child-manjeom-${cid}`,   label:"만점 테스트",   icon:"cap" },
+              // 만점 테스트는 관리자 검토 중 — 학부모 메뉴에서도 임시 숨김 (admin 전용)
               { key:`child-dashboard-${cid}`, label:"메타인지 분석", icon:"cap"      },
               { key:`child-history-${cid}`,   label:"학습 기록",     icon:"calendar" },
             ];
@@ -6511,7 +6511,7 @@ export default function App() {
         ]
       : [
           ...(isIn2ki ? [{ key:"cert", label:"20HA 2기 인증현황", icon:"trophy" }] : []),
-          { key:"manjeom",   label:"만점 테스트",   icon:"cap" },
+          // 만점 테스트는 관리자 검토 중 — 학생 메뉴에서 임시 숨김 (admin 전용)
           { key:"dashboard", label:"메타인지 분석", icon:"cap" },
           { key:"history",   label:"학습 기록",     icon:"calendar" },
         ];
@@ -6603,20 +6603,17 @@ export default function App() {
             <AttendanceUploadView onRefresh={refreshData}/>
           ) : view === "manjeom" && isAdmin ? (
             <ManjeomView onRefresh={refreshData} allProfiles={allProfiles}/>
-          ) : view === "manjeom" && !isAdmin && !isParent ? (
-            <ManjeomStudentView profile={profile}/>
           ) : (view === "users" || view === "cert" || view === "roster2") && isAdmin ? (
             <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData} defaultTab={view}/>
           ) : isParent && view.startsWith("child-") ? (
             (() => {
-              // view: child-cert-{id} / child-dashboard-{id} / child-history-{id} / child-manjeom-{id}
-              const m = view.match(/^child-(cert|dashboard|history|manjeom)-(.+)$/);
+              // 만점 테스트는 관리자 검토 중 — child-manjeom-* 라우트는 admin 전환 전까지 비활성
+              const m = view.match(/^child-(cert|dashboard|history)-(.+)$/);
               if(!m) return null;
               const [, sub, cid] = m;
               const child = children.find(c => c.profile.id === cid);
               if(!child) return <Card style={{padding:24,textAlign:"center",color:T.muted}}>자녀 정보를 찾을 수 없어요.</Card>;
               if(sub === "cert")      return <StudentCertView profile={child.profile}/>;
-              if(sub === "manjeom")   return <ManjeomStudentView profile={child.profile}/>;
               if(sub === "history")   return <LogHistory logs={child.logs} onDelete={null} isAdmin={false} allProfiles={[child.profile]}/>;
               return <StudentDashboard logs={child.logs} profile={child.profile} isAdminView={true}/>;
             })()
