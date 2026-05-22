@@ -2104,8 +2104,13 @@ const _genDates = (days) => {
     }
   return result;
 };
-// 카페 인증은 5/20(수)부터 시작 — 5/17(일)은 제외
-const ROSTER2_NAVER_DATES   = _genDates([0, 3]).filter(d => !(d.getFullYear()===2026 && d.getMonth()===4 && d.getDate()===17));
+// 카페 인증: 5/20(수) ~ 7/12(일), 매주 수/일 2회씩 8주 (총 16일)
+// 5/17(일)은 제외, 마지막에 7/12(일) 추가하여 페어 유지
+const ROSTER2_NAVER_DATES   = _genDates([0, 3])
+  .filter(d => !(d.getFullYear()===2026 && d.getMonth()===4 && d.getDate()===17))
+  .concat([new Date(2026, 6, 12)]); // 7/12 일요일
+// 카페 인증의 주 시작은 5/20(수) — 모닝/나잇 주 구분(5/17 일요일 시작)과 다름
+const NAVER_WEEK_START      = new Date(2026, 4, 20);
 const ROSTER2_MORNING_DATES = _genDates([1, 3, 5]);
 const ROSTER2_NIGHT_DATES   = _genDates([0, 1, 2, 4, 5, 6]);
 const ROSTER2_DAY_KO        = ['일','월','화','수','목','금','토'];
@@ -2223,7 +2228,8 @@ const StudentCertView = ({profile}) => {
   const currentWeekIdx = Math.min(7, Math.max(0, Math.floor((today - WEEK_START) / 604800000)));
   const weeklyData = Array.from({length:8}, (_, w) => {
     const allDates = [
-      ...ROSTER2_NAVER_DATES.filter(dt => Math.floor((dt-WEEK_START)/604800000)===w).map(dt=>({dt,type:"N"})),
+      // 카페 인증은 NAVER_WEEK_START(5/20 수) 기준으로 주 분할 — 모닝/나잇과 다름
+      ...ROSTER2_NAVER_DATES.filter(dt => Math.floor((dt-NAVER_WEEK_START)/604800000)===w).map(dt=>({dt,type:"N"})),
       ...ROSTER2_MORNING_DATES.filter(dt => Math.floor((dt-WEEK_START)/604800000)===w).map(dt=>({dt,type:"M"})),
       ...ROSTER2_NIGHT_DATES.filter(dt => Math.floor((dt-WEEK_START)/604800000)===w).map(dt=>({dt,type:"나"})),
     ];
@@ -2599,8 +2605,12 @@ const StudentCertView = ({profile}) => {
                               ● {label}
                             </td>
                             {weekStarts.map((wStart,wIdx)=>{
-                              const wEnd=new Date(wStart.getTime()+7*86400000);
-                              const wDates=[...dates].filter(dt=>dt>=wStart&&dt<wEnd).sort((a,b)=>a-b);
+                              // 카페 인증(N)은 NAVER_WEEK_START(5/20 수)부터 1주 단위 — 모닝/나잇과 주 시작 다름
+                              const actualWStart = type==="N"
+                                ? new Date(NAVER_WEEK_START.getTime()+wIdx*7*86400000)
+                                : wStart;
+                              const wEnd=new Date(actualWStart.getTime()+7*86400000);
+                              const wDates=[...dates].filter(dt=>dt>=actualWStart&&dt<wEnd).sort((a,b)=>a-b);
                               const isCurrentWeek = wIdx===currentWeekIdx;
                               return(
                                 <td key={wIdx} style={{verticalAlign:"middle",
@@ -2914,14 +2924,17 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
     loadCertStudents();
     if(adminTab==="cert") loadCertRecords("all");
     // 카페 인증 현황: ROSTER2_NAVER_DATES 전체 기간 로드
-    const from = new Date(ROSTER2_NAVER_DATES[0]); from.setHours(0,0,0,0);
-    const to = new Date(ROSTER2_NAVER_DATES[ROSTER2_NAVER_DATES.length-1]); to.setHours(23,59,59,999);
-    loadAttendanceCerts(from, to);
-    // 모닝/나잇 출석 로그 로드 → attendance2 state ({roster2Idx}-${type}-${YYYY-MM-DD})
+    const certFrom = new Date(ROSTER2_NAVER_DATES[0]); certFrom.setHours(0,0,0,0);
+    const certTo = new Date(ROSTER2_NAVER_DATES[ROSTER2_NAVER_DATES.length-1]); certTo.setHours(23,59,59,999);
+    loadAttendanceCerts(certFrom, certTo);
+    // 모닝/나잇 출석 로그 로드 → 전체 활동 기간(5/17~)
     if(adminTab==="roster2"){
-      const fromStr = `${from.getFullYear()}-${String(from.getMonth()+1).padStart(2,'0')}-${String(from.getDate()).padStart(2,'0')}`;
-      const toStr   = `${to.getFullYear()}-${String(to.getMonth()+1).padStart(2,'0')}-${String(to.getDate()).padStart(2,'0')}`;
-      // 전체 클래스 출석 로그 (관리자가 보는 화면)
+      const allDates = [...ROSTER2_MORNING_DATES, ...ROSTER2_NIGHT_DATES];
+      const minMs = Math.min(...allDates.map(d=>d.getTime()));
+      const maxMs = Math.max(...allDates.map(d=>d.getTime()));
+      const f = new Date(minMs); const t = new Date(maxMs);
+      const fromStr = `${f.getFullYear()}-${String(f.getMonth()+1).padStart(2,'0')}-${String(f.getDate()).padStart(2,'0')}`;
+      const toStr   = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
       supabase.rpc("get_attendance_logs", {p_from: fromStr, p_to: toStr}).then(({data})=>{
         const map = {};
         (data||[]).forEach(r => {
