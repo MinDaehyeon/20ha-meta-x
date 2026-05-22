@@ -2622,7 +2622,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
   const [certNickEdit, setCertNickEdit] = useState({}); // {profile_id: editing_value}
   const [invalidCerts, setInvalidCerts] = useState([]);
   const [certSubTab, setCertSubTab] = useState("roster"); // "roster" | "records"
-  const [certScoreModal, setCertScoreModal] = useState(null); // {id, postTitle, value}
+  const [certScoreModal, setCertScoreModal] = useState(null); // {id, postTitle, compliance, completeness}
   const [certScoreSaving, setCertScoreSaving] = useState(false);
   const [lastCrawledAt, setLastCrawledAt] = useState(null);
   const [certRecordsPage, setCertRecordsPage] = useState(1);
@@ -2714,13 +2714,18 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
     setCertRecordsLoading(false);
   };
 
-  const updateCertScore = async (certId, scoreVal) => {
+  const updateCertScores = async (certId, complianceVal, completenessVal) => {
     setCertScoreSaving(true);
-    const score = scoreVal==="" || scoreVal==null ? null : Number(scoreVal);
-    await supabase.rpc("update_cert_score", {p_cert_id: certId, p_score: score});
+    const compliance   = complianceVal==="" || complianceVal==null ? null : Number(complianceVal);
+    const completeness = completenessVal==="" || completenessVal==null ? null : Number(completenessVal);
+    await supabase.rpc("update_cert_scores", {
+      p_cert_id: certId,
+      p_compliance: compliance,
+      p_completeness: completeness,
+    });
     setCertScoreSaving(false);
-    setCertRecords(prev => prev.map(r => r.id===certId ? {...r, score} : r));
-    setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, score} : c));
+    setCertRecords(prev => prev.map(r => r.id===certId ? {...r, compliance_score: compliance, completeness_score: completeness} : r));
+    setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, compliance_score: compliance, completeness_score: completeness} : c));
   };
 
   const updateCertRecord = async (id, updates) => {
@@ -3143,7 +3148,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                   <div id="cert-top"
                     onScroll={e=>{const b=document.getElementById('cert-body');if(b)b.scrollLeft=e.target.scrollLeft;}}
                     style={{overflowX:"auto",overflowY:"hidden",height:14,borderBottom:`1px solid ${T.border}`,cursor:"ew-resize"}}>
-                    <div style={{width:32+100+140+36+ROSTER2_NAVER_DATES.length*CELL_W+20,height:1}}/>
+                    <div style={{width:32+100+140+36+38+38+ROSTER2_NAVER_DATES.length*CELL_W+20,height:1}}/>
                   </div>
                   <div id="cert-body"
                     onScroll={e=>{const t=document.getElementById('cert-top');if(t)t.scrollLeft=e.target.scrollLeft;}}
@@ -3155,8 +3160,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                           <th rowSpan={2} style={{...stickyBase,left:32,width:100,minWidth:100,fontSize:11,color:T.muted,fontWeight:700,padding:"4px 6px",background:T.surfaceAlt,borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>이름 / 연락처</th>
                           <th rowSpan={2} style={{width:140,minWidth:140,fontSize:11,color:T.muted,fontWeight:700,padding:"4px 8px",background:T.surfaceAlt,borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>네이버 닉네임</th>
                           <th rowSpan={2} style={{width:36,minWidth:36,fontSize:9,fontWeight:700,color:"#4F46E5",background:"#EEF2FF",textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`2px solid #4F46E5`,verticalAlign:"middle"}}>인증<br/>합계</th>
+                          <th rowSpan={2} style={{width:38,minWidth:38,fontSize:9,fontWeight:700,color:"#4F46E5",background:"#F5F3FF",textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>이행도<br/>평균</th>
+                          <th rowSpan={2} style={{width:38,minWidth:38,fontSize:9,fontWeight:700,color:"#16A34A",background:"#F0FDF4",textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>완성도<br/>평균</th>
                           <th colSpan={ROSTER2_NAVER_DATES.length} style={{background:"#EEF2FF",color:"#4F46E5",fontSize:11,fontWeight:800,textAlign:"center",padding:"4px 0",borderBottom:`1px solid ${T.border}`,borderLeft:`2px solid #4F46E5`}}>
-                            카페 인증 ({ROSTER2_NAVER_DATES.length}일)
+                            카페 인증 ({ROSTER2_NAVER_DATES.length}일) — 이행도 / 완성도
                           </th>
                         </tr>
                         <tr>
@@ -3173,7 +3180,22 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                           <tr><td colSpan={4+ROSTER2_NAVER_DATES.length} style={{textAlign:"center",padding:40,color:T.muted,fontSize:13}}>데이터 로딩 중...</td></tr>
                         ):certStudents.map((s,ri)=>{
                           const nicks = s.naver_nicknames || [];
-                          const certCount = ROSTER2_NAVER_DATES.filter(dt=>studentHasCert(s,dt)).length;
+                          const studentCerts = ROSTER2_NAVER_DATES
+                            .map(dt => getStudentCertOnDate(s,dt))
+                            .filter(Boolean);
+                          const certCount = studentCerts.length;
+                          const complianceVals = studentCerts
+                            .map(c => c.compliance_score)
+                            .filter(v => v !== null && v !== undefined);
+                          const completenessVals = studentCerts
+                            .map(c => c.completeness_score)
+                            .filter(v => v !== null && v !== undefined);
+                          const avgComp = complianceVals.length
+                            ? Math.round(complianceVals.reduce((a,b)=>a+Number(b),0)/complianceVals.length)
+                            : null;
+                          const avgComplete = completenessVals.length
+                            ? Math.round(completenessVals.reduce((a,b)=>a+Number(b),0)/completenessVals.length)
+                            : null;
                           const isEd = rosterEditRow?.id===s.id;
                           const rowBg = ri%2===0?T.surface:T.surfaceAlt;
                           return (
@@ -3197,29 +3219,45 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                                 </div>
                               </td>
                               {/* 인증 합계 */}
-                              <td style={{width:36,minWidth:36,textAlign:"center",verticalAlign:"middle",background:"#EEF2FF",borderBottom:`1px solid ${T.border}`,borderLeft:`2px solid #4F46E5`,height:36}}>
+                              <td style={{width:36,minWidth:36,textAlign:"center",verticalAlign:"middle",background:"#EEF2FF",borderBottom:`1px solid ${T.border}`,borderLeft:`2px solid #4F46E5`,height:42}}>
                                 <div style={{fontSize:12,fontWeight:800,color:"#4F46E5"}}>{certCount}</div>
                                 <div style={{fontSize:8,color:"#6D28D9"}}>/{ROSTER2_NAVER_DATES.length}</div>
                               </td>
-                              {/* 날짜별 셀 — 점수 또는 ✓ 표시 */}
+                              {/* 이행도 평균 */}
+                              <td style={{width:38,minWidth:38,textAlign:"center",verticalAlign:"middle",background:"#F5F3FF",borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,height:42}}>
+                                <div style={{fontSize:12,fontWeight:800,color:avgComp!==null?"#4F46E5":T.muted}}>
+                                  {avgComp!==null ? avgComp : "—"}
+                                </div>
+                              </td>
+                              {/* 완성도 평균 */}
+                              <td style={{width:38,minWidth:38,textAlign:"center",verticalAlign:"middle",background:"#F0FDF4",borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,height:42}}>
+                                <div style={{fontSize:12,fontWeight:800,color:avgComplete!==null?"#16A34A":T.muted}}>
+                                  {avgComplete!==null ? avgComplete : "—"}
+                                </div>
+                              </td>
+                              {/* 날짜별 셀 — 이행도/완성도 두 점수 표시 */}
                               {ROSTER2_NAVER_DATES.map((dt,di)=>{
                                 const cert = getStudentCertOnDate(s,dt);
                                 const has = !!cert;
-                                const hasScore = has && cert.score !== null && cert.score !== undefined;
+                                const cv = has && cert.compliance_score !== null && cert.compliance_score !== undefined ? cert.compliance_score : null;
+                                const ev = has && cert.completeness_score !== null && cert.completeness_score !== undefined ? cert.completeness_score : null;
                                 return (
                                   <td key={di} style={{
-                                    width:CELL_W,minWidth:CELL_W,height:36,
+                                    width:CELL_W,minWidth:CELL_W,height:42,
                                     textAlign:"center",verticalAlign:"middle",
                                     borderBottom:`1px solid ${T.border}`,
                                     borderLeft:di===0?`2px solid #4F46E5`:`1px solid ${T.border}`,
                                     background:has?"#D1FAE5":rowBg,
+                                    padding:0,
                                   }}>
-                                    {hasScore
-                                      ? <span style={{fontSize:10,fontWeight:800,color:"#065F46"}}>{cert.score}</span>
-                                      : has
-                                        ? <span style={{fontSize:11,color:"#065F46"}}>✓</span>
-                                        : <span style={{fontSize:10,color:"#D1D5DB"}}>·</span>
-                                    }
+                                    {has ? (
+                                      <div style={{display:"flex",flexDirection:"column",lineHeight:1.1,gap:1}}>
+                                        <span style={{fontSize:9,fontWeight:800,color:"#4F46E5"}}>{cv!==null ? cv : "·"}</span>
+                                        <span style={{fontSize:9,fontWeight:800,color:"#16A34A"}}>{ev!==null ? ev : "·"}</span>
+                                      </div>
+                                    ) : (
+                                      <span style={{fontSize:10,color:"#D1D5DB"}}>·</span>
+                                    )}
                                   </td>
                                 );
                               })}
@@ -3249,10 +3287,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                 ):(
                   <Card style={{padding:0,overflow:"hidden"}}>
                     {/* 헤더 */}
-                    <div style={{display:"grid",gridTemplateColumns:"50px 80px 55px 60px 1fr 90px 65px 58px",
+                    <div style={{display:"grid",gridTemplateColumns:"50px 80px 55px 60px 1fr 90px 65px 90px",
                       background:T.navy,padding:"9px 12px",gap:6,alignItems:"center"}}>
-                      {["글번호","학생","회차","정시여부","제목","닉네임","작성일","점수"].map(h=>(
-                        <div key={h} style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:h==="글번호"||h==="회차"||h==="정시여부"||h==="점수"?"center":"left"}}>{h}</div>
+                      {["글번호","학생","회차","정시여부","제목","닉네임","작성일","이행도 / 완성도"].map(h=>(
+                        <div key={h} style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:h==="제목"?"left":"center"}}>{h}</div>
                       ))}
                     </div>
                     {certRecords.length===0&&(
@@ -3264,14 +3302,16 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                       const {sessionNum, isLate} = getSessionInfo(rec.posted_at);
                       const rowBg = i%2===0?T.white:"#F9FAFB";
                       const articleId = rec.post_url ? rec.post_url.split("/").pop() : rec.id;
+                      const hasComp = rec.compliance_score !== null && rec.compliance_score !== undefined;
+                      const hasComplete = rec.completeness_score !== null && rec.completeness_score !== undefined;
                       return (
-                        <div key={rec.id} style={{display:"grid",gridTemplateColumns:"50px 80px 55px 60px 1fr 90px 65px 58px",
+                        <div key={rec.id} style={{display:"grid",gridTemplateColumns:"50px 80px 55px 60px 1fr 90px 65px 90px",
                           padding:"8px 12px",gap:6,borderTop:`1px solid ${T.border}`,
                           background:rowBg,alignItems:"center"}}>
-                          {/* 글번호 (네이버 article ID) */}
+                          {/* 글번호 */}
                           <div style={{fontSize:11,color:T.muted,textAlign:"center",fontFamily:"monospace"}}>{articleId}</div>
-                          {/* 학생 */}
-                          <div style={{fontSize:12,fontWeight:700,color:rec.matched_student_name?T.navy:T.muted}}>
+                          {/* 학생 (가운데) */}
+                          <div style={{fontSize:12,fontWeight:700,color:rec.matched_student_name?T.navy:T.muted,textAlign:"center"}}>
                             {rec.matched_student_name||"—"}
                           </div>
                           {/* 회차 */}
@@ -3287,7 +3327,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                                 : <span style={{color:"#065F46",fontWeight:700}}>✅ 정시</span>
                             }
                           </div>
-                          {/* 제목 (링크) */}
+                          {/* 제목 (링크, 좌측 정렬) */}
                           <div style={{fontSize:11,overflow:"hidden"}}>
                             <a href={rec.post_url} target="_blank" rel="noreferrer"
                               style={{color:T.navy,textDecoration:"none",fontWeight:600,
@@ -3298,21 +3338,26 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                               {rec.post_title}
                             </a>
                           </div>
-                          {/* 닉네임 */}
-                          <div style={{fontSize:11,color:T.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{rec.naver_nickname}</div>
-                          {/* 작성일 */}
+                          {/* 닉네임 (가운데) */}
+                          <div style={{fontSize:11,color:T.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textAlign:"center"}}>{rec.naver_nickname}</div>
+                          {/* 작성일 (가운데) */}
                           <div style={{fontSize:11,color:T.muted,textAlign:"center"}}>
                             {(()=>{const k=new Date(new Date(rec.posted_at).getTime()+9*3600*1000);return`${k.getUTCMonth()+1}/${k.getUTCDate()}`;})()}
                           </div>
-                          {/* 점수 (클릭 → 모달) */}
+                          {/* 점수 (이행도 / 완성도) — 클릭 → 모달 */}
                           <div style={{textAlign:"center"}}>
-                            <div onClick={()=>setCertScoreModal({id:rec.id,postTitle:rec.post_title,value:rec.score!==null&&rec.score!==undefined?String(rec.score):""})}
-                              style={{cursor:"pointer",fontSize:12,fontWeight:700,padding:"3px 0",
-                                color:rec.score!==null&&rec.score!==undefined?T.navy:T.muted,
-                                borderRadius:4,border:"1px dashed transparent"}}
+                            <div onClick={()=>setCertScoreModal({
+                                id:rec.id, postTitle:rec.post_title,
+                                compliance:   hasComp     ? String(rec.compliance_score)   : "",
+                                completeness: hasComplete ? String(rec.completeness_score) : "",
+                              })}
+                              style={{cursor:"pointer",fontSize:12,fontWeight:700,padding:"3px 4px",
+                                borderRadius:4,border:"1px dashed transparent",lineHeight:1.2}}
                               onMouseOver={e=>e.currentTarget.style.borderColor="#D1D5DB"}
                               onMouseOut={e=>e.currentTarget.style.borderColor="transparent"}>
-                              {rec.score!==null&&rec.score!==undefined ? rec.score : "—"}
+                              <span style={{color:hasComp?"#4F46E5":T.muted}}>{hasComp ? rec.compliance_score : "—"}</span>
+                              <span style={{color:T.muted,margin:"0 4px"}}>/</span>
+                              <span style={{color:hasComplete?"#16A34A":T.muted}}>{hasComplete ? rec.completeness_score : "—"}</span>
                             </div>
                           </div>
                         </div>
@@ -3348,33 +3393,48 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
               );
             })()}
 
-            {/* ── 점수 입력 팝업 모달 ── */}
+            {/* ── 점수 입력 팝업 모달 (이행도 + 완성도) ── */}
             {certScoreModal && (
               <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}
                 onClick={()=>setCertScoreModal(null)}>
-                <div style={{background:T.white,borderRadius:16,padding:24,maxWidth:440,width:"90%",boxShadow:"0 8px 32px rgba(0,0,0,0.18)"}}
+                <div style={{background:T.white,borderRadius:16,padding:24,maxWidth:460,width:"90%",boxShadow:"0 8px 32px rgba(0,0,0,0.18)"}}
                   onClick={e=>e.stopPropagation()}>
                   <div style={{fontWeight:800,fontSize:15,color:T.navy,marginBottom:6}}>점수 입력</div>
-                  <div style={{fontSize:12,color:T.muted,marginBottom:16,wordBreak:"break-word",lineHeight:1.4}}>
+                  <div style={{fontSize:12,color:T.muted,marginBottom:18,wordBreak:"break-word",lineHeight:1.4}}>
                     {certScoreModal.postTitle}
                   </div>
-                  <input type="number" min="0" max="100" autoFocus
-                    value={certScoreModal.value}
-                    onChange={e=>setCertScoreModal(p=>({...p,value:e.target.value}))}
-                    onKeyDown={async e=>{
-                      if(e.key==="Enter"){
-                        await updateCertScore(certScoreModal.id, certScoreModal.value);
-                        setCertScoreModal(null);
-                      }
-                      if(e.key==="Escape") setCertScoreModal(null);
-                    }}
-                    style={{...css.input,width:"100%",padding:"10px 14px",fontSize:15,marginBottom:16,boxSizing:"border-box"}}
-                    placeholder="점수 입력 (0~100) — 비우고 확인 시 점수 삭제" />
+                  <div style={{display:"flex",gap:12,marginBottom:18}}>
+                    <div style={{flex:1}}>
+                      <label style={{fontSize:11,fontWeight:700,color:"#4F46E5",display:"block",marginBottom:5}}>이행도 (0~100)</label>
+                      <input type="number" min="0" max="100" autoFocus
+                        value={certScoreModal.compliance}
+                        onChange={e=>setCertScoreModal(p=>({...p,compliance:e.target.value}))}
+                        onKeyDown={e=>{ if(e.key==="Escape") setCertScoreModal(null); }}
+                        style={{...css.input,width:"100%",padding:"9px 12px",fontSize:14,boxSizing:"border-box"}}
+                        placeholder="예: 85" />
+                    </div>
+                    <div style={{flex:1}}>
+                      <label style={{fontSize:11,fontWeight:700,color:"#16A34A",display:"block",marginBottom:5}}>완성도 (0~100)</label>
+                      <input type="number" min="0" max="100"
+                        value={certScoreModal.completeness}
+                        onChange={e=>setCertScoreModal(p=>({...p,completeness:e.target.value}))}
+                        onKeyDown={async e=>{
+                          if(e.key==="Enter"){
+                            await updateCertScores(certScoreModal.id, certScoreModal.compliance, certScoreModal.completeness);
+                            setCertScoreModal(null);
+                          }
+                          if(e.key==="Escape") setCertScoreModal(null);
+                        }}
+                        style={{...css.input,width:"100%",padding:"9px 12px",fontSize:14,boxSizing:"border-box"}}
+                        placeholder="예: 90" />
+                    </div>
+                  </div>
+                  <div style={{fontSize:10,color:T.muted,marginBottom:12}}>※ 비우고 확인 시 해당 점수 삭제</div>
                   <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
                     <button onClick={()=>setCertScoreModal(null)}
                       style={{...css.btnOutline,padding:"7px 18px",fontSize:13}}>취소</button>
                     <button onClick={async()=>{
-                      await updateCertScore(certScoreModal.id, certScoreModal.value);
+                      await updateCertScores(certScoreModal.id, certScoreModal.compliance, certScoreModal.completeness);
                       setCertScoreModal(null);
                     }} disabled={certScoreSaving}
                       style={{...css.btnOrange,padding:"7px 18px",fontSize:13,opacity:certScoreSaving?0.6:1}}>
@@ -3615,11 +3675,28 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
         };
         const certStudentByName = {};
         (certStudents||[]).forEach(cs => { certStudentByName[cs.name] = cs.id; });
-        const getNaverCert = (studentName, date) => {
+
+        // 회차 매칭 (지각 포함). naverDates의 sessionIdx 단위로 cert를 분류.
+        const getSessionForPostedAt = (posted_at) => {
+          const postStr = kstDateStr(posted_at);
+          for (let i = naverDates.length - 1; i >= 0; i--) {
+            const certStr = fmtKey(naverDates[i]);
+            if (postStr >= certStr) return { sessionIdx: i, isLate: postStr > certStr };
+          }
+          return { sessionIdx: -1, isLate: false };
+        };
+        // 학생의 sessionIdx별 cert(있으면 정시/지각 구분)
+        const getNaverCertForSession = (studentName, sessionIdx) => {
           const csId = certStudentByName[studentName];
-          if (!csId) return null;
-          const dk = fmtKey(date);
-          return attendanceCerts.find(c => c.assigned_student_id === csId && kstDateStr(c.posted_at) === dk) || null;
+          if (csId === undefined) return null;
+          for (const cert of attendanceCerts) {
+            if (cert.assigned_student_id !== csId) continue;
+            const info = getSessionForPostedAt(cert.posted_at);
+            if (info.sessionIdx === sessionIdx) {
+              return { cert, isLate: info.isLate };
+            }
+          }
+          return null;
         };
 
         // 출석 토글/조회
@@ -3775,7 +3852,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                         </td>
                       </tr>
                     ) : filtered.map((s, rowI) => {
-                      const nCount = naverDates.filter(dt => !!getNaverCert(s.name, dt)).length;
+                      const nCount = naverDates.filter((_, idx) => !!getNaverCertForSession(s.name, idx)).length;
                       const mCount = morningDates.filter(dt => getAtt(s.idx,"M",fmtKey(dt))).length;
                       const naCount = nightDates.filter(dt => getAtt(s.idx,"나",fmtKey(dt))).length;
                       return (
@@ -3833,10 +3910,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                           {SECS.map((sec, si) =>
                             sec.dates.map((dt, di) => {
                               const key = fmtKey(dt);
-                              // 카페 인증(N)은 cert_students/attendanceCerts에서 점수 우선 사용
-                              const naverCert = sec.type === "N" ? getNaverCert(s.name, dt) : null;
-                              const hasNaverCert = !!naverCert;
-                              const naverScore = hasNaverCert && naverCert.score !== null && naverCert.score !== undefined ? naverCert.score : null;
+                              // 카페 인증(N): O(정시) / △(지각), 회차 단위로 매칭
+                              const naverMatch = sec.type === "N" ? getNaverCertForSession(s.name, di) : null;
+                              const hasNaverCert = !!naverMatch;
+                              const isLate = hasNaverCert && naverMatch.isLate;
                               const checked = sec.type === "N" ? hasNaverCert : getAtt(s.idx, sec.type, key);
                               return (
                                 <td key={`${si}-${di}`}
@@ -3845,17 +3922,17 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                                     height: CELL_H,
                                     textAlign:"center", verticalAlign:"middle",
                                     cursor:"default",
-                                    fontSize: naverScore !== null ? 9 : 11,
-                                    fontWeight: checked ? 700 : 400,
-                                    color: checked ? sec.color : "transparent",
-                                    background: checked ? sec.bg : "transparent",
+                                    fontSize: 12,
+                                    fontWeight: checked ? 800 : 400,
+                                    color: checked ? (sec.type==="N" && isLate ? "#B45309" : sec.color) : "transparent",
+                                    background: checked ? (sec.type==="N" && isLate ? "#FEF3C7" : sec.bg) : "transparent",
                                     borderBottom:`1px solid ${T.border}`,
                                     borderLeft: di===0 ? `2px solid ${sec.color}` : `1px solid ${T.border}`,
                                     userSelect:"none",
                                     padding:0,
                                   }}>
                                   {sec.type === "N"
-                                    ? (naverScore !== null ? naverScore : (hasNaverCert ? "✓" : ""))
+                                    ? (hasNaverCert ? (isLate ? "△" : "O") : "")
                                     : (checked ? "✓" : "")}
                                 </td>
                               );
