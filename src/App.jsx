@@ -3414,7 +3414,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                   <div id="cert-top"
                     onScroll={e=>{const b=document.getElementById('cert-body');if(b)b.scrollLeft=e.target.scrollLeft;}}
                     style={{overflowX:"auto",overflowY:"hidden",height:14,borderBottom:`1px solid ${T.border}`,cursor:"ew-resize"}}>
-                    <div style={{width:32+100+140+36+44+ROSTER2_NAVER_DATES.length*CELL_W+20,height:1}}/>
+                    <div style={{width:32+100+140+42+44+ROSTER2_NAVER_DATES.length*CELL_W+20,height:1}}/>
                   </div>
                   <div id="cert-body"
                     onScroll={e=>{const t=document.getElementById('cert-top');if(t)t.scrollLeft=e.target.scrollLeft;}}
@@ -3425,7 +3425,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                           <th rowSpan={2} style={{...stickyBase,width:32,minWidth:32,fontSize:10,color:T.muted,fontWeight:700,textAlign:"center",padding:"4px 2px",background:T.surfaceAlt,borderBottom:`2px solid ${T.borderStrong}`,verticalAlign:"middle"}}>#</th>
                           <th rowSpan={2} style={{...stickyBase,left:32,width:100,minWidth:100,fontSize:11,color:T.muted,fontWeight:700,padding:"4px 6px",background:T.surfaceAlt,borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>이름 / 연락처</th>
                           <th rowSpan={2} style={{width:140,minWidth:140,fontSize:11,color:T.muted,fontWeight:700,padding:"4px 8px",background:T.surfaceAlt,borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>네이버 닉네임</th>
-                          <th rowSpan={2} style={{width:36,minWidth:36,fontSize:9,fontWeight:700,color:"#4F46E5",background:"#EEF2FF",textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`2px solid #4F46E5`,verticalAlign:"middle"}}>인증<br/>합계</th>
+                          <th rowSpan={2} style={{width:42,minWidth:42,fontSize:9,fontWeight:700,color:"#4F46E5",background:"#EEF2FF",textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`2px solid #4F46E5`,verticalAlign:"middle"}}>인증<br/>합계</th>
                           <th rowSpan={2} style={{width:44,minWidth:44,fontSize:9,fontWeight:700,color:"#16A34A",background:"#F0FDF4",textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>점수<br/>평균</th>
                           <th colSpan={ROSTER2_NAVER_DATES.length} style={{background:"#EEF2FF",color:"#4F46E5",fontSize:11,fontWeight:800,textAlign:"center",padding:"4px 0",borderBottom:`1px solid ${T.border}`,borderLeft:`2px solid #4F46E5`}}>
                             카페 인증 ({ROSTER2_NAVER_DATES.length}일) — 완성도 점수
@@ -3477,10 +3477,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                                   }
                                 </div>
                               </td>
-                              {/* 인증 합계 */}
-                              <td style={{width:36,minWidth:36,textAlign:"center",verticalAlign:"middle",background:"#EEF2FF",borderBottom:`1px solid ${T.border}`,borderLeft:`2px solid #4F46E5`,height:38}}>
-                                <div style={{fontSize:12,fontWeight:800,color:"#4F46E5"}}>{certCount}</div>
-                                <div style={{fontSize:8,color:"#6D28D9"}}>/{ROSTER2_NAVER_DATES.length}</div>
+                              {/* 인증 합계 (한 줄) */}
+                              <td style={{width:42,minWidth:42,textAlign:"center",verticalAlign:"middle",background:"#EEF2FF",borderBottom:`1px solid ${T.border}`,borderLeft:`2px solid #4F46E5`,height:38}}>
+                                <span style={{fontSize:11,fontWeight:800,color:"#4F46E5"}}>{certCount}</span>
+                                <span style={{fontSize:9,fontWeight:600,color:"#6D28D9"}}>/{ROSTER2_NAVER_DATES.length}</span>
                               </td>
                               {/* 점수 평균 */}
                               <td style={{width:44,minWidth:44,textAlign:"center",verticalAlign:"middle",background:"#F0FDF4",borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,height:38}}>
