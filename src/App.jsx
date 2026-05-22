@@ -3334,7 +3334,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
           <div>
             {/* 헤더: 서브탭 + 크롤링 버튼 */}
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-              {[{k:"roster",l:"👥 2기 명단"},{k:"records",l:"📝 크롤링된 인증글"}].map(({k,l})=>(
+              {[{k:"roster",l:"👥 2기 명단"},{k:"records",l:"📝 인증글 채점"}].map(({k,l})=>(
                 <button key={k} onClick={()=>setCertSubTab(k)}
                   style={{...certSubTab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>{l}</button>
               ))}
@@ -3450,7 +3450,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                                     {has
                                       ? (ev!==null
                                           ? <span style={{fontSize:11,fontWeight:800,color:"#065F46"}}>{ev}</span>
-                                          : <span style={{fontSize:11,color:"#065F46"}}>✓</span>)
+                                          : <span style={{fontSize:10,color:"#94A3B8",fontStyle:"italic"}}>—</span>)
                                       : <span style={{fontSize:10,color:"#D1D5DB"}}>·</span>
                                     }
                                   </td>
@@ -4132,6 +4132,264 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
 };
 
 // ══════════════════════════════════════════════════════
+// ADMIN: 20HA 2기 출석체크 (CSV 업로드)
+// ══════════════════════════════════════════════════════
+const AttendanceUploadView = ({onRefresh}) => {
+  const [parsed, setParsed] = useState(null);   // {sessionDate, sessionType, sessionIdx, sessionLabel, matched: [{name,csvName,id}], errors: [{csvName,reason}], errorActions: {csvName: 'ignore'|'name'|...}}
+  const [students, setStudents] = useState([]); // cert_students
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState(null);
+  const fileRef = useRef(null);
+
+  useEffect(()=>{
+    supabase.rpc("get_cert_students").then(({data})=>setStudents(data||[]));
+  },[]);
+
+  // 헬퍼: 폰 뒷4 / 중간4 인덱스
+  const studentIndex = useMemo(()=>{
+    const byLast4 = {}, byMid4 = {}, byName = {};
+    students.forEach(s=>{
+      const ph = (s.phone||"").replace(/-/g,"");
+      if(ph.length>=4) byLast4[ph.slice(-4)] = s;
+      if(ph.length>=7) byMid4[ph.slice(3,7)] = s;
+      byName[s.name] = s;
+    });
+    return {byLast4, byMid4, byName};
+  },[students]);
+
+  // CSV 한 줄 파싱 (큰따옴표 처리 포함)
+  const parseCSVLine = (line) => {
+    const out = [];
+    let cur = "", inQ = false;
+    for(let i=0;i<line.length;i++){
+      const c = line[i];
+      if(c === '"'){ inQ = !inQ; continue; }
+      if(c === ',' && !inQ){ out.push(cur); cur = ""; continue; }
+      cur += c;
+    }
+    out.push(cur);
+    return out;
+  };
+
+  // 이름 파싱 ("강예나/초5/7565", "초6/김가인/0142", "심수윤", "한설아/초5/1931 (한설아)" 등)
+  const parseParticipantName = (raw) => {
+    if(!raw) return {name:null, code:null};
+    // 괄호 안 내용 제거
+    let s = raw.replace(/\([^)]*\)/g, "").trim();
+    // 슬래시/공백/언더스코어 → 공백
+    s = s.replace(/[\/_]/g, " ").replace(/\s+/g," ").trim();
+    // 4자리 숫자 (전화 뒷4 또는 중간4)
+    const codeM = s.match(/\d{4}/);
+    const code = codeM ? codeM[0] : null;
+    // 한글 이름 (2~4자, "주차" 등 제외)
+    const names = (s.match(/[가-힣]{2,4}/g) || []).filter(n => !["주차","초등","중등","고등"].includes(n) && !/^[초중고]\d?$/.test(n));
+    const name = names[0] || null;
+    return {name, code};
+  };
+
+  // CSV 처리
+  const handleFile = async (file) => {
+    setSaveMsg(null);
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter(l=>l.trim());
+    if(lines.length < 2){ alert("CSV가 비어있어요"); return; }
+    const header = parseCSVLine(lines[0]);
+    const nameIdx = header.findIndex(h => h.includes("이름") || h.includes("원래"));
+    const joinIdx = header.findIndex(h => h.includes("참가"));
+    if(nameIdx < 0 || joinIdx < 0){ alert("CSV 헤더 형식이 다릅니다 (이름/참가 시간 필요)"); return; }
+
+    // 첫 데이터 행에서 날짜/시간 파악 → 모닝/나잇 구분
+    let sessionDate = null, sessionType = null;
+    for(let i=1;i<lines.length;i++){
+      const cols = parseCSVLine(lines[i]);
+      const t = cols[joinIdx];
+      // "2026/05/22 06:57:23 AM" 형태
+      const m = t && t.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})\s+\d{1,2}:\d{2}(?::\d{2})?\s*(AM|PM)/i);
+      if(m){
+        sessionDate = `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+        sessionType = m[4].toUpperCase()==="AM" ? "M" : "N"; // M=모닝, N=나잇
+        break;
+      }
+    }
+    if(!sessionDate){ alert("CSV에서 날짜를 인식하지 못했어요"); return; }
+
+    // 회차 매칭 (모닝/나잇)
+    const dates = sessionType==="M" ? ROSTER2_MORNING_DATES : ROSTER2_NIGHT_DATES;
+    const sessionIdx = dates.findIndex(d => roster2FmtKey(d) === sessionDate);
+    const typeLabel = sessionType==="M" ? "미라클모닝" : "미라클나이트";
+    const sessionLabel = sessionIdx >= 0
+      ? `${sessionDate.slice(5)} ${sessionIdx+1}회 ${typeLabel}`
+      : `${sessionDate.slice(5)} ${typeLabel} (일정 외)`;
+
+    // 모든 참가자 → 이름 매칭
+    const matchedMap = {}; // student_id → {id,name,csvNames:[]}
+    const errors = []; // {csvName,reason}
+    const seenCsvNames = new Set();
+    for(let i=1;i<lines.length;i++){
+      const cols = parseCSVLine(lines[i]);
+      const rawName = cols[nameIdx];
+      if(!rawName || seenCsvNames.has(rawName)) continue;
+      seenCsvNames.add(rawName);
+      // 외부인 ("아이작", "Kevin" 등 알려진 외부인은 제외)
+      if(/iforyou76@/i.test(cols[1]||"")) continue;
+      const {name, code} = parseParticipantName(rawName);
+      if(!name && !code){
+        if(rawName !== "아이작" && rawName !== "Kevin") errors.push({csvName: rawName, reason: "이름/코드 파싱 실패"});
+        continue;
+      }
+      // 매칭 시도: 이름+뒷4 → 이름+중간4 → 이름만 → 코드만
+      let stu = null;
+      if(name && code){
+        if(studentIndex.byLast4[code] && studentIndex.byLast4[code].name===name) stu = studentIndex.byLast4[code];
+        else if(studentIndex.byMid4[code] && studentIndex.byMid4[code].name===name) stu = studentIndex.byMid4[code];
+      }
+      if(!stu && name && studentIndex.byName[name]) stu = studentIndex.byName[name];
+      if(!stu && code){
+        if(studentIndex.byLast4[code]) stu = studentIndex.byLast4[code];
+        else if(studentIndex.byMid4[code]) stu = studentIndex.byMid4[code];
+      }
+      if(stu){
+        if(!matchedMap[stu.id]) matchedMap[stu.id] = {id: stu.id, name: stu.name, csvNames: []};
+        matchedMap[stu.id].csvNames.push(rawName);
+      } else {
+        errors.push({csvName: rawName, reason: name?`'${name}' 명단에 없음`:`코드 ${code||'?'} 매칭 실패`});
+      }
+    }
+    const matched = Object.values(matchedMap).sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+    const errorActions = {};
+    errors.forEach(e => { errorActions[e.csvName] = "ignore"; });
+
+    setParsed({
+      sessionDate, sessionType, sessionIdx,
+      sessionLabel, typeLabel,
+      matched, errors, errorActions,
+      fileName: file.name,
+    });
+  };
+
+  const handleSave = async () => {
+    if(!parsed) return;
+    setSaving(true);
+    setSaveMsg(null);
+    // 에러 학생 중 수동 할당된 것 추가
+    const extraIds = [];
+    Object.entries(parsed.errorActions).forEach(([csvName, action])=>{
+      if(action && action !== "ignore"){
+        const sid = parseInt(action);
+        if(!isNaN(sid)) extraIds.push(sid);
+      }
+    });
+    const allStudentIds = [...parsed.matched.map(m=>m.id), ...extraIds];
+    const {error} = await supabase.rpc("save_attendance_batch", {
+      p_session_date: parsed.sessionDate,
+      p_session_type: parsed.sessionType,
+      p_student_ids: allStudentIds,
+    });
+    setSaving(false);
+    if(error){
+      setSaveMsg({type:"error", text:`저장 실패: ${error.message}`});
+    } else {
+      setSaveMsg({type:"success", text:`✅ ${parsed.sessionLabel} 출석 ${allStudentIds.length}명 저장 완료!`});
+      setTimeout(()=>{ setParsed(null); setSaveMsg(null); if(fileRef.current) fileRef.current.value=""; },2500);
+      onRefresh && onRefresh();
+    }
+  };
+
+  return (
+    <div style={{display:"grid",gap:14}}>
+      <div style={{fontSize:18,fontWeight:800,color:T.navy}}>📋 20HA 2기 출석체크</div>
+      <Card style={{padding:"18px 20px"}}>
+        <div style={{fontSize:13,color:T.muted,marginBottom:12}}>
+          Zoom 참가자 CSV를 업로드하면 자동으로 날짜/회차/세션을 판별해 출석을 정리합니다.
+          미리보기 후 <b>저장</b>을 눌러야 DB에 반영됩니다.
+        </div>
+        <input ref={fileRef} type="file" accept=".csv,text/csv"
+          onChange={e=>{const f=e.target.files?.[0]; if(f) handleFile(f);}}
+          style={{padding:"8px",fontSize:13}}/>
+      </Card>
+
+      {parsed && (
+        <>
+          {/* 세션 정보 */}
+          <Card style={{padding:"18px 20px",background:parsed.sessionIdx>=0?"#F0FDF4":"#FEF3C7",border:`2px solid ${parsed.sessionIdx>=0?"#86EFAC":"#FCD34D"}`}}>
+            <div style={{fontSize:12,color:T.muted,marginBottom:6}}>파일: {parsed.fileName}</div>
+            <div style={{fontSize:20,fontWeight:900,color:T.navy}}>{parsed.sessionLabel}</div>
+            {parsed.sessionIdx < 0 && (
+              <div style={{fontSize:11,color:"#B45309",marginTop:6}}>⚠️ ROSTER2 회차 일정에 없는 날짜입니다. 저장은 가능하지만 회차 표시는 안 됩니다.</div>
+            )}
+          </Card>
+
+          {/* 인정 명단 */}
+          <Card style={{padding:"16px 20px"}}>
+            <div style={{fontSize:14,fontWeight:800,color:T.navy,marginBottom:10}}>
+              ✅ 출석 인정 ({parsed.matched.length}명)
+            </div>
+            {parsed.matched.length === 0 ? (
+              <div style={{fontSize:12,color:T.muted,textAlign:"center",padding:"16px 0"}}>매칭된 학생 없음</div>
+            ) : (
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:6}}>
+                {parsed.matched.map(m => (
+                  <div key={m.id} style={{padding:"6px 10px",borderRadius:8,background:"#F0FDF4",border:"1px solid #86EFAC",fontSize:12,color:T.navy}}>
+                    <span style={{fontWeight:700}}>{m.name}</span>
+                    {m.csvNames[0] !== m.name && (
+                      <div style={{fontSize:9,color:T.muted,marginTop:2}}>CSV: {m.csvNames[0]}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* 에러 처리 */}
+          {parsed.errors.length > 0 && (
+            <Card style={{padding:"16px 20px",background:"#FFFBEB",border:"1px solid #FCD34D"}}>
+              <div style={{fontSize:14,fontWeight:800,color:"#B45309",marginBottom:10}}>
+                ⚠️ 매칭 실패 ({parsed.errors.length}명) — 어떻게 처리할지 선택
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {parsed.errors.map((e,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:T.white,borderRadius:8,border:`1px solid ${T.border}`}}>
+                    <span style={{flex:1,fontSize:12,color:T.navy}}>
+                      <b>{e.csvName}</b>
+                      <span style={{fontSize:10,color:T.muted,marginLeft:6}}>({e.reason})</span>
+                    </span>
+                    <select value={parsed.errorActions[e.csvName] || "ignore"}
+                      onChange={ev=>setParsed(p=>({...p,errorActions:{...p.errorActions,[e.csvName]:ev.target.value}}))}
+                      style={{...css.input,fontSize:11,padding:"4px 8px",width:160}}>
+                      <option value="ignore">무시</option>
+                      <optgroup label="학생 수동 할당">
+                        {students.filter(s=>s.sort_order<43).map(s=>(
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* 저장 영역 */}
+          <div style={{display:"flex",justifyContent:"flex-end",gap:10,alignItems:"center"}}>
+            {saveMsg && (
+              <span style={{fontSize:13,fontWeight:700,color:saveMsg.type==="success"?"#065F46":T.danger}}>
+                {saveMsg.text}
+              </span>
+            )}
+            <button onClick={()=>{setParsed(null); if(fileRef.current) fileRef.current.value="";}}
+              style={{...css.btnOutline,padding:"10px 20px",fontSize:14}}>취소</button>
+            <button onClick={handleSave} disabled={saving}
+              style={{...css.btnOrange,padding:"10px 24px",fontSize:14,opacity:saving?0.6:1}}>
+              {saving?"저장 중...":"💾 저장"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════
 // LOG HISTORY
 // ══════════════════════════════════════════════════════
 const LogHistory = ({logs, onDelete, isAdmin, allProfiles}) => {
@@ -4696,6 +4954,7 @@ export default function App() {
     if(path === "/input")   return "input";
     if(path === "/users")   return "users";
     if(path === "/roster2") return "roster2";
+    if(path === "/attendance") return "attendance";
     return "dashboard";
   };
   const [view, setView]           = useState(getInitialView);
@@ -4705,7 +4964,7 @@ export default function App() {
 
   // URL ↔ 상태 동기화
   const navigate = (v, input=false) => {
-    const path = input ? "/input" : v === "history" ? "/history" : v === "cert" ? "/cert" : v === "users" ? "/users" : v === "roster2" ? "/roster2" : "/";
+    const path = input ? "/input" : v === "history" ? "/history" : v === "cert" ? "/cert" : v === "users" ? "/users" : v === "roster2" ? "/roster2" : v === "attendance" ? "/attendance" : "/";
     window.history.pushState({ view:v, input }, "", path);
     setView(v);
     setShowInput(input);
@@ -4716,10 +4975,12 @@ export default function App() {
       const s = e.state;
       const path = window.location.pathname;
       if(s) { setView(s.view||"dashboard"); setShowInput(s.input||false); }
-      else if(path==="/cert")    { setView("cert");    setShowInput(false); }
-      else if(path==="/users")   { setView("users");   setShowInput(false); }
-      else if(path==="/history") { setView("history"); setShowInput(false); }
-      else                       { setView("dashboard"); setShowInput(false); }
+      else if(path==="/cert")       { setView("cert");       setShowInput(false); }
+      else if(path==="/users")      { setView("users");      setShowInput(false); }
+      else if(path==="/roster2")    { setView("roster2");    setShowInput(false); }
+      else if(path==="/attendance") { setView("attendance"); setShowInput(false); }
+      else if(path==="/history")    { setView("history");    setShowInput(false); }
+      else                          { setView("dashboard");  setShowInput(false); }
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -4892,10 +5153,11 @@ export default function App() {
   const isIn2ki  = !isAdmin && !isParent && ROSTER2.some(s => s.name === profile.name);
   const NAV = isAdmin
     ? [
-        { key:"users",   label:"회원 관리",          icon:"users"     },
-        { key:"roster2", label:"20HA 2기 현황",      icon:"trophy"    },
-        { key:"cert",    label:"20HA 2기 인증글 관리", icon:"clipboard" },
-        { key:"history", label:"전체 기록",           icon:"calendar"  },
+        { key:"users",       label:"회원 관리",          icon:"users"     },
+        { key:"roster2",     label:"20HA 2기 현황",      icon:"trophy"    },
+        { key:"cert",        label:"20HA 2기 인증글 관리", icon:"clipboard" },
+        { key:"attendance",  label:"20HA 2기 출석체크",   icon:"calendar"  },
+        { key:"history",     label:"전체 기록",           icon:"calendar"  },
       ]
     : isParent
       ? [{ key:"dashboard", label:"자녀 현황", icon:"users" }]
@@ -4988,6 +5250,8 @@ export default function App() {
             </div>
           ) : view === "cert" && !isAdmin && !isParent && isIn2ki ? (
             <StudentCertView profile={profile}/>
+          ) : view === "attendance" && isAdmin ? (
+            <AttendanceUploadView onRefresh={refreshData}/>
           ) : (view === "users" || view === "cert" || view === "roster2") && isAdmin ? (
             <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData} defaultTab={view}/>
           ) : view === "dashboard" ? (
