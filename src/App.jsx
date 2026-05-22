@@ -2112,23 +2112,10 @@ const ROSTER2_DAY_KO        = ['일','월','화','수','목','금','토'];
 const roster2FmtKey = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 const roster2Fmt    = (dt) => `${dt.getMonth()+1}/${dt.getDate()}`;
 
-// 2기 출석 데이터 모듈 상수 (학생 인증 현황 + 관리자 명단 공용)
-const INIT_ATTENDANCE2 = {"36-나-2026-05-17":true,"27-나-2026-05-17":true,"4-나-2026-05-17":true,"9-나-2026-05-17":true,"0-나-2026-05-17":true,"6-나-2026-05-17":true,"19-나-2026-05-17":true,"3-나-2026-05-17":true,"5-나-2026-05-17":true,"37-나-2026-05-17":true,"31-나-2026-05-17":true,"7-나-2026-05-17":true,"13-나-2026-05-17":true,"8-나-2026-05-17":true,"15-나-2026-05-17":true,"33-나-2026-05-17":true,"1-나-2026-05-17":true,"10-나-2026-05-17":true,"25-나-2026-05-17":true,"29-나-2026-05-17":true,"32-나-2026-05-17":true,"11-나-2026-05-17":true,"12-나-2026-05-17":true,"28-나-2026-05-17":true,"26-나-2026-05-17":true,"22-나-2026-05-17":true,"30-나-2026-05-17":true,"24-나-2026-05-17":true,"38-나-2026-05-17":true,"17-나-2026-05-17":true,"2-나-2026-05-17":true,"40-나-2026-05-17":true,"16-나-2026-05-17":true,"23-나-2026-05-17":true,"35-나-2026-05-17":true,"4-M-2026-05-18":true,"11-M-2026-05-18":true,"6-M-2026-05-18":true,"23-M-2026-05-18":true,"17-M-2026-05-18":true,"36-M-2026-05-18":true,"39-M-2026-05-18":true,"10-M-2026-05-18":true,"8-M-2026-05-18":true,"33-M-2026-05-18":true,"27-M-2026-05-18":true,"24-M-2026-05-18":true,"19-M-2026-05-18":true,"20-M-2026-05-18":true,"2-M-2026-05-18":true,"3-M-2026-05-18":true,"22-M-2026-05-18":true,"26-M-2026-05-18":true,"34-M-2026-05-18":true,"12-M-2026-05-18":true,"25-M-2026-05-18":true,"28-M-2026-05-18":true,"18-M-2026-05-18":true,"31-M-2026-05-18":true,"9-M-2026-05-18":true,"16-M-2026-05-18":true,"0-M-2026-05-18":true,"32-M-2026-05-18":true,"30-M-2026-05-18":true,"1-M-2026-05-18":true,"29-M-2026-05-18":true,"15-M-2026-05-18":true,"18-나-2026-05-18":true,"36-나-2026-05-18":true,"23-나-2026-05-18":true,"32-나-2026-05-18":true,"35-나-2026-05-18":true,"4-나-2026-05-18":true,"10-나-2026-05-18":true,"3-나-2026-05-18":true,"12-나-2026-05-18":true,"16-나-2026-05-18":true,"2-나-2026-05-18":true,"11-나-2026-05-18":true,"0-나-2026-05-18":true,"8-나-2026-05-18":true,"19-나-2026-05-18":true,"7-나-2026-05-18":true,"31-나-2026-05-18":true,"17-나-2026-05-18":true,"20-나-2026-05-18":true,"9-나-2026-05-18":true,"13-나-2026-05-18":true,"33-나-2026-05-18":true,"25-나-2026-05-18":true,"30-나-2026-05-18":true,"1-나-2026-05-18":true,"39-나-2026-05-18":true,"28-나-2026-05-18":true,"15-나-2026-05-18":true,"22-나-2026-05-18":true,"37-나-2026-05-18":true,"21-나-2026-05-18":true,"41-나-2026-05-18":true,"38-나-2026-05-18":true,"34-나-2026-05-18":true,"27-나-2026-05-18":true,"6-나-2026-05-18":true,"14-나-2026-05-18":true,"24-나-2026-05-18":true,"26-나-2026-05-18":true,"40-나-2026-05-18":true,"5-나-2026-05-18":true,"36-나-2026-05-19":true,"23-나-2026-05-19":true,"40-나-2026-05-19":true,"32-나-2026-05-19":true,"37-나-2026-05-19":true,"0-나-2026-05-19":true,"17-나-2026-05-19":true,"9-나-2026-05-19":true,"25-나-2026-05-19":true,"2-나-2026-05-19":true,"33-나-2026-05-19":true,"35-나-2026-05-19":true,"14-나-2026-05-19":true,"21-나-2026-05-19":true,"4-나-2026-05-19":true,"1-나-2026-05-19":true,"24-나-2026-05-19":true,"15-나-2026-05-19":true,"20-나-2026-05-19":true,"39-나-2026-05-19":true,"8-나-2026-05-19":true,"34-나-2026-05-19":true,"29-나-2026-05-19":true,"5-나-2026-05-19":true,"13-나-2026-05-19":true,"10-나-2026-05-19":true,"19-나-2026-05-19":true,"30-나-2026-05-19":true,"6-나-2026-05-19":true,"28-나-2026-05-19":true,"11-나-2026-05-19":true,"3-나-2026-05-19":true,"18-나-2026-05-19":true,"7-나-2026-05-19":true,"41-나-2026-05-19":true,"26-나-2026-05-19":true,"12-나-2026-05-19":true,"22-나-2026-05-19":true,"10-M-2026-05-20":true,"36-M-2026-05-20":true,"8-M-2026-05-20":true,"23-M-2026-05-20":true,"6-M-2026-05-20":true,"3-M-2026-05-20":true,"40-M-2026-05-20":true,"12-M-2026-05-20":true,"35-M-2026-05-20":true,"4-M-2026-05-20":true,"19-M-2026-05-20":true,"21-M-2026-05-20":true,"9-M-2026-05-20":true,"18-M-2026-05-20":true,"33-M-2026-05-20":true,"24-M-2026-05-20":true,"0-M-2026-05-20":true,"2-M-2026-05-20":true,"39-M-2026-05-20":true,"15-M-2026-05-20":true,"16-M-2026-05-20":true,"20-M-2026-05-20":true,"1-M-2026-05-20":true,"31-M-2026-05-20":true,"14-M-2026-05-20":true,"37-M-2026-05-20":true,"41-M-2026-05-20":true,"30-M-2026-05-20":true,"26-M-2026-05-20":true,"28-M-2026-05-20":true,"38-M-2026-05-20":true,"34-M-2026-05-20":true,"22-M-2026-05-20":true,
-  // 5/21 나이트 (나이트 idx: 0~41 참석, 12=권민유·38=오수빈 결석)
-  "0-나-2026-05-21":true,"1-나-2026-05-21":true,"2-나-2026-05-21":true,"3-나-2026-05-21":true,"4-나-2026-05-21":true,"5-나-2026-05-21":true,"6-나-2026-05-21":true,"7-나-2026-05-21":true,"8-나-2026-05-21":true,"9-나-2026-05-21":true,"10-나-2026-05-21":true,"11-나-2026-05-21":true,"13-나-2026-05-21":true,"14-나-2026-05-21":true,"15-나-2026-05-21":true,"16-나-2026-05-21":true,"17-나-2026-05-21":true,"18-나-2026-05-21":true,"19-나-2026-05-21":true,"20-나-2026-05-21":true,"21-나-2026-05-21":true,"22-나-2026-05-21":true,"23-나-2026-05-21":true,"24-나-2026-05-21":true,"25-나-2026-05-21":true,"26-나-2026-05-21":true,"27-나-2026-05-21":true,"28-나-2026-05-21":true,"29-나-2026-05-21":true,"30-나-2026-05-21":true,"31-나-2026-05-21":true,"32-나-2026-05-21":true,"33-나-2026-05-21":true,"34-나-2026-05-21":true,"35-나-2026-05-21":true,"36-나-2026-05-21":true,"37-나-2026-05-21":true,"39-나-2026-05-21":true,"40-나-2026-05-21":true,"41-나-2026-05-21":true,"43-나-2026-05-21":true,"44-나-2026-05-21":true,
-  // 5/22 모닝 (결석: 5=손연재,7=최지유,13=권순혁,15=김도현,25=서소윤,28=양소윤,29=오수연,38=오수빈)
-  "0-M-2026-05-22":true,"1-M-2026-05-22":true,"2-M-2026-05-22":true,"3-M-2026-05-22":true,"4-M-2026-05-22":true,"6-M-2026-05-22":true,"8-M-2026-05-22":true,"9-M-2026-05-22":true,"10-M-2026-05-22":true,"11-M-2026-05-22":true,"12-M-2026-05-22":true,"14-M-2026-05-22":true,"16-M-2026-05-22":true,"17-M-2026-05-22":true,"18-M-2026-05-22":true,"19-M-2026-05-22":true,"20-M-2026-05-22":true,"21-M-2026-05-22":true,"22-M-2026-05-22":true,"23-M-2026-05-22":true,"24-M-2026-05-22":true,"26-M-2026-05-22":true,"27-M-2026-05-22":true,"30-M-2026-05-22":true,"31-M-2026-05-22":true,"32-M-2026-05-22":true,"33-M-2026-05-22":true,"34-M-2026-05-22":true,"35-M-2026-05-22":true,"36-M-2026-05-22":true,"37-M-2026-05-22":true,"39-M-2026-05-22":true,"40-M-2026-05-22":true,"41-M-2026-05-22":true,"43-M-2026-05-22":true,"44-M-2026-05-22":true,
-  // 신규 학생 소급: 한유찬(idx=43)
-  "43-나-2026-05-17":true,"43-M-2026-05-18":true,"43-나-2026-05-18":true,"43-나-2026-05-19":true,"43-M-2026-05-20":true,
-  // 신규 학생 소급: 문성민(idx=44)
-  "44-나-2026-05-17":true,"44-나-2026-05-18":true,"44-나-2026-05-19":true,"44-M-2026-05-20":true,
-  // 테스트학생 (idx=42) 더미 데이터
-  "42-나-2026-05-17":true,
-  "42-N-2026-05-17":true,
-  "42-M-2026-05-18":true,"42-나-2026-05-18":true,
-  "42-나-2026-05-19":true,
-  "42-N-2026-05-20":true,"42-M-2026-05-20":true,
-};
+// 2기 출석 데이터 (사용 안 함 — DB attendance_logs로 마이그레이션 완료)
+// 5/17~5/22 기존 데이터는 모두 attendance_logs에 저장되어 있음
+// 새 출석은 /attendance 메뉴에서 CSV 업로드로 추가
+const INIT_ATTENDANCE2 = {};
 
 // ══════════════════════════════════════════════════════
 // 학생: 20HA 인증 현황 탭
@@ -2137,6 +2124,8 @@ const StudentCertView = ({profile}) => {
   const [peerGrades, setPeerGrades] = useState({});
   const [myCafeCerts, setMyCafeCerts] = useState([]);
   const [classCertStats, setClassCertStats] = useState({}); // {name: cert_count}
+  const [myAttLogs, setMyAttLogs] = useState([]);            // [{session_date, session_type}]
+  const [classAttStats, setClassAttStats] = useState({});    // {name: {morning, night}}
   const isMobile = useMobile();
   useEffect(() => {
     supabase.from("profiles").select("name,grade,birth_year,birth_month")
@@ -2157,6 +2146,16 @@ const StudentCertView = ({profile}) => {
       const map = {};
       (data||[]).forEach(r => { map[r.student_name] = r.cert_count; });
       setClassCertStats(map);
+    });
+    // 본인 출석 (모닝/나잇)
+    supabase.rpc("get_my_attendance_logs").then(({data}) => {
+      setMyAttLogs(data || []);
+    });
+    // 클래스 전체 출석 카운트 (랭킹/평균용)
+    supabase.rpc("get_class_attendance_stats").then(({data}) => {
+      const map = {};
+      (data||[]).forEach(r => { map[r.student_name] = {morning: r.morning_count, night: r.night_count}; });
+      setClassAttStats(map);
     });
   }, []);
 
@@ -2184,13 +2183,24 @@ const StudentCertView = ({profile}) => {
     }
   });
 
-  // 전체 통계: 카페(N)은 cert DB 기반, 모닝/나잇은 INIT_ATTENDANCE2
-  const allStats = ROSTER2.map((s, i) => {
-    const m  = ROSTER2_MORNING_DATES.filter(dt => INIT_ATTENDANCE2[`${i}-M-${fk(dt)}`]).length;
-    const na = ROSTER2_NIGHT_DATES.filter(dt => INIT_ATTENDANCE2[`${i}-나-${fk(dt)}`]).length;
-    // N(카페): 본인은 myCertSessions, 그 외 학생은 classCertStats (둘 다 cert DB 기반)
+  // 본인 출석 set: "M-YYYY-MM-DD" 또는 "N-YYYY-MM-DD" (M=모닝, N=나잇)
+  const myAttSet = new Set();
+  myAttLogs.forEach(l => myAttSet.add(`${l.session_type}-${l.session_date}`));
+
+  // 전체 통계: 모두 DB 기반
+  const allStats = ROSTER2.map((s) => {
+    // 본인은 myAttSet, 타 학생은 classAttStats
+    let morning, night;
+    if (s.name === profile.name) {
+      morning = ROSTER2_MORNING_DATES.filter(dt => myAttSet.has(`M-${fk(dt)}`)).length;
+      night   = ROSTER2_NIGHT_DATES.filter(dt => myAttSet.has(`N-${fk(dt)}`)).length;
+    } else {
+      morning = classAttStats[s.name]?.morning || 0;
+      night   = classAttStats[s.name]?.night   || 0;
+    }
+    // N(카페): 본인은 myCertSessions, 그 외 학생은 classCertStats
     const n = s.name === profile.name ? myCertSessions.size : (classCertStats[s.name] || 0);
-    return {name: s.name, naver: n, morning: m, night: na, total: n + m + na};
+    return {name: s.name, naver: n, morning, night, total: n + morning + night};
   });
   const myStat = myIdx >= 0 ? allStats[myIdx] : {naver:0, morning:0, night:0, total:0};
   const ranked = [...allStats].sort((a, b) => b.total - a.total);
@@ -2218,13 +2228,15 @@ const StudentCertView = ({profile}) => {
       ...ROSTER2_NIGHT_DATES.filter(dt => Math.floor((dt-WEEK_START)/604800000)===w).map(dt=>({dt,type:"나"})),
     ];
     const possible = allDates.length;
-    // N(카페)는 cert DB 기반, 나머지는 INIT_ATTENDANCE2
+    // 전부 DB 기반 (카페=myCertSessions, 모닝/나잇=myAttSet)
     const done = allDates.filter(({dt,type}) => {
       if (type === "N") {
         const sessionIdx = ROSTER2_NAVER_DATES.findIndex(d => fk(d) === fk(dt));
         return sessionIdx >= 0 && myCertSessions.has(sessionIdx);
       }
-      return myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-${type}-${fk(dt)}`];
+      // type "M" = 모닝, type "나" = 나잇 → DB는 "N"
+      const dbType = type === "나" ? "N" : "M";
+      return myAttSet.has(`${dbType}-${fk(dt)}`);
     }).length;
     return {w:w+1, possible, done, pct: possible>0 ? Math.round(done/possible*100) : 0, isCurrent: w===currentWeekIdx};
   });
@@ -2243,10 +2255,13 @@ const StudentCertView = ({profile}) => {
     if (isScheduled) {
       let done;
       if (attendanceKey === "N") {
+        // 카페 인증 — 회차 단위
         const sessionIdx = ROSTER2_NAVER_DATES.findIndex(dt => fk(dt) === todayKey);
         done = sessionIdx >= 0 && myCertSessions.has(sessionIdx);
       } else {
-        done = myIdx >= 0 && INIT_ATTENDANCE2[`${myIdx}-${attendanceKey}-${todayKey}`];
+        // 모닝/나잇 — attendance_logs
+        const dbType = attendanceKey === "나" ? "N" : "M";
+        done = myAttSet.has(`${dbType}-${todayKey}`);
       }
       return done ? "완료" : "진행중";
     }
@@ -2598,13 +2613,14 @@ const StudentCertView = ({profile}) => {
                                       ? <div style={{width:cell,height:cell,borderRadius:4,background:T.surfaceAlt,border:`1px solid ${T.border}`}}/>
                                       : wDates.map((dt,i)=>{
                                           const dk=fk(dt);
-                                          // N(카페)는 cert DB 기반, 나머지는 INIT_ATTENDANCE2
+                                          // 전부 DB 기반
                                           let done;
                                           if (type === "N") {
                                             const sessionIdx = ROSTER2_NAVER_DATES.findIndex(d => fk(d) === dk);
                                             done = sessionIdx >= 0 && myCertSessions.has(sessionIdx);
                                           } else {
-                                            done = myIdx>=0 && INIT_ATTENDANCE2[`${myIdx}-${type}-${dk}`];
+                                            const dbType = type === "나" ? "N" : "M";
+                                            done = myAttSet.has(`${dbType}-${dk}`);
                                           }
                                           const isPast=dt<todayMidnight;
                                           const missed = isPast && !done;
@@ -2804,7 +2820,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
   useEffect(() => { setAdminTab(defaultTab); }, [defaultTab]);
   const [rosterSearch, setRosterSearch] = useState("");
   const [rosterSort, setRosterSort] = useState({by:"name",dir:"asc"});
-  const [attendance2, setAttendance2] = useState(INIT_ATTENDANCE2);
+  const [attendance2, setAttendance2] = useState({}); // attendance_logs에서 로드 (key: "${roster2Idx}-${type}-${YYYY-MM-DD}")
   const [sel, setSel]           = useState("전체");
   const [editStudent, setEditStudent] = useState(null);
   const [saving, setSaving]     = useState(false);
@@ -2901,6 +2917,24 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
     const from = new Date(ROSTER2_NAVER_DATES[0]); from.setHours(0,0,0,0);
     const to = new Date(ROSTER2_NAVER_DATES[ROSTER2_NAVER_DATES.length-1]); to.setHours(23,59,59,999);
     loadAttendanceCerts(from, to);
+    // 모닝/나잇 출석 로그 로드 → attendance2 state ({roster2Idx}-${type}-${YYYY-MM-DD})
+    if(adminTab==="roster2"){
+      const fromStr = `${from.getFullYear()}-${String(from.getMonth()+1).padStart(2,'0')}-${String(from.getDate()).padStart(2,'0')}`;
+      const toStr   = `${to.getFullYear()}-${String(to.getMonth()+1).padStart(2,'0')}-${String(to.getDate()).padStart(2,'0')}`;
+      // 전체 클래스 출석 로그 (관리자가 보는 화면)
+      supabase.rpc("get_attendance_logs", {p_from: fromStr, p_to: toStr}).then(({data})=>{
+        const map = {};
+        (data||[]).forEach(r => {
+          const idx = ROSTER2.findIndex(s => s.name === r.student_name);
+          if(idx >= 0){
+            // session_type: "M" 또는 "N"(나잇) → roster2 키는 "M" 또는 "나"
+            const rosterType = r.session_type === "N" ? "나" : "M";
+            map[`${idx}-${rosterType}-${r.session_date}`] = true;
+          }
+        });
+        setAttendance2(map);
+      });
+    }
   },[adminTab]);
 
   const saveNickname = async (profileId, nickname) => {
