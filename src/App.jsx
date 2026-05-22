@@ -1962,6 +1962,120 @@ const StudentDashboard = ({logs, profile, isAdminView=false}) => {
 // ══════════════════════════════════════════════════════
 // PARENT DASHBOARD
 // ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+// PARENT HOME — 자녀 아이디 관리 (추가/삭제만)
+// ══════════════════════════════════════════════════════
+const ParentHomeView = ({children, parentId, onChildrenUpdate}) => {
+  const [addEmail, setAddEmail] = useState("");
+  const [addLoading, setAddLoading] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const isMobile = useMobile();
+
+  const handleAdd = async () => {
+    if(!addEmail){ setMsg({type:"err",text:"이메일을 입력해주세요."}); return; }
+    setAddLoading(true); setMsg(null);
+    const { data, error } = await supabase.rpc("find_student_by_email", { student_email: addEmail.trim().toLowerCase() });
+    if(error || !data || data.length === 0) {
+      setMsg({type:"err",text:"해당 이메일의 학생을 찾을 수 없습니다. 학생이 가입 및 승인 완료된 상태여야 합니다."});
+      setAddLoading(false); return;
+    }
+    const student = data[0];
+    if(children.some(c => c.profile?.id === student.id)) {
+      setMsg({type:"err",text:"이미 연결된 학생입니다."}); setAddLoading(false); return;
+    }
+    const { error: insErr } = await supabase.from("parent_students").insert({ parent_id: parentId, student_id: student.id });
+    if(insErr && insErr.code !== '23505'){ setMsg({type:"err",text:"연결 중 오류가 발생했습니다."}); setAddLoading(false); return; }
+    const { data: cl } = await supabase.rpc("get_child_logs", { child_id: student.id });
+    onChildrenUpdate([...children, { profile: {...student, role:"student"}, logs: cl || [] }], student.id);
+    setAddEmail("");
+    setMsg({type:"ok",text:`${student.name}(${student.grade}) 학생이 연결됐어요. 좌측 메뉴에 추가됐습니다.`});
+    setAddLoading(false);
+  };
+
+  const handleDelete = async (childId, childName) => {
+    if(!window.confirm(`${childName} 학생 연결을 해제할까요?`)) return;
+    const { error } = await supabase.from("parent_students").delete().eq("parent_id", parentId).eq("student_id", childId);
+    if(error){ alert("삭제 중 오류가 발생했습니다."); return; }
+    onChildrenUpdate(children.filter(c => c.profile.id !== childId), null);
+    setMsg({type:"ok",text:`${childName} 학생 연결이 해제되었습니다.`});
+  };
+
+  return (
+    <div style={{display:"grid",gap:14}}>
+      <div style={{fontSize:18,fontWeight:800,color:T.navy}}>👥 자녀 아이디 관리</div>
+
+      {/* 자녀 추가 */}
+      <Card style={{padding:"18px 20px"}}>
+        <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:10}}>자녀 이메일로 연결</div>
+        <div style={{fontSize:11,color:T.muted,marginBottom:12,lineHeight:1.5}}>
+          자녀가 회원가입 + 관리자 승인 완료된 상태여야 연결할 수 있어요.
+        </div>
+        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+          <input value={addEmail} onChange={e=>{setAddEmail(e.target.value);setMsg(null);}}
+            onKeyDown={e=>e.key==="Enter"&&handleAdd()}
+            placeholder="example@email.com"
+            style={{...css.input,margin:0,flex:"1 1 220px",fontSize:13,padding:"10px 14px"}}/>
+          <button onClick={handleAdd} disabled={addLoading}
+            style={{...css.btnPrimary,padding:"10px 18px",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:5}}>
+            {addLoading?<Spinner size={14} color="#fff"/>:"+ 추가"}
+          </button>
+        </div>
+        {msg && (
+          <div style={{
+            marginTop:12,padding:"10px 14px",borderRadius:8,fontSize:12,
+            background:msg.type==="ok"?"#F0FDF4":"#FEF2F2",
+            border:`1px solid ${msg.type==="ok"?"#BBF7D0":"#FECACA"}`,
+            color:msg.type==="ok"?"#166534":T.danger,
+          }}>
+            {msg.type==="ok"?"✅ ":"⚠️ "}{msg.text}
+          </div>
+        )}
+      </Card>
+
+      {/* 연결된 자녀 목록 */}
+      <Card style={{padding:"18px 20px"}}>
+        <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:12}}>
+          연결된 자녀 <span style={{fontSize:12,color:T.muted,fontWeight:400,marginLeft:4}}>({children.length}명)</span>
+        </div>
+        {children.length === 0 ? (
+          <div style={{textAlign:"center",padding:"32px 16px",color:T.muted,fontSize:13}}>
+            연결된 자녀가 없어요. 위에서 자녀 이메일을 입력해 연결해보세요.
+          </div>
+        ) : (
+          <div style={{display:"grid",gap:8}}>
+            {children.map(c=>(
+              <div key={c.profile.id} style={{
+                display:"flex",alignItems:"center",gap:10,padding:"12px 14px",
+                borderRadius:10,border:`1px solid ${T.border}`,background:T.surface,
+              }}>
+                <div style={{width:36,height:36,borderRadius:"50%",background:T.navy+"15",
+                  display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  {HI.cap(18,T.navy)}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:700,color:T.navy}}>
+                    {c.profile.name}
+                    <span style={{fontSize:11,fontWeight:400,color:T.muted,marginLeft:6}}>
+                      ({calcGrade(c.profile.birth_year, c.profile.birth_month) || c.profile.grade || "-"})
+                    </span>
+                  </div>
+                  <div style={{fontSize:11,color:T.muted,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {c.profile.email}
+                  </div>
+                </div>
+                <button onClick={()=>handleDelete(c.profile.id, c.profile.name)}
+                  style={{...css.btnOutline,padding:"6px 12px",fontSize:11,color:T.danger,borderColor:T.danger}}>
+                  삭제
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+};
+
 const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChildrenUpdate}) => {
   const [addEmail, setAddEmail]   = useState("");
   const [addLoading, setAddLoading] = useState(false);
@@ -4925,7 +5039,7 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
 // ══════════════════════════════════════════════════════
 const BottomNav = ({nav,view,showInput,onNavigate,isAdmin}) => (
   <div style={{position:"fixed",bottom:0,left:0,right:0,background:T.surface,borderTop:`1px solid ${T.border}`,display:"flex",zIndex:50,paddingBottom:"env(safe-area-inset-bottom)"}}>
-    {nav.map(n=>(
+    {nav.filter(n=>!n.header).map(n=>(
       <button key={n.key} onClick={()=>onNavigate(n.key,false)}
         style={{flex:1,padding:"12px 0 10px",border:"none",background:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:view===n.key&&!showInput?T.navy:T.muted}}>
         <span style={{fontSize:20}}>{n.icon}</span>
@@ -5003,7 +5117,20 @@ const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, 
               : <span style={{display:"flex",justifyContent:"center"}}>{HI.bell(16,"#E8394A")}</span>}
           </div>
         )}
-        {nav.map(n => {
+        {nav.map((n, i) => {
+          // 헤더 항목 (자녀 이름 등) — 클릭 불가, 구분 라벨
+          if(n.header){
+            if(!isOpen) return null;
+            return (
+              <div key={`hdr-${i}`} style={{
+                padding:"14px 14px 4px 14px", fontSize:11, fontWeight:800,
+                color:"#9CA3AF", letterSpacing:"0.02em", marginTop:4,
+                borderTop: i>0 ? "1px solid rgba(25,29,84,0.08)" : "none",
+              }}>
+                {n.label}
+              </div>
+            );
+          }
           const isActive = view===n.key && !showInput;
           return (
             <div key={n.key} onClick={()=>onNavigate(n.key, false)}
@@ -5092,7 +5219,15 @@ export default function App() {
 
   // URL ↔ 상태 동기화
   const navigate = (v, input=false) => {
-    const path = input ? "/input" : v === "history" ? "/history" : v === "cert" ? "/cert" : v === "users" ? "/users" : v === "roster2" ? "/roster2" : v === "attendance" ? "/attendance" : v === "manjeom" ? "/manjeom" : "/";
+    // 학부모 자녀별 view (child-*)는 URL을 / 로 두고 view 상태만 변경
+    const path = input ? "/input"
+      : v === "history" ? "/history"
+      : v === "cert" ? "/cert"
+      : v === "users" ? "/users"
+      : v === "roster2" ? "/roster2"
+      : v === "attendance" ? "/attendance"
+      : v === "manjeom" ? "/manjeom"
+      : "/";
     window.history.pushState({ view:v, input }, "", path);
     setView(v);
     setShowInput(input);
@@ -5290,7 +5425,21 @@ export default function App() {
         { key:"history",     label:"전체 기록",           icon:"calendar"  },
       ]
     : isParent
-      ? [{ key:"dashboard", label:"자녀 현황", icon:"users" }]
+      ? [
+          { key:"dashboard", label:"자녀 아이디 관리", icon:"users" },
+          // 등록된 자녀별로 그룹 메뉴 동적 추가
+          ...children.flatMap(c => {
+            const cid = c.profile.id;
+            const cname = c.profile.name;
+            const childIs2ki = ROSTER2.some(s => s.name === cname);
+            return [
+              { header: true, label: `👤 ${cname}` },
+              ...(childIs2ki ? [{ key:`child-cert-${cid}`,      label:"20HA 2기 인증현황", icon:"trophy"   }] : []),
+              { key:`child-dashboard-${cid}`, label:"메타인지 분석", icon:"cap"      },
+              { key:`child-history-${cid}`,   label:"학습 기록",     icon:"calendar" },
+            ];
+          }),
+        ]
       : [
           ...(isIn2ki ? [{ key:"cert", label:"20HA 2기 인증현황", icon:"trophy" }] : []),
           { key:"dashboard", label:"메타인지 분석", icon:"cap" },
@@ -5386,14 +5535,24 @@ export default function App() {
             <ManjeomView onRefresh={refreshData}/>
           ) : (view === "users" || view === "cert" || view === "roster2") && isAdmin ? (
             <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData} defaultTab={view}/>
+          ) : isParent && view.startsWith("child-") ? (
+            (() => {
+              // view: child-cert-{id} / child-dashboard-{id} / child-history-{id}
+              const m = view.match(/^child-(cert|dashboard|history)-(.+)$/);
+              if(!m) return null;
+              const [, sub, cid] = m;
+              const child = children.find(c => c.profile.id === cid);
+              if(!child) return <Card style={{padding:24,textAlign:"center",color:T.muted}}>자녀 정보를 찾을 수 없어요.</Card>;
+              if(sub === "cert")      return <StudentCertView profile={child.profile}/>;
+              if(sub === "history")   return <LogHistory logs={child.logs} onDelete={null} isAdmin={false} allProfiles={[child.profile]}/>;
+              return <StudentDashboard logs={child.logs} profile={child.profile} isAdminView={true}/>;
+            })()
           ) : view === "dashboard" ? (
             isAdmin
               ? <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData} defaultTab="users"/>
               : isParent
-                ? <ParentDashboard
+                ? <ParentHomeView
                     children={children}
-                    selChildId={selChildId}
-                    setSelChildId={setSelChildId}
                     parentId={session.user.id}
                     onChildrenUpdate={(newChildren, newSelId) => { setChildren(newChildren); if(newSelId) setSelChildId(newSelId); }}
                   />
