@@ -7,6 +7,30 @@
 
 ---
 
+## v2026.05.22-2 — 2026-05-22
+**커밋:** [89ae0af](https://github.com/MinDaehyeon/20ha-meta-x/commit/89ae0af)
+
+### 주요 변경
+- **만점 테스트 기능 신규** — 시험지를 모두 정답으로 맞출 때까지 반복하는 학습 훈련
+  - 관리자: 📚 문항 관리 / 🗂️ 시험지 관리 / 👥 배정 관리 / 📊 결과(시험지별·학생별)
+  - 학생/학부모: 본인 또는 자녀의 만점 테스트 메뉴, 카드 목록 → 풀이 → 통과까지 답안 보존
+  - 문항: 단답형(복수 정답 후보) + 객관식(2~10개 보기, 다중 정답·다중 선택)
+  - 문제 이미지 업로드 (Supabase Storage, 2MB 이하)
+  - 문항 Q-N ID, 태그 칩 표시·검색 (본문·태그·번호 통합 검색)
+  - 통과/실패 모달, 시도 횟수에 따라 격려 메시지 변주
+- **비밀번호 찾기 사전 체크** — 가입되지 않은 이메일이면 "가입되지 않은 이메일입니다" 안내 (이전에는 무조건 "보냈다"고만 응답)
+- **20HA 2기 자동 연동** — 학생 회원가입 시 `cert_students` 명단과 이름 1:1 매칭되면 자동으로 2기 회원으로 연결, 기존 가입 학생 30명 백필 완료
+
+### 백그라운드 변경
+- DB: `manjeom_*` 5개 테이블 + 10개 RPC + Supabase Storage `manjeom-images` 버킷 신설
+- DB: `cert_students.linked_profile_id` 컬럼 + `try_link_2ki_on_signup` RPC
+- DB: `auth_email_exists` RPC (비밀번호 찾기용)
+- `get_child_manjeom_tests` RPC 권한 픽스 (학생 본인 호출 허용)
+- `.gitignore` 강화 — tools/ 운영 스크립트(관리 토큰 포함)·.env.vercel 커밋 차단
+- CHANGELOG.md 시작, 버전 태깅 체계 정착
+
+---
+
 ## v2026.05.22-1 — 2026-05-22
 **커밋:** [dceae6b](https://github.com/MinDaehyeon/20ha-meta-x/commit/dceae6b)
 
