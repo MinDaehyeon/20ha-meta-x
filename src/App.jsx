@@ -2218,13 +2218,11 @@ const _genDates = (days) => {
     }
   return result;
 };
-// 카페 인증: 5/20(수) ~ 7/12(일), 매주 수/일 2회씩 8주 (총 16일)
-// 5/17(일)은 제외, 마지막에 7/12(일) 추가하여 페어 유지
+// 카페 인증: 5/20부터 시작, 매주 수/일 + 마지막 7/12 추가 (총 16일)
+// 모닝/나잇과 동일한 5/17 기준 주 구분으로 표시됨
 const ROSTER2_NAVER_DATES   = _genDates([0, 3])
   .filter(d => !(d.getFullYear()===2026 && d.getMonth()===4 && d.getDate()===17))
   .concat([new Date(2026, 6, 12)]); // 7/12 일요일
-// 카페 인증의 주 시작은 5/20(수) — 모닝/나잇 주 구분(5/17 일요일 시작)과 다름
-const NAVER_WEEK_START      = new Date(2026, 4, 20);
 const ROSTER2_MORNING_DATES = _genDates([1, 3, 5]);
 const ROSTER2_NIGHT_DATES   = _genDates([0, 1, 2, 4, 5, 6]);
 const ROSTER2_DAY_KO        = ['일','월','화','수','목','금','토'];
@@ -2342,8 +2340,7 @@ const StudentCertView = ({profile}) => {
   const currentWeekIdx = Math.min(7, Math.max(0, Math.floor((today - WEEK_START) / 604800000)));
   const weeklyData = Array.from({length:8}, (_, w) => {
     const allDates = [
-      // 카페 인증은 NAVER_WEEK_START(5/20 수) 기준으로 주 분할 — 모닝/나잇과 다름
-      ...ROSTER2_NAVER_DATES.filter(dt => Math.floor((dt-NAVER_WEEK_START)/604800000)===w).map(dt=>({dt,type:"N"})),
+      ...ROSTER2_NAVER_DATES.filter(dt => Math.floor((dt-WEEK_START)/604800000)===w).map(dt=>({dt,type:"N"})),
       ...ROSTER2_MORNING_DATES.filter(dt => Math.floor((dt-WEEK_START)/604800000)===w).map(dt=>({dt,type:"M"})),
       ...ROSTER2_NIGHT_DATES.filter(dt => Math.floor((dt-WEEK_START)/604800000)===w).map(dt=>({dt,type:"나"})),
     ];
@@ -2719,12 +2716,8 @@ const StudentCertView = ({profile}) => {
                               ● {label}
                             </td>
                             {weekStarts.map((wStart,wIdx)=>{
-                              // 카페 인증(N)은 NAVER_WEEK_START(5/20 수)부터 1주 단위 — 모닝/나잇과 주 시작 다름
-                              const actualWStart = type==="N"
-                                ? new Date(NAVER_WEEK_START.getTime()+wIdx*7*86400000)
-                                : wStart;
-                              const wEnd=new Date(actualWStart.getTime()+7*86400000);
-                              const wDates=[...dates].filter(dt=>dt>=actualWStart&&dt<wEnd).sort((a,b)=>a-b);
+                              const wEnd=new Date(wStart.getTime()+7*86400000);
+                              const wDates=[...dates].filter(dt=>dt>=wStart&&dt<wEnd).sort((a,b)=>a-b);
                               const isCurrentWeek = wIdx===currentWeekIdx;
                               return(
                                 <td key={wIdx} style={{verticalAlign:"middle",
@@ -2732,19 +2725,11 @@ const StudentCertView = ({profile}) => {
                                   paddingLeft:2, paddingRight:2,
                                   background: isCurrentWeek ? "rgba(246,139,30,0.07)" : "transparent",
                                   borderRadius: isCurrentWeek && isLast ? "0 0 8px 8px" : 0}}>
-                                  <div style={{display:"flex",flexWrap:"nowrap",gap:2,justifyContent:"center"}}>
+                                  <div style={{display:"flex",flexWrap:"wrap",gap:2,justifyContent:"center"}}>
                                     {wDates.length===0
                                       ? <div style={{width:cell,height:cell,borderRadius:4,background:T.surfaceAlt,border:`1px solid ${T.border}`}}/>
                                       : wDates.map((dt,i)=>{
                                           const dk=fk(dt);
-                                          // 셀 크기: 한 주 td 폭(cell+3*2)에 wDates.length개가 들어가도록 동적 조정
-                                          const cellSize = wDates.length >= 4
-                                            ? Math.floor(cell*0.5)
-                                            : wDates.length === 3
-                                              ? Math.floor(cell*0.65)
-                                              : wDates.length === 2
-                                                ? Math.floor(cell*0.85)
-                                                : cell;
                                           let done;
                                           if (type === "N") {
                                             const sessionIdx = ROSTER2_NAVER_DATES.findIndex(d => fk(d) === dk);
@@ -2757,7 +2742,7 @@ const StudentCertView = ({profile}) => {
                                           const missed = isPast && !done;
                                           return(
                                             <div key={i} title={`${dt.getMonth()+1}/${dt.getDate()}`} style={{
-                                              width:cellSize,height:cellSize,borderRadius:4,flexShrink:0,
+                                              width:cell,height:cell,borderRadius:4,
                                               background:done?color:missed?"transparent":"#F0F2FA",
                                               border:`1px solid ${done?color:missed?`${color}35`:"#E2E6F3"}`,
                                               display:"flex",alignItems:"center",justifyContent:"center",
