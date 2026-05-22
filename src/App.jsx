@@ -2093,7 +2093,8 @@ const _genDates = (days) => {
     }
   return result;
 };
-const ROSTER2_NAVER_DATES   = _genDates([0, 3]);
+// 카페 인증은 5/20(수)부터 시작 — 5/17(일)은 제외
+const ROSTER2_NAVER_DATES   = _genDates([0, 3]).filter(d => !(d.getFullYear()===2026 && d.getMonth()===4 && d.getDate()===17));
 const ROSTER2_MORNING_DATES = _genDates([1, 3, 5]);
 const ROSTER2_NIGHT_DATES   = _genDates([0, 1, 2, 4, 5, 6]);
 const ROSTER2_DAY_KO        = ['일','월','화','수','목','금','토'];
@@ -2163,6 +2164,7 @@ const StudentCertView = ({profile}) => {
   const avgTotal   = avgNaver + avgMorning + avgNight;
 
   const today = new Date();
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const weekStart = new Date(today); weekStart.setDate(today.getDate() - today.getDay());
   const thisWeek = Array.from({length:7}, (_, i) => { const d = new Date(weekStart); d.setDate(weekStart.getDate()+i); return d; });
 
@@ -2474,7 +2476,7 @@ const StudentCertView = ({profile}) => {
                                       : wDates.map((dt,i)=>{
                                           const dk=fk(dt);
                                           const done=myIdx>=0&&INIT_ATTENDANCE2[`${myIdx}-${type}-${dk}`];
-                                          const isPast=dt<today;
+                                          const isPast=dt<todayMidnight;
                                           const missed = isPast && !done;
                                           return(
                                             <div key={i} title={`${dt.getMonth()+1}/${dt.getDate()}`} style={{
