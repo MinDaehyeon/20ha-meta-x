@@ -2316,7 +2316,7 @@ const StudentCertView = ({profile}) => {
 
     // 0%~10% (시작 전/직후)
     ...(totalPct<10 && weeksLeft>0 ? [
-      `8주, 매주 모닝 ${morningPerWeek}회 · 카페 ${naverPerWeek}회 · 나잇 ${nightPerWeek}회면 목표 100%예요. 오늘부터 시작!`,
+      `남은 ${weeksLeft}주 동안 매주 모닝 ${morningPerWeek}회 · 카페 ${naverPerWeek}회 · 나잇 ${nightPerWeek}회면 목표 100%예요. 오늘부터 시작!`,
       "첫 인증이 가장 어려워요. 오늘 딱 하나만 올려봐요.",
     ] : []),
 
