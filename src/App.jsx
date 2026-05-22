@@ -2747,7 +2747,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
         "https://api.github.com/repos/MinDaehyeon/20ha-meta-x/actions/workflows/cafe_crawler.yml/dispatches",
         { method:"POST",
           headers:{"Authorization":`Bearer ${token}`,"Accept":"application/vnd.github+json","Content-Type":"application/json"},
-          body: JSON.stringify({ref:"dev"}) }
+          body: JSON.stringify({ref: ["meta-x.ai.kr","20ha-meta-x.vercel.app"].includes(window.location.hostname) ? "main" : "dev"}) }
       );
       if(r.status===204) alert("크롤링 시작됐습니다!\n약 1분 후 새로고침 하면 데이터가 업데이트됩니다.");
       else alert("실행 실패: " + r.status);
