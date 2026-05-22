@@ -2747,7 +2747,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
         "https://api.github.com/repos/MinDaehyeon/20ha-meta-x/actions/workflows/cafe_crawler.yml/dispatches",
         { method:"POST",
           headers:{"Authorization":`Bearer ${token}`,"Accept":"application/vnd.github+json","Content-Type":"application/json"},
-          body: JSON.stringify({ref:"main"}) }
+          body: JSON.stringify({ref:"dev"}) }
       );
       if(r.status===204) alert("크롤링 시작됐습니다!\n약 1분 후 새로고침 하면 데이터가 업데이트됩니다.");
       else alert("실행 실패: " + r.status);
@@ -3254,8 +3254,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                         <div key={rec.id} style={{display:"grid",gridTemplateColumns:"50px 80px 55px 60px 1fr 90px 65px 58px",
                           padding:"8px 12px",gap:6,borderTop:`1px solid ${T.border}`,
                           background:rowBg,alignItems:"center"}}>
-                          {/* 글번호 */}
-                          <div style={{fontSize:11,color:T.muted,textAlign:"center",fontFamily:"monospace"}}>{rec.id}</div>
+                          {/* 글번호 (네이버 article ID) */}
+                          <div style={{fontSize:11,color:T.muted,textAlign:"center",fontFamily:"monospace"}}>
+                            {rec.post_url ? rec.post_url.split("/").pop() : rec.id}
+                          </div>
                           {/* 학생 */}
                           <div style={{fontSize:12,fontWeight:700,color:rec.matched_student_name?T.navy:T.muted}}>
                             {rec.matched_student_name||"—"}
