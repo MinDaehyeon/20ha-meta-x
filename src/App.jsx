@@ -2081,6 +2081,8 @@ const ROSTER2 = [
   {name:"오수빈",  phone:"010-3286-6880"}, {name:"남희수",  phone:"010-8965-5948"},
   {name:"김가인",  phone:"010-4549-0142"}, {name:"양은정",  phone:"010-7232-0795"},
   {name:"테스트학생", phone:"010-0000-0000"},
+  {name:"한유찬",  phone:"010-3288-1931"}, // 신규 (2026-05-22, idx=43)
+  {name:"문성민",  phone:"010-6496-1389"}, // 신규 (2026-05-22, idx=44)
 ];
 const _genDates = (days) => {
   const result = [];
@@ -2100,6 +2102,14 @@ const roster2Fmt    = (dt) => `${dt.getMonth()+1}/${dt.getDate()}`;
 
 // 2기 출석 데이터 모듈 상수 (학생 인증 현황 + 관리자 명단 공용)
 const INIT_ATTENDANCE2 = {"36-나-2026-05-17":true,"27-나-2026-05-17":true,"4-나-2026-05-17":true,"9-나-2026-05-17":true,"0-나-2026-05-17":true,"6-나-2026-05-17":true,"19-나-2026-05-17":true,"3-나-2026-05-17":true,"5-나-2026-05-17":true,"37-나-2026-05-17":true,"31-나-2026-05-17":true,"7-나-2026-05-17":true,"13-나-2026-05-17":true,"8-나-2026-05-17":true,"15-나-2026-05-17":true,"33-나-2026-05-17":true,"1-나-2026-05-17":true,"10-나-2026-05-17":true,"25-나-2026-05-17":true,"29-나-2026-05-17":true,"32-나-2026-05-17":true,"11-나-2026-05-17":true,"12-나-2026-05-17":true,"28-나-2026-05-17":true,"26-나-2026-05-17":true,"22-나-2026-05-17":true,"30-나-2026-05-17":true,"24-나-2026-05-17":true,"38-나-2026-05-17":true,"17-나-2026-05-17":true,"2-나-2026-05-17":true,"40-나-2026-05-17":true,"16-나-2026-05-17":true,"23-나-2026-05-17":true,"35-나-2026-05-17":true,"4-M-2026-05-18":true,"11-M-2026-05-18":true,"6-M-2026-05-18":true,"23-M-2026-05-18":true,"17-M-2026-05-18":true,"36-M-2026-05-18":true,"39-M-2026-05-18":true,"10-M-2026-05-18":true,"8-M-2026-05-18":true,"33-M-2026-05-18":true,"27-M-2026-05-18":true,"24-M-2026-05-18":true,"19-M-2026-05-18":true,"20-M-2026-05-18":true,"2-M-2026-05-18":true,"3-M-2026-05-18":true,"22-M-2026-05-18":true,"26-M-2026-05-18":true,"34-M-2026-05-18":true,"12-M-2026-05-18":true,"25-M-2026-05-18":true,"28-M-2026-05-18":true,"18-M-2026-05-18":true,"31-M-2026-05-18":true,"9-M-2026-05-18":true,"16-M-2026-05-18":true,"0-M-2026-05-18":true,"32-M-2026-05-18":true,"30-M-2026-05-18":true,"1-M-2026-05-18":true,"29-M-2026-05-18":true,"15-M-2026-05-18":true,"18-나-2026-05-18":true,"36-나-2026-05-18":true,"23-나-2026-05-18":true,"32-나-2026-05-18":true,"35-나-2026-05-18":true,"4-나-2026-05-18":true,"10-나-2026-05-18":true,"3-나-2026-05-18":true,"12-나-2026-05-18":true,"16-나-2026-05-18":true,"2-나-2026-05-18":true,"11-나-2026-05-18":true,"0-나-2026-05-18":true,"8-나-2026-05-18":true,"19-나-2026-05-18":true,"7-나-2026-05-18":true,"31-나-2026-05-18":true,"17-나-2026-05-18":true,"20-나-2026-05-18":true,"9-나-2026-05-18":true,"13-나-2026-05-18":true,"33-나-2026-05-18":true,"25-나-2026-05-18":true,"30-나-2026-05-18":true,"1-나-2026-05-18":true,"39-나-2026-05-18":true,"28-나-2026-05-18":true,"15-나-2026-05-18":true,"22-나-2026-05-18":true,"37-나-2026-05-18":true,"21-나-2026-05-18":true,"41-나-2026-05-18":true,"38-나-2026-05-18":true,"34-나-2026-05-18":true,"27-나-2026-05-18":true,"6-나-2026-05-18":true,"14-나-2026-05-18":true,"24-나-2026-05-18":true,"26-나-2026-05-18":true,"40-나-2026-05-18":true,"5-나-2026-05-18":true,"36-나-2026-05-19":true,"23-나-2026-05-19":true,"40-나-2026-05-19":true,"32-나-2026-05-19":true,"37-나-2026-05-19":true,"0-나-2026-05-19":true,"17-나-2026-05-19":true,"9-나-2026-05-19":true,"25-나-2026-05-19":true,"2-나-2026-05-19":true,"33-나-2026-05-19":true,"35-나-2026-05-19":true,"14-나-2026-05-19":true,"21-나-2026-05-19":true,"4-나-2026-05-19":true,"1-나-2026-05-19":true,"24-나-2026-05-19":true,"15-나-2026-05-19":true,"20-나-2026-05-19":true,"39-나-2026-05-19":true,"8-나-2026-05-19":true,"34-나-2026-05-19":true,"29-나-2026-05-19":true,"5-나-2026-05-19":true,"13-나-2026-05-19":true,"10-나-2026-05-19":true,"19-나-2026-05-19":true,"30-나-2026-05-19":true,"6-나-2026-05-19":true,"28-나-2026-05-19":true,"11-나-2026-05-19":true,"3-나-2026-05-19":true,"18-나-2026-05-19":true,"7-나-2026-05-19":true,"41-나-2026-05-19":true,"26-나-2026-05-19":true,"12-나-2026-05-19":true,"22-나-2026-05-19":true,"10-M-2026-05-20":true,"36-M-2026-05-20":true,"8-M-2026-05-20":true,"23-M-2026-05-20":true,"6-M-2026-05-20":true,"3-M-2026-05-20":true,"40-M-2026-05-20":true,"12-M-2026-05-20":true,"35-M-2026-05-20":true,"4-M-2026-05-20":true,"19-M-2026-05-20":true,"21-M-2026-05-20":true,"9-M-2026-05-20":true,"18-M-2026-05-20":true,"33-M-2026-05-20":true,"24-M-2026-05-20":true,"0-M-2026-05-20":true,"2-M-2026-05-20":true,"39-M-2026-05-20":true,"15-M-2026-05-20":true,"16-M-2026-05-20":true,"20-M-2026-05-20":true,"1-M-2026-05-20":true,"31-M-2026-05-20":true,"14-M-2026-05-20":true,"37-M-2026-05-20":true,"41-M-2026-05-20":true,"30-M-2026-05-20":true,"26-M-2026-05-20":true,"28-M-2026-05-20":true,"38-M-2026-05-20":true,"34-M-2026-05-20":true,"22-M-2026-05-20":true,
+  // 5/21 나이트 (나이트 idx: 0~41 참석, 12=권민유·38=오수빈 결석)
+  "0-나-2026-05-21":true,"1-나-2026-05-21":true,"2-나-2026-05-21":true,"3-나-2026-05-21":true,"4-나-2026-05-21":true,"5-나-2026-05-21":true,"6-나-2026-05-21":true,"7-나-2026-05-21":true,"8-나-2026-05-21":true,"9-나-2026-05-21":true,"10-나-2026-05-21":true,"11-나-2026-05-21":true,"13-나-2026-05-21":true,"14-나-2026-05-21":true,"15-나-2026-05-21":true,"16-나-2026-05-21":true,"17-나-2026-05-21":true,"18-나-2026-05-21":true,"19-나-2026-05-21":true,"20-나-2026-05-21":true,"21-나-2026-05-21":true,"22-나-2026-05-21":true,"23-나-2026-05-21":true,"24-나-2026-05-21":true,"25-나-2026-05-21":true,"26-나-2026-05-21":true,"27-나-2026-05-21":true,"28-나-2026-05-21":true,"29-나-2026-05-21":true,"30-나-2026-05-21":true,"31-나-2026-05-21":true,"32-나-2026-05-21":true,"33-나-2026-05-21":true,"34-나-2026-05-21":true,"35-나-2026-05-21":true,"36-나-2026-05-21":true,"37-나-2026-05-21":true,"39-나-2026-05-21":true,"40-나-2026-05-21":true,"41-나-2026-05-21":true,"43-나-2026-05-21":true,"44-나-2026-05-21":true,
+  // 5/22 모닝 (결석: 5=손연재,7=최지유,13=권순혁,15=김도현,25=서소윤,28=양소윤,29=오수연,38=오수빈)
+  "0-M-2026-05-22":true,"1-M-2026-05-22":true,"2-M-2026-05-22":true,"3-M-2026-05-22":true,"4-M-2026-05-22":true,"6-M-2026-05-22":true,"8-M-2026-05-22":true,"9-M-2026-05-22":true,"10-M-2026-05-22":true,"11-M-2026-05-22":true,"12-M-2026-05-22":true,"14-M-2026-05-22":true,"16-M-2026-05-22":true,"17-M-2026-05-22":true,"18-M-2026-05-22":true,"19-M-2026-05-22":true,"20-M-2026-05-22":true,"21-M-2026-05-22":true,"22-M-2026-05-22":true,"23-M-2026-05-22":true,"24-M-2026-05-22":true,"26-M-2026-05-22":true,"27-M-2026-05-22":true,"30-M-2026-05-22":true,"31-M-2026-05-22":true,"32-M-2026-05-22":true,"33-M-2026-05-22":true,"34-M-2026-05-22":true,"35-M-2026-05-22":true,"36-M-2026-05-22":true,"37-M-2026-05-22":true,"39-M-2026-05-22":true,"40-M-2026-05-22":true,"41-M-2026-05-22":true,"43-M-2026-05-22":true,"44-M-2026-05-22":true,
+  // 신규 학생 소급: 한유찬(idx=43)
+  "43-나-2026-05-17":true,"43-M-2026-05-18":true,"43-나-2026-05-18":true,"43-나-2026-05-19":true,"43-M-2026-05-20":true,
+  // 신규 학생 소급: 문성민(idx=44)
+  "44-나-2026-05-17":true,"44-나-2026-05-18":true,"44-나-2026-05-19":true,"44-M-2026-05-20":true,
   // 테스트학생 (idx=42) 더미 데이터
   "42-나-2026-05-17":true,
   "42-N-2026-05-17":true,
@@ -2611,7 +2621,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
   const [certWeekOffset, setCertWeekOffset] = useState(0); // 0=이번주, -1=지난주 ...
   const [certNickEdit, setCertNickEdit] = useState({}); // {profile_id: editing_value}
   const [invalidCerts, setInvalidCerts] = useState([]);
-  const [certSubTab, setCertSubTab] = useState("attendance"); // "attendance" | "records" | "roster"
+  const [certSubTab, setCertSubTab] = useState("roster"); // "roster" | "records"
   const [certRecords, setCertRecords] = useState([]);
   const [certRecordsLoading, setCertRecordsLoading] = useState(false);
   const [certStatusFilter, setCertStatusFilter] = useState("all");
@@ -2669,12 +2679,12 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
   useEffect(()=>{
     if(adminTab!=="cert") return;
     loadCertStudents();
+    loadCertRecords("all");
+    // 카페 인증 현황: ROSTER2_NAVER_DATES 전체 기간 로드
+    const from = new Date(ROSTER2_NAVER_DATES[0]); from.setHours(0,0,0,0);
+    const to = new Date(ROSTER2_NAVER_DATES[ROSTER2_NAVER_DATES.length-1]); to.setHours(23,59,59,999);
+    loadAttendanceCerts(from, to);
   },[adminTab]);
-
-  useEffect(()=>{
-    if(adminTab!=="cert") return;
-    loadCertRecords(certStatusFilter);
-  },[adminTab, certStatusFilter]);
 
   const saveNickname = async (profileId, nickname) => {
     await supabase.rpc("update_naver_nickname", {p_profile_id: profileId, p_nickname: nickname.trim()||null});
@@ -2740,10 +2750,13 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
 
   const upsertCertStudent = async (row) => {
     await supabase.rpc("upsert_cert_student", {
-      p_id: row.id||null, p_name: row.name,
-      p_grade: row.grade||null, p_naver_nickname: row.naver_nickname||null
+      p_id: row.id||null,
+      p_name: row.name,
+      p_phone: row.phone||null,
+      p_grade: row.grade||null,
+      p_naver_nicknames: row.naver_nicknames||[],
     });
-    setRosterEditRow(null); setRosterAddMode(false);
+    setRosterEditRow(null);
     loadCertStudents();
   };
 
@@ -3045,85 +3058,219 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
       {/* ── 진단 센터 탭 ── */}
       {/* ── 인증 현황 탭 ── */}
       {adminTab==="cert"&&(()=>{
+        // ── 카페 인증 매칭 헬퍼 ──
+        const kstDateStr = ts => {
+          const k = new Date(new Date(ts).getTime() + 9*60*60*1000);
+          return `${k.getUTCFullYear()}-${String(k.getUTCMonth()+1).padStart(2,'0')}-${String(k.getUTCDate()).padStart(2,'0')}`;
+        };
+        const studentHasCert = (student, date) => {
+          const dk = roster2FmtKey(date);
+          const nicks = student.naver_nicknames || [];
+          if (!nicks.length) return false;
+          return attendanceCerts.some(c => nicks.includes(c.naver_nickname) && kstDateStr(c.posted_at) === dk);
+        };
+
+        const CELL_W = 28;
+        const stickyBase = {position:"sticky",left:0,zIndex:2,borderRight:`1px solid ${T.border}`};
+        const today = new Date();
+
         return (
           <div>
-            {/* 헤더: 크롤링 버튼 */}
-            <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",marginBottom:20}}>
-              <button onClick={triggerCrawl} disabled={crawlRunning}
-                style={{...css.btnOrange,padding:"8px 18px",fontSize:13,background:"#059669",opacity:crawlRunning?0.6:1}}>
-                {crawlRunning?"⏳ 실행 중...":"🔄 지금 크롤링"}
-              </button>
+            {/* 헤더: 서브탭 + 크롤링 버튼 */}
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+              {[{k:"roster",l:"👥 2기 명단"},{k:"records",l:"📝 크롤링된 인증글"}].map(({k,l})=>(
+                <button key={k} onClick={()=>setCertSubTab(k)}
+                  style={{...certSubTab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>{l}</button>
+              ))}
+              <div style={{marginLeft:"auto"}}>
+                <button onClick={triggerCrawl} disabled={crawlRunning}
+                  style={{...css.btnOrange,padding:"7px 16px",fontSize:13,background:"#059669",opacity:crawlRunning?0.6:1}}>
+                  {crawlRunning?"⏳ 실행 중...":"🔄 지금 크롤링"}
+                </button>
+              </div>
             </div>
 
-            {/* ── 2기 명단 ── */}
-            <div style={{marginBottom:28}}>
-              <div style={{fontSize:15,fontWeight:800,color:T.navy,marginBottom:12}}>
-                👥 2기 명단 <span style={{fontSize:13,fontWeight:400,color:T.muted}}>({certStudents.length}명)</span>
-              </div>
-              <Card style={{padding:0,overflow:"hidden"}}>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 0.7fr 1.2fr",background:T.navy,padding:"10px 14px",gap:8}}>
-                  {["이름","학년","네이버 닉네임"].map(h=>(
-                    <div key={h} style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)"}}>{h}</div>
-                  ))}
+            {/* ── 2기 명단 탭 ── */}
+            {certSubTab==="roster"&&(
+              <div>
+                <div style={{fontSize:12,color:T.muted,marginBottom:10}}>
+                  총 {certStudents.length}명 · 닉네임 셀 클릭 시 편집 가능 (여러 개 등록 가능)
                 </div>
-                {certStudents.length===0&&(
-                  <div style={{padding:24,textAlign:"center",color:T.muted,fontSize:13}}>명단 없음</div>
-                )}
-                {certStudents.map((s,i)=>(
-                  <div key={s.id} style={{display:"grid",gridTemplateColumns:"1fr 0.7fr 1.2fr",
-                    padding:"10px 14px",gap:8,borderTop:`1px solid ${T.border}`,
-                    background:i%2===0?T.white:"#F9FAFB",alignItems:"center"}}>
-                    <div style={{fontSize:13,fontWeight:700,color:T.navy}}>{s.name}</div>
-                    <div style={{fontSize:12,color:T.muted}}>{s.grade||"-"}</div>
-                    <div style={{fontSize:12,color:s.naver_nickname?T.navy:T.muted}}>
-                      {s.naver_nickname||"(미설정)"}
-                    </div>
-                  </div>
-                ))}
-              </Card>
-            </div>
-
-            {/* ── 크롤링된 인증글 리스트 ── */}
-            <div>
-              <div style={{fontSize:15,fontWeight:800,color:T.navy,marginBottom:12}}>
-                📝 크롤링된 인증글 <span style={{fontSize:13,fontWeight:400,color:T.muted}}>({certRecords.length}건)</span>
-              </div>
-              {certRecordsLoading?(
-                <div style={{textAlign:"center",padding:40,color:T.muted,fontSize:13}}>불러오는 중...</div>
-              ):(
                 <Card style={{padding:0,overflow:"hidden"}}>
-                  <div style={{display:"grid",gridTemplateColumns:"3fr 1fr 0.7fr",background:T.navy,padding:"10px 14px",gap:8}}>
-                    {["제목 (클릭 시 원문 이동)","닉네임","작성일"].map(h=>(
-                      <div key={h} style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)"}}>{h}</div>
-                    ))}
+                  {/* 상단 스크롤바 */}
+                  <div id="cert-top"
+                    onScroll={e=>{const b=document.getElementById('cert-body');if(b)b.scrollLeft=e.target.scrollLeft;}}
+                    style={{overflowX:"auto",overflowY:"hidden",height:14,borderBottom:`1px solid ${T.border}`,cursor:"ew-resize"}}>
+                    <div style={{width:32+100+140+36+ROSTER2_NAVER_DATES.length*CELL_W+20,height:1}}/>
                   </div>
-                  {certRecords.length===0&&(
-                    <div style={{padding:24,textAlign:"center",color:T.muted,fontSize:13}}>
-                      크롤링된 글이 없습니다. 우측 상단 "지금 크롤링" 버튼을 눌러주세요.
-                    </div>
-                  )}
-                  {certRecords.map((rec,i)=>(
-                    <div key={rec.id} style={{display:"grid",gridTemplateColumns:"3fr 1fr 0.7fr",
-                      padding:"10px 14px",gap:8,borderTop:`1px solid ${T.border}`,
-                      background:i%2===0?T.white:"#F9FAFB",alignItems:"center"}}>
-                      <div style={{fontSize:12}}>
-                        <a href={rec.post_url} target="_blank" rel="noreferrer"
-                          style={{color:T.navy,textDecoration:"none",fontWeight:600,lineHeight:1.5,
-                            display:"block",wordBreak:"break-word"}}
-                          onMouseOver={e=>e.currentTarget.style.color=T.orange}
-                          onMouseOut={e=>e.currentTarget.style.color=T.navy}>
-                          {rec.post_title}
-                        </a>
-                      </div>
-                      <div style={{fontSize:12,color:T.muted}}>{rec.naver_nickname}</div>
-                      <div style={{fontSize:11,color:T.muted}}>
-                        {new Date(rec.posted_at).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"})}
-                      </div>
-                    </div>
-                  ))}
+                  <div id="cert-body"
+                    onScroll={e=>{const t=document.getElementById('cert-top');if(t)t.scrollLeft=e.target.scrollLeft;}}
+                    style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+                    <table style={{borderCollapse:"collapse",tableLayout:"fixed"}}>
+                      <thead>
+                        <tr>
+                          <th rowSpan={2} style={{...stickyBase,width:32,minWidth:32,fontSize:10,color:T.muted,fontWeight:700,textAlign:"center",padding:"4px 2px",background:T.surfaceAlt,borderBottom:`2px solid ${T.borderStrong}`,verticalAlign:"middle"}}>#</th>
+                          <th rowSpan={2} style={{...stickyBase,left:32,width:100,minWidth:100,fontSize:11,color:T.muted,fontWeight:700,padding:"4px 6px",background:T.surfaceAlt,borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>이름 / 연락처</th>
+                          <th rowSpan={2} style={{width:140,minWidth:140,fontSize:11,color:T.muted,fontWeight:700,padding:"4px 8px",background:T.surfaceAlt,borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>네이버 닉네임</th>
+                          <th rowSpan={2} style={{width:36,minWidth:36,fontSize:9,fontWeight:700,color:"#4F46E5",background:"#EEF2FF",textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`2px solid #4F46E5`,verticalAlign:"middle"}}>인증<br/>합계</th>
+                          <th colSpan={ROSTER2_NAVER_DATES.length} style={{background:"#EEF2FF",color:"#4F46E5",fontSize:11,fontWeight:800,textAlign:"center",padding:"4px 0",borderBottom:`1px solid ${T.border}`,borderLeft:`2px solid #4F46E5`}}>
+                            카페 인증 ({ROSTER2_NAVER_DATES.length}일)
+                          </th>
+                        </tr>
+                        <tr>
+                          {ROSTER2_NAVER_DATES.map((dt,di)=>(
+                            <th key={di} style={{width:CELL_W,minWidth:CELL_W,fontSize:8,fontWeight:600,color:"#4F46E5",textAlign:"center",padding:"2px 0",verticalAlign:"middle",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:di===0?`2px solid #4F46E5`:`1px solid ${T.border}`,background:"#EEF2FF",whiteSpace:"nowrap",lineHeight:"1.2"}}>
+                              <div>{roster2Fmt(dt)}</div>
+                              <div>{ROSTER2_DAY_KO[dt.getDay()]}</div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {certStudents.length===0?(
+                          <tr><td colSpan={4+ROSTER2_NAVER_DATES.length} style={{textAlign:"center",padding:40,color:T.muted,fontSize:13}}>데이터 로딩 중...</td></tr>
+                        ):certStudents.map((s,ri)=>{
+                          const nicks = s.naver_nicknames || [];
+                          const certCount = ROSTER2_NAVER_DATES.filter(dt=>studentHasCert(s,dt)).length;
+                          const isEd = rosterEditRow?.id===s.id;
+                          const rowBg = ri%2===0?T.surface:T.surfaceAlt;
+                          return (
+                            <tr key={s.id} style={{background:rowBg}}>
+                              {/* # */}
+                              <td style={{...stickyBase,width:32,minWidth:32,textAlign:"center",fontSize:10,color:T.muted,fontWeight:700,padding:0,height:36,background:rowBg,borderBottom:`1px solid ${T.border}`}}>{ri+1}</td>
+                              {/* 이름+연락처 */}
+                              <td style={{...stickyBase,left:32,width:100,minWidth:100,padding:"4px 6px",background:rowBg,borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>
+                                <div style={{fontSize:12,fontWeight:800,color:T.navy,textAlign:"center",lineHeight:1.3}}>{s.name}</div>
+                                <div style={{fontSize:9,color:T.muted,textAlign:"center",fontFamily:"monospace",marginTop:1}}>{s.phone||"-"}</div>
+                              </td>
+                              {/* 닉네임 (클릭 편집) */}
+                              <td style={{width:140,minWidth:140,padding:"4px 8px",borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,background:rowBg,verticalAlign:"middle"}}>
+                                {isEd?(
+                                  <div>
+                                    <div style={{display:"flex",flexWrap:"wrap",gap:3,marginBottom:4}}>
+                                      {(rosterEditRow.naver_nicknames||[]).map((nick,ni)=>(
+                                        <span key={ni} style={{display:"inline-flex",alignItems:"center",gap:2,fontSize:10,padding:"2px 5px",borderRadius:8,background:"#EEF2FF",color:"#4F46E5",border:"1px solid #C7D2FE"}}>
+                                          {nick}
+                                          <span onClick={()=>setRosterEditRow(p=>({...p,naver_nicknames:p.naver_nicknames.filter((_,i)=>i!==ni)}))} style={{cursor:"pointer",fontSize:12,color:"#9CA3AF",lineHeight:1,marginLeft:1}}>✕</span>
+                                        </span>
+                                      ))}
+                                    </div>
+                                    <div style={{display:"flex",gap:3,marginBottom:4}}>
+                                      <input placeholder="닉네임 추가 후 Enter"
+                                        value={rosterEditRow._newNick||""}
+                                        onChange={e=>setRosterEditRow(p=>({...p,_newNick:e.target.value}))}
+                                        onKeyDown={e=>{
+                                          if(e.key==="Enter"&&(rosterEditRow._newNick||"").trim()){
+                                            const nick=(rosterEditRow._newNick||"").trim();
+                                            setRosterEditRow(p=>({...p,naver_nicknames:[...(p.naver_nicknames||[]),nick],_newNick:""}));
+                                            e.preventDefault();
+                                          }
+                                        }}
+                                        style={{...css.input,flex:1,padding:"3px 5px",fontSize:10}}/>
+                                      <button onClick={()=>{
+                                        const nick=(rosterEditRow._newNick||"").trim();
+                                        if(nick) setRosterEditRow(p=>({...p,naver_nicknames:[...(p.naver_nicknames||[]),nick],_newNick:""}));
+                                      }} style={{...css.btnOrange,padding:"2px 6px",fontSize:11}}>+</button>
+                                    </div>
+                                    <div style={{display:"flex",gap:3}}>
+                                      <button onClick={()=>upsertCertStudent({id:s.id,name:s.name,phone:s.phone,naver_nicknames:rosterEditRow.naver_nicknames||[]})}
+                                        style={{...css.btnOrange,padding:"3px 8px",fontSize:10}}>저장</button>
+                                      <button onClick={()=>setRosterEditRow(null)}
+                                        style={{...css.btnOutline,padding:"3px 6px",fontSize:10}}>취소</button>
+                                    </div>
+                                  </div>
+                                ):(
+                                  <div style={{display:"flex",alignItems:"center",gap:3,flexWrap:"wrap",cursor:"pointer",minHeight:28}}
+                                    onClick={()=>setRosterEditRow({id:s.id,name:s.name,phone:s.phone||"",naver_nicknames:nicks.slice(),_newNick:""})}>
+                                    {nicks.length===0
+                                      ? <span style={{fontSize:10,color:T.muted,fontStyle:"italic"}}>클릭하여 추가</span>
+                                      : nicks.map((nick,ni)=>(
+                                          <span key={ni} style={{fontSize:10,padding:"2px 5px",borderRadius:8,background:"#EEF2FF",color:"#4F46E5",border:"1px solid #C7D2FE"}}>{nick}</span>
+                                        ))
+                                    }
+                                  </div>
+                                )}
+                              </td>
+                              {/* 인증 합계 */}
+                              <td style={{width:36,minWidth:36,textAlign:"center",verticalAlign:"middle",background:"#EEF2FF",borderBottom:`1px solid ${T.border}`,borderLeft:`2px solid #4F46E5`,height:36}}>
+                                <div style={{fontSize:12,fontWeight:800,color:"#4F46E5"}}>{certCount}</div>
+                                <div style={{fontSize:8,color:"#6D28D9"}}>/{ROSTER2_NAVER_DATES.length}</div>
+                              </td>
+                              {/* 날짜별 셀 */}
+                              {ROSTER2_NAVER_DATES.map((dt,di)=>{
+                                const has = studentHasCert(s,dt);
+                                const isPast = dt <= today;
+                                return (
+                                  <td key={di} style={{
+                                    width:CELL_W,minWidth:CELL_W,height:36,
+                                    textAlign:"center",verticalAlign:"middle",
+                                    borderBottom:`1px solid ${T.border}`,
+                                    borderLeft:di===0?`2px solid #4F46E5`:`1px solid ${T.border}`,
+                                    background:has?"#D1FAE5":rowBg,
+                                  }}>
+                                    {has
+                                      ? <span style={{fontSize:13}}>✅</span>
+                                      : nicks.length===0
+                                        ? <span style={{fontSize:10,color:"#D1D5DB"}}>－</span>
+                                        : isPast
+                                          ? <span style={{fontSize:11,color:"#FCA5A5"}}>✗</span>
+                                          : <span style={{fontSize:10,color:"#D1D5DB"}}>·</span>
+                                    }
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </Card>
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* ── 크롤링된 인증글 탭 ── */}
+            {certSubTab==="records"&&(
+              <div>
+                <div style={{fontSize:12,color:T.muted,marginBottom:10}}>
+                  총 {certRecords.length}건 · 제목 클릭 시 네이버 카페 원문으로 이동
+                </div>
+                {certRecordsLoading?(
+                  <div style={{textAlign:"center",padding:40,color:T.muted,fontSize:13}}>불러오는 중...</div>
+                ):(
+                  <Card style={{padding:0,overflow:"hidden"}}>
+                    <div style={{display:"grid",gridTemplateColumns:"3fr 1fr 0.7fr",background:T.navy,padding:"10px 14px",gap:8}}>
+                      {["제목 (클릭 시 원문 이동)","닉네임","작성일"].map(h=>(
+                        <div key={h} style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)"}}>{h}</div>
+                      ))}
+                    </div>
+                    {certRecords.length===0&&(
+                      <div style={{padding:24,textAlign:"center",color:T.muted,fontSize:13}}>
+                        크롤링된 글이 없습니다. 우측 상단 "지금 크롤링" 버튼을 눌러주세요.
+                      </div>
+                    )}
+                    {certRecords.map((rec,i)=>(
+                      <div key={rec.id} style={{display:"grid",gridTemplateColumns:"3fr 1fr 0.7fr",
+                        padding:"10px 14px",gap:8,borderTop:`1px solid ${T.border}`,
+                        background:i%2===0?T.white:"#F9FAFB",alignItems:"center"}}>
+                        <div style={{fontSize:12}}>
+                          <a href={rec.post_url} target="_blank" rel="noreferrer"
+                            style={{color:T.navy,textDecoration:"none",fontWeight:600,lineHeight:1.5,display:"block",wordBreak:"break-word"}}
+                            onMouseOver={e=>e.currentTarget.style.color=T.orange}
+                            onMouseOut={e=>e.currentTarget.style.color=T.navy}>
+                            {rec.post_title}
+                          </a>
+                        </div>
+                        <div style={{fontSize:12,color:T.muted}}>{rec.naver_nickname}</div>
+                        <div style={{fontSize:11,color:T.muted}}>
+                          {new Date(rec.posted_at).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"})}
+                        </div>
+                      </div>
+                    ))}
+                  </Card>
+                )}
+              </div>
+            )}
           </div>
         );
       })()}
