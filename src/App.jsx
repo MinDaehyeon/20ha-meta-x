@@ -4622,7 +4622,14 @@ const ManjeomQuestionsTab = () => {
 
   const filtered = list.filter(q=>{
     if(filter.type && q.q_type!==filter.type) return false;
-    if(filter.kw && !(q.prompt||"").includes(filter.kw)) return false;
+    const kw = (filter.kw||"").trim();
+    if(kw){
+      const kwLower = kw.toLowerCase();
+      const inPrompt = (q.prompt||"").toLowerCase().includes(kwLower);
+      const inTags   = (q.tags||[]).some(t => String(t||"").toLowerCase().includes(kwLower));
+      const inSeq    = String(q.seq||"").includes(kw) || `q-${q.seq||""}`.toLowerCase().includes(kwLower);
+      if(!inPrompt && !inTags && !inSeq) return false;
+    }
     return true;
   });
 
@@ -4736,7 +4743,7 @@ const ManjeomQuestionsTab = () => {
             <option value="mcq">객관식</option>
           </select>
           <input value={filter.kw} onChange={e=>setFilter(f=>({...f,kw:e.target.value}))}
-            placeholder="본문 검색" style={{...css.input,padding:"6px 10px",fontSize:11}}/>
+            placeholder="검색 (본문·태그·번호)" style={{...css.input,padding:"6px 10px",fontSize:11}}/>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:520,overflowY:"auto"}}>
           {loading ? <Spinner/> :
@@ -4745,12 +4752,25 @@ const ManjeomQuestionsTab = () => {
               <div key={q.id} onClick={()=>startEdit(q)}
                 style={{padding:"8px 10px",borderRadius:8,border:`1px solid ${editing?.id===q.id?T.navy:T.border}`,
                   background:editing?.id===q.id?"#EEF2FF":T.surfaceAlt,cursor:"pointer"}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3,flexWrap:"wrap"}}>
+                  <span style={{fontSize:10,fontWeight:800,color:T.muted,letterSpacing:"0.04em"}}>Q-{q.seq||"?"}</span>
                   <Pill color={q.q_type==="short"?"#0EA5E9":"#A855F7"}>{q.q_type==="short"?"단답":"객관식"}</Pill>
                   {q.image_url && <span style={{fontSize:10}}>🖼️</span>}
                 </div>
-                <div style={{fontSize:12,color:T.navy,lineHeight:1.4,
+                <div style={{fontSize:12,color:T.navy,lineHeight:1.4,marginBottom:4,
                   display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{q.prompt}</div>
+                {(q.tags||[]).length > 0 && (
+                  <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>
+                    {q.tags.map((t,i)=>(
+                      <span key={i} onClick={(e)=>{e.stopPropagation(); setFilter(f=>({...f,kw:t}));}}
+                        style={{fontSize:10,color:T.navy,background:"#E0E7FF",
+                          padding:"1px 7px",borderRadius:10,fontWeight:600,cursor:"pointer"}}
+                        title={`태그 "${t}"로 검색`}>
+                        #{t}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             ))
           }
@@ -4767,7 +4787,15 @@ const ManjeomQuestionsTab = () => {
         ) : (
           <div style={{display:"grid",gap:12}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{fontSize:14,fontWeight:800,color:T.navy}}>{editing.id ? "문항 편집":"새 문항"}</div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{fontSize:14,fontWeight:800,color:T.navy}}>{editing.id ? "문항 편집":"새 문항"}</div>
+                {editing.id && editing.seq && (
+                  <span style={{fontSize:11,fontWeight:700,color:T.muted,
+                    padding:"2px 8px",background:T.surfaceAlt,borderRadius:6,letterSpacing:"0.04em"}}>
+                    Q-{editing.seq}
+                  </span>
+                )}
+              </div>
               <div style={{display:"flex",gap:6}}>
                 {editing.id && <button style={{...css.btnGhost,padding:"7px 14px",fontSize:11,color:"#DC2626"}} onClick={()=>remove(editing)}>삭제</button>}
                 <button style={{...css.btnGhost,padding:"7px 14px",fontSize:11}} onClick={()=>setEditing(null)}>취소</button>
@@ -4925,7 +4953,7 @@ const ManjeomTestsTab = () => {
 
   const load = async () => {
     const {data:t} = await supabase.from("manjeom_tests").select("*").order("created_at",{ascending:false});
-    const {data:q} = await supabase.from("manjeom_questions").select("id,q_type,prompt,image_url").order("created_at",{ascending:false});
+    const {data:q} = await supabase.from("manjeom_questions").select("id,seq,q_type,prompt,image_url,tags").order("seq",{ascending:true});
     setTests(t||[]);
     setQuestions(q||[]);
   };
@@ -5496,10 +5524,30 @@ const ManjeomStudentView = ({profile}) => {
         {active.test.description && <div style={{fontSize:13,color:T.muted}}>{active.test.description}</div>}
 
         {feedback && (
-          <Card style={{padding:"14px 18px",background:feedback.type==="ok"?"#F0FDF4":"#FEF2F2",
-            border:`2px solid ${feedback.type==="ok"?"#86EFAC":"#FCA5A5"}`}}>
-            <div style={{fontSize:14,fontWeight:800,color:feedback.type==="ok"?"#16A34A":"#DC2626"}}>{feedback.text}</div>
-          </Card>
+          <div onClick={()=>{ if(feedback.type==="err") setFeedback(null); }}
+            style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:1000,
+              display:"flex",alignItems:"center",justifyContent:"center",padding:20,
+              animation:"fadeIn 0.2s ease"}}>
+            <div onClick={e=>e.stopPropagation()}
+              style={{background:T.surface,borderRadius:16,padding:"28px 32px",maxWidth:420,width:"100%",
+                textAlign:"center",boxShadow:"0 12px 40px rgba(0,0,0,0.3)",
+                border:`2px solid ${feedback.type==="ok"?"#86EFAC":"#FCA5A5"}`}}>
+              <div style={{fontSize:46,marginBottom:10}}>{feedback.type==="ok"?"🎉":"❌"}</div>
+              <div style={{fontSize:16,fontWeight:800,color:feedback.type==="ok"?"#16A34A":"#DC2626",marginBottom:8,whiteSpace:"pre-wrap"}}>
+                {feedback.text.replace(/^[🎉❌]\s*/, "")}
+              </div>
+              {feedback.type==="err" && (
+                <>
+                  <div style={{fontSize:12,color:T.muted,marginBottom:18}}>
+                    답안은 그대로 남아 있어요. 의심되는 답을 고쳐서 다시 제출해 보세요.
+                  </div>
+                  <button style={{...css.btnOrange,padding:"10px 28px",fontSize:13}} onClick={()=>setFeedback(null)}>
+                    다시 풀기
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         )}
 
         <Card style={{padding:"18px 20px"}}>
