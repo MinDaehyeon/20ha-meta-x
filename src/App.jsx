@@ -2618,12 +2618,19 @@ const StudentCertView = ({profile}) => {
                                   paddingLeft:2, paddingRight:2,
                                   background: isCurrentWeek ? "rgba(246,139,30,0.07)" : "transparent",
                                   borderRadius: isCurrentWeek && isLast ? "0 0 8px 8px" : 0}}>
-                                  <div style={{display:"flex",flexWrap:"wrap",gap:2,justifyContent:"center"}}>
+                                  <div style={{display:"flex",flexWrap:"nowrap",gap:2,justifyContent:"center"}}>
                                     {wDates.length===0
                                       ? <div style={{width:cell,height:cell,borderRadius:4,background:T.surfaceAlt,border:`1px solid ${T.border}`}}/>
                                       : wDates.map((dt,i)=>{
                                           const dk=fk(dt);
-                                          // 전부 DB 기반
+                                          // 셀 크기: 한 주 td 폭(cell+3*2)에 wDates.length개가 들어가도록 동적 조정
+                                          const cellSize = wDates.length >= 4
+                                            ? Math.floor(cell*0.5)
+                                            : wDates.length === 3
+                                              ? Math.floor(cell*0.65)
+                                              : wDates.length === 2
+                                                ? Math.floor(cell*0.85)
+                                                : cell;
                                           let done;
                                           if (type === "N") {
                                             const sessionIdx = ROSTER2_NAVER_DATES.findIndex(d => fk(d) === dk);
@@ -2636,7 +2643,7 @@ const StudentCertView = ({profile}) => {
                                           const missed = isPast && !done;
                                           return(
                                             <div key={i} title={`${dt.getMonth()+1}/${dt.getDate()}`} style={{
-                                              width:cell,height:cell,borderRadius:4,
+                                              width:cellSize,height:cellSize,borderRadius:4,flexShrink:0,
                                               background:done?color:missed?"transparent":"#F0F2FA",
                                               border:`1px solid ${done?color:missed?`${color}35`:"#E2E6F3"}`,
                                               display:"flex",alignItems:"center",justifyContent:"center",
