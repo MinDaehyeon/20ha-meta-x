@@ -2324,59 +2324,83 @@ const StudentCertView = ({profile}) => {
     ? mentorPool[(myStat.total + myRank + currentWeekIdx) % mentorPool.length]
     : "꾸준히 인증하는 것 자체가 이미 대단한 일이에요.";
 
-  // ── 마스터리 도전 메시지 풀 (활동별 분배 + 약점 집중 + 100% 장려)
+  // ── 마스터리 도전 메시지 풀 (행동 가이드 + 동기부여, 진행 회차 기반)
   const remainingTo100 = Math.max(0, grandTotal - myStat.total);
-  // 활동별 잔여 / 남은 주차 (100% 기준 분배)
-  const morningPerWeek = weeksLeft>0 ? Math.ceil(Math.max(0, morningTotal - myStat.morning)/weeksLeft) : Math.max(0, morningTotal - myStat.morning);
-  const naverPerWeek   = weeksLeft>0 ? Math.ceil(Math.max(0, naverTotal   - myStat.naver  )/weeksLeft) : Math.max(0, naverTotal   - myStat.naver);
-  const nightPerWeek   = weeksLeft>0 ? Math.ceil(Math.max(0, nightTotal   - myStat.night  )/weeksLeft) : Math.max(0, nightTotal   - myStat.night);
+  const remainingTo80  = Math.max(0, Math.ceil(grandTotal * 0.8) - myStat.total);
+  // 약점 활동의 진행 회차 중 놓친 횟수
+  const weakestMissed = weakest ? Math.max(0, weakest.past - weakest.done) : 0;
 
   const masteryPool = [
-    // 🎉 100% 완주
-    ...(totalPct>=100 ? [
-      "🏆 100% 완주! 8주를 완벽하게 채웠어요. 최고예요!",
-      "흠 잡을 데 없는 8주! 자기 통제력의 정점이에요. 🏅",
+    // 🏆 100% 완주
+    ...(totalPct >= 100 ? [
+      "🏆 100% 완주! 8주를 완벽하게 채웠어요.",
+      "흠 잡을 데 없는 8주, 자기 통제력의 정점이에요. 🏅",
     ] : []),
 
-    // 🎯 80%~99% (목표 달성, 100% 장려)
-    ...(totalPct>=80 && totalPct<100 ? [
-      `🎯 목표 80% 달성! 이제 100%까지 ${remainingTo100}회 남았어요. 완주에 도전해봐요!`,
-      `목표를 넘었어요. 여기서 멈추긴 아까워요 — 남은 ${remainingTo100}회, 완주합시다!`,
-      ...(weakest && weakest.p < 100 ? [`${weakest.label}만 마저 챙기면 100%예요. 마지막 한 발!`] : []),
+    // 🎯 80~99% (목표 달성, 100% 챌린지)
+    ...(totalPct >= 80 && totalPct < 100 ? [
+      `🎯 목표 80% 달성! 100%까지 ${remainingTo100}회 — 완주에 도전해봐요.`,
+      ...(weakest && weakest.p < 100
+        ? [`${J_eul(weakest.label)} 마저 챙기면 100% — 마지막 한 발이에요. (현재 ${weakest.p}%)`]
+        : []),
     ] : []),
 
-    // 70%~80% (목표 직전)
-    ...(totalPct>=70 && totalPct<80 ? [
-      `목표 80%까지 단 ${Math.ceil(grandTotal*0.8) - myStat.total}회! 손 닿을 거리예요.`,
-      ...(weakest && weeksLeft>0 ? [`${weakest.label}에 조금만 집중하면 목표가 가까워져요. (현재 ${weakest.p}%)`] : []),
+    // 60~80% (목표 직전)
+    ...(totalPct >= 60 && totalPct < 80 ? [
+      `목표 80%까지 ${remainingTo80}회 — 손 닿을 거리예요.`,
+      ...(weakest ? [`${J_eul(weakest.label)} 조금만 더 챙기면 목표 달성이에요. (현재 ${weakest.p}%)`] : []),
     ] : []),
 
-    // 40%~70% (활동별 페이스 안내)
-    ...(totalPct>=40 && totalPct<70 && weeksLeft>0 ? [
-      `남은 ${weeksLeft}주 동안 주당 모닝 ${morningPerWeek}회 · 카페 ${naverPerWeek}회 · 나잇 ${nightPerWeek}회면 100%에 닿아요.`,
-      ...(weakest ? [`${weakest.label}에 집중! 지금 ${weakest.p}%로 가장 낮아요. 여기만 보강하면 페이스가 살아나요.`] : []),
+    // 30~60% (페이스 안정 + 약점 보강)
+    ...(totalPct >= 30 && totalPct < 60 ? [
+      ...(weakest && weakest.p < 60 && weakestMissed > 0
+        ? [`${weakest.label} ${weakest.p}% — 진행된 ${weakest.past}회 중 ${weakestMissed}회를 놓쳤어요. 다음부터 챙겨봐요.`]
+        : []),
+      `현재 진행된 일정의 ${totalPctPast}% 달성 — 페이스 잘 잡고 있어요. 마지막까지 꾸준히!`,
+      ...(weakest && weakest.p >= 60 ? [`전체적으로 균형이 잡혀있어요. 이 페이스만 유지하면 충분해요.`] : []),
     ] : []),
 
-    // 10%~40% (시작 단계, 약점 집중)
-    ...(totalPct>=10 && totalPct<40 && weeksLeft>0 ? [
-      `남은 ${weeksLeft}주 동안 주당 모닝 ${morningPerWeek}회 · 카페 ${naverPerWeek}회 · 나잇 ${nightPerWeek}회씩 챙기면 목표에 닿아요.`,
-      ...(weakest ? [`${weakest.label}부터 챙겨봐요. 지금 ${weakest.p}%로 가장 낮은 활동이에요.`] : []),
+    // 10~30% (따라잡기)
+    ...(totalPct >= 10 && totalPct < 30 ? [
+      ...(weakest && weakest.p === 0
+        ? [`${weakest.label} 0회 — 다음 ${weakest.label} 일정부터 챙겨봐요. 가장 빠르게 따라잡을 수 있어요.`]
+        : []),
+      ...(weakest && weakest.p > 0 && weakest.p < 60
+        ? [`${J_eun(weakest.label)} 가장 늦었어요. (${weakest.p}%) 여기에 집중하면 페이스가 살아나요.`]
+        : []),
+      `지금부터 매 회차를 챙기면 충분히 따라잡을 수 있어요.`,
     ] : []),
 
-    // 0%~10% (시작 전/직후)
-    ...(totalPct<10 && weeksLeft>0 ? [
-      `남은 ${weeksLeft}주 동안 매주 모닝 ${morningPerWeek}회 · 카페 ${naverPerWeek}회 · 나잇 ${nightPerWeek}회면 목표 100%예요. 오늘부터 시작!`,
-      "첫 인증이 가장 어려워요. 오늘 딱 하나만 올려봐요.",
+    // 1~10% (시작 직후)
+    ...(totalPct > 0 && totalPct < 10 ? [
+      "시작했어요. 작은 한 걸음이 8주를 만들어요.",
+      ...(weakest && weakest.past > 0
+        ? [`다음 ${weakest.label} 일정부터 챙겨봐요. 가장 빠르게 따라잡을 수 있어요.`]
+        : []),
+      ...(weakestMissed === 0 && weakest
+        ? [`지금까지 챙긴 회차는 모두 완수! 다음 일정도 놓치지 말고 챙겨봐요.`]
+        : []),
     ] : []),
 
-    // 마지막 주
-    ...(weeksLeft===0 && totalPct<100 ? [
-      `마지막 주, 100%까지 ${remainingTo100}회 남았어요. 끝까지 달려요!`,
+    // 0회 (시작 전)
+    ...(myStat.total === 0 && grandPast > 0 ? [
+      "첫 인증이 가장 어려워요. 오늘 일정부터 하나만 도전!",
+      "한 회차씩 쌓이는 게 결국 8주 결과예요. 지금 시작해볼까요?",
+    ] : []),
+
+    // 프로젝트 시작 전
+    ...(grandPast === 0 ? [
+      "프로젝트가 막 시작했어요. 첫 회차부터 차근차근 채워봐요.",
+    ] : []),
+
+    // 마지막 주 미완
+    ...(weeksLeft === 0 && totalPct < 100 ? [
+      `마지막 주, 100%까지 ${remainingTo100}회 — 끝까지 달려요!`,
     ] : []),
   ];
   const masteryMsg = masteryPool.length > 0
     ? masteryPool[(myStat.total + currentWeekIdx) % masteryPool.length]
-    : `매주 일정대로 인증하면 목표 80%에 자연스럽게 닿아요.`;
+    : "한 회차씩 차근차근 챙기면 8주가 채워져요.";
 
   return (
     <div style={{display:"grid", gap:12}}>
