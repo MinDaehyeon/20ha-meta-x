@@ -3197,7 +3197,6 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                               {/* 날짜별 셀 */}
                               {ROSTER2_NAVER_DATES.map((dt,di)=>{
                                 const has = studentHasCert(s,dt);
-                                const isPast = dt <= today;
                                 return (
                                   <td key={di} style={{
                                     width:CELL_W,minWidth:CELL_W,height:36,
@@ -3210,9 +3209,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                                       ? <span style={{fontSize:13}}>✅</span>
                                       : nicks.length===0
                                         ? <span style={{fontSize:10,color:"#D1D5DB"}}>－</span>
-                                        : isPast
-                                          ? <span style={{fontSize:11,color:"#FCA5A5"}}>✗</span>
-                                          : <span style={{fontSize:10,color:"#D1D5DB"}}>·</span>
+                                        : <span style={{fontSize:10,color:"#D1D5DB"}}>·</span>
                                     }
                                   </td>
                                 );
