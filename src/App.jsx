@@ -4627,10 +4627,12 @@ const ManjeomQuestionsTab = () => {
   });
 
   const MCQ_DEFAULT_CHOICES = ["①","②","③","④","⑤"];
+  const MCQ_LABELS = ["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩"];
   const blank = () => ({
     id:null, q_type:"short", prompt:"", image_url:"",
     choices:["",""], answers:[""], tags:[],
     _correctIdx: [], // mcq 정답 보기 인덱스 (편집 UX용)
+    _tagsRaw: "",     // 태그 원본 입력 문자열 (쉼표 입력 시 사라지지 않도록)
   });
 
   const startNew = () => setEditing(blank());
@@ -4648,6 +4650,7 @@ const ManjeomQuestionsTab = () => {
       answers: q.answers || [""],
       tags: q.tags || [],
       _correctIdx: correctIdx,
+      _tagsRaw: (q.tags || []).join(", "),
     });
   };
 
@@ -4683,13 +4686,15 @@ const ManjeomQuestionsTab = () => {
       editing.choices = cleanChoices;
     }
 
+    const parsedTags = String(editing._tagsRaw || "")
+      .split(",").map(s=>s.trim()).filter(Boolean);
     const payload = {
       q_type: editing.q_type,
       prompt: editing.prompt.trim(),
       image_url: editing.image_url || null,
       choices: editing.q_type==="mcq" ? editing.choices : null,
       answers,
-      tags: editing.tags && editing.tags.length>0 ? editing.tags : null,
+      tags: parsedTags.length>0 ? parsedTags : null,
     };
 
     let res;
@@ -4833,9 +4838,33 @@ const ManjeomQuestionsTab = () => {
               </div>
             ) : (
               <div>
-                <label style={css.label}>
-                  객관식 정답 (기본 5개 ①~⑤ · 이미지에 보기 내용 포함 · 정답 번호만 체크 — 복수 가능)
-                </label>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                  <label style={{...css.label,marginBottom:0}}>
+                    객관식 정답 ({editing.choices.length}개 보기 · 정답 번호만 체크 — 복수 가능)
+                  </label>
+                  <div style={{display:"flex",gap:6}}>
+                    <button style={{...css.btnOutline,padding:"4px 10px",fontSize:11}}
+                      disabled={editing.choices.length<=2}
+                      onClick={()=>setEditing(ed=>{
+                        const last = ed.choices.length - 1;
+                        return {
+                          ...ed,
+                          choices: ed.choices.slice(0,last),
+                          _correctIdx: (ed._correctIdx||[]).filter(i => i !== last),
+                        };
+                      })}>− 보기 줄이기</button>
+                    <button style={{...css.btnOutline,padding:"4px 10px",fontSize:11}}
+                      disabled={editing.choices.length>=10}
+                      onClick={()=>setEditing(ed=>{
+                        const i = ed.choices.length;
+                        const lbl = MCQ_LABELS[i] || String(i+1);
+                        return {...ed, choices:[...ed.choices, lbl]};
+                      })}>+ 보기 늘리기</button>
+                  </div>
+                </div>
+                <div style={{fontSize:11,color:T.muted,marginBottom:8}}>
+                  보기 내용은 보통 문제 이미지에 포함됩니다. 텍스트도 넣고 싶다면 아래 "보기 텍스트 입력" 펼치세요.
+                </div>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                   {editing.choices.map((c,i)=>(
                     <label key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",
@@ -4849,47 +4878,33 @@ const ManjeomQuestionsTab = () => {
                           if(e.target.checked) set.add(i); else set.delete(i);
                           return {...ed,_correctIdx:[...set]};
                         })}/>
-                      <span style={{fontSize:16,fontWeight:800,color:T.navy}}>{c || ("①②③④⑤"[i]||(i+1))}</span>
+                      <span style={{fontSize:16,fontWeight:800,color:T.navy}}>{c || (MCQ_LABELS[i]||(i+1))}</span>
                     </label>
                   ))}
                 </div>
                 <details style={{marginTop:10}}>
-                  <summary style={{fontSize:11,color:T.muted,cursor:"pointer"}}>보기 텍스트도 입력하기 (선택, 보통 이미지에 포함됨)</summary>
+                  <summary style={{fontSize:11,color:T.muted,cursor:"pointer"}}>보기 텍스트 입력 (선택)</summary>
                   <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:8}}>
                     {editing.choices.map((c,i)=>(
                       <div key={i} style={{display:"flex",gap:6,alignItems:"center"}}>
-                        <span style={{fontSize:12,color:T.muted,width:20}}>{"①②③④⑤"[i]||(i+1)}</span>
+                        <span style={{fontSize:12,color:T.muted,width:20}}>{MCQ_LABELS[i]||(i+1)}</span>
                         <input value={c} onChange={e=>{
                           const next=[...editing.choices]; next[i]=e.target.value;
                           setEditing({...editing,choices:next});
                         }} placeholder={`보기 ${i+1} (선택)`}
                         style={{...css.input,padding:"6px 10px",fontSize:12}}/>
-                        <button style={{...css.btnGhost,padding:"4px 8px",fontSize:11}}
-                          onClick={()=>setEditing(ed=>({
-                            ...ed,
-                            choices:ed.choices.filter((_,idx)=>idx!==i),
-                            _correctIdx:(ed._correctIdx||[]).filter(x=>x!==i).map(x=>x>i?x-1:x),
-                          }))}>✕</button>
                       </div>
                     ))}
-                    {editing.choices.length < 5 && (
-                      <button style={{...css.btnOutline,alignSelf:"flex-start",padding:"5px 12px",fontSize:11}}
-                        onClick={()=>setEditing(e=>{
-                          const i=e.choices.length;
-                          const lbl="①②③④⑤"[i]||String(i+1);
-                          return {...e,choices:[...e.choices, lbl]};
-                        })}>+ 보기 추가</button>
-                    )}
                   </div>
                 </details>
               </div>
             )}
 
             <div>
-              <label style={css.label}>태그 (선택, 쉼표 구분)</label>
-              <input value={(editing.tags||[]).join(",")}
-                onChange={e=>setEditing({...editing,tags:e.target.value.split(",").map(s=>s.trim()).filter(Boolean)})}
-                placeholder="예: 수학,중1,비례식"
+              <label style={css.label}>태그 (선택, 쉼표 구분 — 예: "수학, 중1, 비례식")</label>
+              <input value={editing._tagsRaw ?? (editing.tags||[]).join(", ")}
+                onChange={e=>setEditing({...editing,_tagsRaw:e.target.value})}
+                placeholder='예: 수학, 중1, 비례식'
                 style={{...css.input,padding:"8px 12px",fontSize:13}}/>
             </div>
           </div>
