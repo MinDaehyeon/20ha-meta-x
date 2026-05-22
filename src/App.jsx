@@ -4474,6 +4474,49 @@ const AttendanceUploadView = ({onRefresh}) => {
 };
 
 // ══════════════════════════════════════════════════════
+// ADMIN: 만점 테스트
+// ══════════════════════════════════════════════════════
+const ManjeomView = ({onRefresh}) => {
+  const [tab, setTab] = useState("manage"); // "manage" | "results"
+
+  return (
+    <div style={{display:"grid",gap:14}}>
+      <div style={{fontSize:18,fontWeight:800,color:T.navy}}>💯 만점 테스트</div>
+
+      {/* 하위 탭 */}
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+        {[
+          {k:"manage", l:"📝 만점 테스트 관리"},
+          {k:"results", l:"📊 만점 테스트 결과"},
+        ].map(({k,l})=>(
+          <button key={k} onClick={()=>setTab(k)}
+            style={{...tab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {/* 탭 컨텐츠 */}
+      {tab==="manage" && (
+        <Card style={{padding:"24px",textAlign:"center"}}>
+          <div style={{fontSize:36,opacity:0.4,marginBottom:10}}>📝</div>
+          <div style={{fontSize:15,fontWeight:700,color:T.navy,marginBottom:6}}>만점 테스트 관리</div>
+          <div style={{fontSize:12,color:T.muted}}>준비 중입니다.</div>
+        </Card>
+      )}
+
+      {tab==="results" && (
+        <Card style={{padding:"24px",textAlign:"center"}}>
+          <div style={{fontSize:36,opacity:0.4,marginBottom:10}}>📊</div>
+          <div style={{fontSize:15,fontWeight:700,color:T.navy,marginBottom:6}}>만점 테스트 결과</div>
+          <div style={{fontSize:12,color:T.muted}}>준비 중입니다.</div>
+        </Card>
+      )}
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════
 // LOG HISTORY
 // ══════════════════════════════════════════════════════
 const LogHistory = ({logs, onDelete, isAdmin, allProfiles}) => {
@@ -5039,6 +5082,7 @@ export default function App() {
     if(path === "/users")   return "users";
     if(path === "/roster2") return "roster2";
     if(path === "/attendance") return "attendance";
+    if(path === "/manjeom")    return "manjeom";
     return "dashboard";
   };
   const [view, setView]           = useState(getInitialView);
@@ -5048,7 +5092,7 @@ export default function App() {
 
   // URL ↔ 상태 동기화
   const navigate = (v, input=false) => {
-    const path = input ? "/input" : v === "history" ? "/history" : v === "cert" ? "/cert" : v === "users" ? "/users" : v === "roster2" ? "/roster2" : v === "attendance" ? "/attendance" : "/";
+    const path = input ? "/input" : v === "history" ? "/history" : v === "cert" ? "/cert" : v === "users" ? "/users" : v === "roster2" ? "/roster2" : v === "attendance" ? "/attendance" : v === "manjeom" ? "/manjeom" : "/";
     window.history.pushState({ view:v, input }, "", path);
     setView(v);
     setShowInput(input);
@@ -5063,6 +5107,7 @@ export default function App() {
       else if(path==="/users")      { setView("users");      setShowInput(false); }
       else if(path==="/roster2")    { setView("roster2");    setShowInput(false); }
       else if(path==="/attendance") { setView("attendance"); setShowInput(false); }
+      else if(path==="/manjeom")    { setView("manjeom");    setShowInput(false); }
       else if(path==="/history")    { setView("history");    setShowInput(false); }
       else                          { setView("dashboard");  setShowInput(false); }
     };
@@ -5241,6 +5286,7 @@ export default function App() {
         { key:"roster2",     label:"20HA 2기 현황",      icon:"trophy"    },
         { key:"cert",        label:"20HA 2기 인증글 관리", icon:"clipboard" },
         { key:"attendance",  label:"20HA 2기 출석체크",   icon:"calendar"  },
+        { key:"manjeom",     label:"만점 테스트",         icon:"cap"       },
         { key:"history",     label:"전체 기록",           icon:"calendar"  },
       ]
     : isParent
@@ -5336,6 +5382,8 @@ export default function App() {
             <StudentCertView profile={profile}/>
           ) : view === "attendance" && isAdmin ? (
             <AttendanceUploadView onRefresh={refreshData}/>
+          ) : view === "manjeom" && isAdmin ? (
+            <ManjeomView onRefresh={refreshData}/>
           ) : (view === "users" || view === "cert" || view === "roster2") && isAdmin ? (
             <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData} defaultTab={view}/>
           ) : view === "dashboard" ? (
