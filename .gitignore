@@ -8,3 +8,13 @@ build/
 
 # 네이버 크롤러 세션 쿠키
 tools/.naver_cookies.json
+
+# 관리 토큰이 하드코딩된 로컬 운영 스크립트 — 커밋 금지
+tools/apply_*.js
+tools/verify_*.js
+tools/check_*.js
+tools/backfill_*.js
+tools/remigrate*.js
+
+# Vercel env 백업 파일
+.env.vercel

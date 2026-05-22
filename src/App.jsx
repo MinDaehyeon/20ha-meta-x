@@ -440,7 +440,21 @@ const AuthScreen = ({ onLogin }) => {
 
   const handleForgotPassword = async () => {
     if(!fpEmail){ setError("이메일을 입력해주세요."); return; }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fpEmail)){ setError("유효하지 않은 이메일 형식입니다."); return; }
     setLoad("fp", true); setError("");
+    // 1) 가입된 이메일인지 사전 체크 (Supabase는 보안상 항상 success를 반환하므로 RPC로 별도 확인)
+    const { data: exists, error: chkErr } = await supabase.rpc("auth_email_exists", { p_email: fpEmail });
+    if(chkErr){
+      setLoad("fp", false);
+      setError("확인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+    if(!exists){
+      setLoad("fp", false);
+      setError("가입되지 않은 이메일입니다. 이메일을 확인하거나 회원가입을 진행해주세요.");
+      return;
+    }
+    // 2) 실제 재설정 메일 발송
     const { error:err } = await supabase.auth.resetPasswordForEmail(fpEmail, {
       redirectTo: "https://meta-x.ai.kr"
     });
@@ -533,6 +547,12 @@ const AuthScreen = ({ onLogin }) => {
         setLoad("signup",false);
         setError("프로필 저장 중 오류가 발생했습니다. 다시 시도해주세요.");
         return;
+      }
+      // 학생 회원가입 시 20HA 2기 명단(cert_students)과 이름 매칭되면 자동 연동
+      if(suRole === "student"){
+        try {
+          await supabase.rpc("try_link_2ki_on_signup", { p_profile_id: data.user.id, p_name: suName.trim() });
+        } catch (e) { /* 실패해도 가입 자체는 성공 처리 */ }
       }
     }
     await supabase.auth.signOut();
@@ -4580,42 +4600,942 @@ const AttendanceUploadView = ({onRefresh}) => {
 // ══════════════════════════════════════════════════════
 // ADMIN: 만점 테스트
 // ══════════════════════════════════════════════════════
-const ManjeomView = ({onRefresh}) => {
-  const [tab, setTab] = useState("manage"); // "manage" | "results"
+
+// ── 문항 관리 (Question Bank) ─────────────────────────
+const ManjeomQuestionsTab = () => {
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [editing, setEditing] = useState(null); // 선택된 문항 또는 새 문항 객체
+  const [filter, setFilter] = useState({type:"", kw:""});
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
+
+  const load = async () => {
+    setLoading(true);
+    const {data, error} = await supabase.from("manjeom_questions")
+      .select("*").order("created_at",{ascending:false});
+    if(error){ alert("문항 조회 실패: "+error.message); }
+    else setList(data||[]);
+    setLoading(false);
+  };
+  useEffect(()=>{ load(); }, []);
+
+  const filtered = list.filter(q=>{
+    if(filter.type && q.q_type!==filter.type) return false;
+    if(filter.kw && !(q.prompt||"").includes(filter.kw)) return false;
+    return true;
+  });
+
+  const blank = () => ({
+    id:null, q_type:"short", prompt:"", image_url:"",
+    choices:["",""], answers:[""], tags:[],
+    _correctIdx: [], // mcq 정답 보기 인덱스 (편집 UX용)
+  });
+
+  const startNew = () => setEditing(blank());
+  const startEdit = (q) => setEditing({
+    ...q,
+    choices: q.choices || ["",""],
+    answers: q.answers || [""],
+    tags: q.tags || [],
+    _correctIdx: q.q_type==="mcq" && q.answers
+      ? q.answers.map(a => (q.choices||[]).indexOf(a)).filter(i=>i>=0)
+      : [],
+  });
+
+  const upload = async (file) => {
+    if(!file) return;
+    if(file.size > 2*1024*1024){ alert("파일 크기는 2MB 이하만 가능합니다."); return; }
+    if(!/^image\/(png|jpeg|jpg|webp)$/.test(file.type)){ alert("PNG/JPG/WebP만 가능합니다."); return; }
+    setUploading(true);
+    const ext = file.name.split(".").pop();
+    const path = `q_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+    const {error} = await supabase.storage.from("manjeom-images").upload(path, file, {contentType:file.type});
+    if(error){ alert("업로드 실패: "+error.message); setUploading(false); return; }
+    const {data:{publicUrl}} = supabase.storage.from("manjeom-images").getPublicUrl(path);
+    setEditing(e => ({...e, image_url: publicUrl}));
+    setUploading(false);
+  };
+
+  const save = async () => {
+    if(!editing.prompt.trim()){ alert("문제 본문을 입력해주세요."); return; }
+
+    let answers;
+    if(editing.q_type === "short"){
+      answers = (editing.answers||[]).map(a=>String(a||"").trim()).filter(Boolean);
+      if(answers.length === 0){ alert("정답을 한 개 이상 입력해주세요."); return; }
+    } else {
+      const cleanChoices = (editing.choices||[]).map(c=>String(c||"").trim()).filter(Boolean);
+      if(cleanChoices.length < 2){ alert("보기를 2개 이상 입력해주세요."); return; }
+      const corr = (editing._correctIdx||[]).filter(i => i < cleanChoices.length);
+      if(corr.length === 0){ alert("정답 보기를 1개 이상 선택해주세요."); return; }
+      answers = corr.map(i => cleanChoices[i]);
+      editing.choices = cleanChoices;
+    }
+
+    const payload = {
+      q_type: editing.q_type,
+      prompt: editing.prompt.trim(),
+      image_url: editing.image_url || null,
+      choices: editing.q_type==="mcq" ? editing.choices : null,
+      answers,
+      tags: editing.tags && editing.tags.length>0 ? editing.tags : null,
+    };
+
+    let res;
+    if(editing.id){
+      res = await supabase.from("manjeom_questions").update({...payload, updated_at:new Date().toISOString()}).eq("id", editing.id);
+    } else {
+      res = await supabase.from("manjeom_questions").insert(payload);
+    }
+    if(res.error){ alert("저장 실패: "+res.error.message); return; }
+    setEditing(null);
+    await load();
+  };
+
+  const remove = async (q) => {
+    if(!window.confirm(`"${q.prompt.slice(0,30)}..." 문항을 삭제할까요?\n(시험지에 사용 중이면 삭제 불가)`)) return;
+    const {error} = await supabase.from("manjeom_questions").delete().eq("id", q.id);
+    if(error){
+      if(error.code === "23503") alert("이 문항은 시험지에 포함되어 있어 삭제할 수 없습니다. 먼저 시험지에서 제거하세요.");
+      else alert("삭제 실패: "+error.message);
+      return;
+    }
+    setEditing(null);
+    await load();
+  };
+
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"320px 1fr",gap:14,alignItems:"start"}}>
+      {/* 좌측 목록 */}
+      <Card style={{padding:"14px 16px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div style={{fontSize:13,fontWeight:800,color:T.navy}}>문항 ({list.length})</div>
+          <button style={{...css.btnOrange,padding:"6px 12px",fontSize:11}} onClick={startNew}>+ 새 문항</button>
+        </div>
+        <div style={{display:"flex",gap:6,marginBottom:10}}>
+          <select value={filter.type} onChange={e=>setFilter(f=>({...f,type:e.target.value}))}
+            style={{...css.select,padding:"6px 8px",fontSize:11,flex:"0 0 100px"}}>
+            <option value="">전체</option>
+            <option value="short">단답형</option>
+            <option value="mcq">객관식</option>
+          </select>
+          <input value={filter.kw} onChange={e=>setFilter(f=>({...f,kw:e.target.value}))}
+            placeholder="본문 검색" style={{...css.input,padding:"6px 10px",fontSize:11}}/>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:520,overflowY:"auto"}}>
+          {loading ? <Spinner/> :
+            filtered.length===0 ? <div style={{fontSize:11,color:T.muted,textAlign:"center",padding:"20px 0"}}>문항이 없습니다.</div> :
+            filtered.map(q=>(
+              <div key={q.id} onClick={()=>startEdit(q)}
+                style={{padding:"8px 10px",borderRadius:8,border:`1px solid ${editing?.id===q.id?T.navy:T.border}`,
+                  background:editing?.id===q.id?"#EEF2FF":T.surfaceAlt,cursor:"pointer"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                  <Pill color={q.q_type==="short"?"#0EA5E9":"#A855F7"}>{q.q_type==="short"?"단답":"객관식"}</Pill>
+                  {q.image_url && <span style={{fontSize:10}}>🖼️</span>}
+                </div>
+                <div style={{fontSize:12,color:T.navy,lineHeight:1.4,
+                  display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{q.prompt}</div>
+              </div>
+            ))
+          }
+        </div>
+      </Card>
+
+      {/* 우측 편집 */}
+      <Card style={{padding:"18px 20px"}}>
+        {!editing ? (
+          <div style={{textAlign:"center",padding:"60px 0",color:T.muted}}>
+            <div style={{fontSize:36,opacity:0.4,marginBottom:10}}>📝</div>
+            <div style={{fontSize:13}}>좌측에서 문항을 선택하거나 "+ 새 문항"을 눌러주세요.</div>
+          </div>
+        ) : (
+          <div style={{display:"grid",gap:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontSize:14,fontWeight:800,color:T.navy}}>{editing.id ? "문항 편집":"새 문항"}</div>
+              <div style={{display:"flex",gap:6}}>
+                {editing.id && <button style={{...css.btnGhost,padding:"7px 14px",fontSize:11,color:"#DC2626"}} onClick={()=>remove(editing)}>삭제</button>}
+                <button style={{...css.btnGhost,padding:"7px 14px",fontSize:11}} onClick={()=>setEditing(null)}>취소</button>
+                <button style={{...css.btnOrange,padding:"7px 14px",fontSize:11}} onClick={save}>저장</button>
+              </div>
+            </div>
+
+            <div style={{display:"flex",gap:14,alignItems:"center"}}>
+              <label style={{...css.label,marginBottom:0}}>유형</label>
+              {[{v:"short",l:"단답형"},{v:"mcq",l:"객관식"}].map(({v,l})=>(
+                <label key={v} style={{display:"flex",alignItems:"center",gap:4,fontSize:12,cursor:"pointer"}}>
+                  <input type="radio" name="qtype" checked={editing.q_type===v}
+                    onChange={()=>setEditing(e=>({...e,q_type:v}))}/>{l}
+                </label>
+              ))}
+            </div>
+
+            <div>
+              <label style={css.label}>문제 본문</label>
+              <textarea value={editing.prompt} onChange={e=>setEditing({...editing,prompt:e.target.value})}
+                rows={3} style={{...css.input,fontFamily:"inherit",resize:"vertical"}}/>
+            </div>
+
+            <div>
+              <label style={css.label}>문제 이미지 (선택, 권장 가로 800~1200px, 2MB 이하)</label>
+              {editing.image_url ? (
+                <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                  <img src={editing.image_url} alt="문제" style={{maxWidth:300,borderRadius:8,border:`1px solid ${T.border}`}}/>
+                  <button style={{...css.btnGhost,padding:"6px 12px",fontSize:11}}
+                    onClick={()=>setEditing(e=>({...e,image_url:""}))}>이미지 제거</button>
+                </div>
+              ) : (
+                <>
+                  <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp"
+                    style={{display:"none"}}
+                    onChange={e=>{const f=e.target.files?.[0]; if(f) upload(f); e.target.value="";}}/>
+                  <button style={{...css.btnGhost,padding:"8px 16px",fontSize:12}} onClick={()=>fileRef.current?.click()}>
+                    {uploading ? <Spinner size={14}/> : "📁 이미지 업로드"}
+                  </button>
+                </>
+              )}
+            </div>
+
+            {editing.q_type === "short" ? (
+              <div>
+                <label style={css.label}>정답 후보 (여러 개 등록 가능 — 학생이 어느 것 하나만 맞으면 정답. 공백/대소문자 무시)</label>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {editing.answers.map((a,i)=>(
+                    <div key={i} style={{display:"flex",gap:6}}>
+                      <input value={a} onChange={e=>{
+                        const next=[...editing.answers]; next[i]=e.target.value;
+                        setEditing({...editing,answers:next});
+                      }} placeholder={`정답 ${i+1}`}
+                      style={{...css.input,padding:"8px 12px",fontSize:13}}/>
+                      <button style={{...css.btnGhost,padding:"6px 12px",fontSize:11}}
+                        onClick={()=>setEditing(e=>({...e,answers:e.answers.filter((_,idx)=>idx!==i)}))}>✕</button>
+                    </div>
+                  ))}
+                  <button style={{...css.btnOutline,alignSelf:"flex-start",padding:"6px 14px",fontSize:11}}
+                    onClick={()=>setEditing(e=>({...e,answers:[...e.answers,""]}))}>+ 정답 추가</button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label style={css.label}>보기 (2~5개, 정답 보기는 좌측 체크박스로 선택 — 복수 가능)</label>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {editing.choices.map((c,i)=>(
+                    <div key={i} style={{display:"flex",gap:6,alignItems:"center"}}>
+                      <input type="checkbox" checked={(editing._correctIdx||[]).includes(i)}
+                        onChange={e=>setEditing(ed=>{
+                          const set = new Set(ed._correctIdx||[]);
+                          if(e.target.checked) set.add(i); else set.delete(i);
+                          return {...ed,_correctIdx:[...set]};
+                        })}/>
+                      <span style={{fontSize:12,color:T.muted,width:20}}>{"①②③④⑤"[i]||(i+1)}</span>
+                      <input value={c} onChange={e=>{
+                        const next=[...editing.choices]; next[i]=e.target.value;
+                        setEditing({...editing,choices:next});
+                      }} placeholder={`보기 ${i+1}`}
+                      style={{...css.input,padding:"8px 12px",fontSize:13}}/>
+                      <button style={{...css.btnGhost,padding:"6px 10px",fontSize:11}}
+                        onClick={()=>setEditing(ed=>({
+                          ...ed,
+                          choices:ed.choices.filter((_,idx)=>idx!==i),
+                          _correctIdx:(ed._correctIdx||[]).filter(x=>x!==i).map(x=>x>i?x-1:x),
+                        }))}>✕</button>
+                    </div>
+                  ))}
+                  {editing.choices.length < 5 && (
+                    <button style={{...css.btnOutline,alignSelf:"flex-start",padding:"6px 14px",fontSize:11}}
+                      onClick={()=>setEditing(e=>({...e,choices:[...e.choices,""]}))}>+ 보기 추가</button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label style={css.label}>태그 (선택, 쉼표 구분)</label>
+              <input value={(editing.tags||[]).join(",")}
+                onChange={e=>setEditing({...editing,tags:e.target.value.split(",").map(s=>s.trim()).filter(Boolean)})}
+                placeholder="예: 수학,중1,비례식"
+                style={{...css.input,padding:"8px 12px",fontSize:13}}/>
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+};
+
+// ── 시험지 관리 (Test Composer) ────────────────────────
+const ManjeomTestsTab = () => {
+  const [tests, setTests] = useState([]);
+  const [questions, setQuestions] = useState([]); // 문항 은행 전체
+  const [editing, setEditing] = useState(null);   // 시험지 편집 객체
+  const [editingQids, setEditingQids] = useState([]); // 시험지에 포함된 question id 배열 (순서)
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerKw, setPickerKw] = useState("");
+
+  const load = async () => {
+    const {data:t} = await supabase.from("manjeom_tests").select("*").order("created_at",{ascending:false});
+    const {data:q} = await supabase.from("manjeom_questions").select("id,q_type,prompt,image_url").order("created_at",{ascending:false});
+    setTests(t||[]);
+    setQuestions(q||[]);
+  };
+  useEffect(()=>{ load(); }, []);
+
+  const startNew = () => { setEditing({id:null,title:"",description:"",is_published:false}); setEditingQids([]); };
+  const startEdit = async (t) => {
+    setEditing({...t});
+    const {data} = await supabase.from("manjeom_test_questions")
+      .select("question_id,q_order").eq("test_id",t.id).order("q_order");
+    setEditingQids((data||[]).map(r=>r.question_id));
+  };
+
+  const save = async () => {
+    if(!editing.title.trim()){ alert("제목을 입력해주세요."); return; }
+    let testId = editing.id;
+    if(testId){
+      const {error} = await supabase.from("manjeom_tests")
+        .update({title:editing.title,description:editing.description,is_published:editing.is_published,updated_at:new Date().toISOString()})
+        .eq("id",testId);
+      if(error){ alert("저장 실패: "+error.message); return; }
+    } else {
+      const {data,error} = await supabase.from("manjeom_tests")
+        .insert({title:editing.title,description:editing.description,is_published:editing.is_published})
+        .select().single();
+      if(error){ alert("저장 실패: "+error.message); return; }
+      testId = data.id;
+    }
+    // 문항 매핑 일괄 교체
+    const {error:e2} = await supabase.rpc("set_manjeom_test_questions",{p_test_id:testId,p_question_ids:editingQids});
+    if(e2){ alert("문항 매핑 저장 실패: "+e2.message); return; }
+    setEditing(null);
+    await load();
+  };
+
+  const remove = async (t) => {
+    if(!window.confirm(`"${t.title}" 시험지를 삭제할까요?\n(배정 및 시도 기록도 함께 삭제됩니다)`)) return;
+    const {error} = await supabase.from("manjeom_tests").delete().eq("id",t.id);
+    if(error){ alert("삭제 실패: "+error.message); return; }
+    setEditing(null);
+    await load();
+  };
+
+  const move = (idx, dir) => {
+    const next=[...editingQids]; const j=idx+dir;
+    if(j<0||j>=next.length) return;
+    [next[idx],next[j]]=[next[j],next[idx]];
+    setEditingQids(next);
+  };
+
+  const addQuestions = (ids) => {
+    setEditingQids(prev => [...prev, ...ids.filter(id=>!prev.includes(id))]);
+    setShowPicker(false);
+  };
+
+  const qMap = Object.fromEntries(questions.map(q=>[q.id,q]));
+  const pickerList = questions.filter(q =>
+    !editingQids.includes(q.id) &&
+    (!pickerKw || (q.prompt||"").includes(pickerKw))
+  );
+
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"320px 1fr",gap:14,alignItems:"start"}}>
+      <Card style={{padding:"14px 16px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div style={{fontSize:13,fontWeight:800,color:T.navy}}>시험지 ({tests.length})</div>
+          <button style={{...css.btnOrange,padding:"6px 12px",fontSize:11}} onClick={startNew}>+ 새 시험지</button>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:520,overflowY:"auto"}}>
+          {tests.length===0 ? <div style={{fontSize:11,color:T.muted,textAlign:"center",padding:"20px 0"}}>시험지가 없습니다.</div> :
+            tests.map(t=>(
+              <div key={t.id} onClick={()=>startEdit(t)}
+                style={{padding:"10px 12px",borderRadius:8,border:`1px solid ${editing?.id===t.id?T.navy:T.border}`,
+                  background:editing?.id===t.id?"#EEF2FF":T.surfaceAlt,cursor:"pointer"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                  <Pill color={t.is_published?"#16A34A":"#94A3B8"}>{t.is_published?"🟢 공개":"📝 초안"}</Pill>
+                </div>
+                <div style={{fontSize:13,fontWeight:700,color:T.navy}}>{t.title}</div>
+                {t.description && <div style={{fontSize:11,color:T.muted,marginTop:2}}>{t.description}</div>}
+              </div>
+            ))
+          }
+        </div>
+      </Card>
+
+      <Card style={{padding:"18px 20px"}}>
+        {!editing ? (
+          <div style={{textAlign:"center",padding:"60px 0",color:T.muted}}>
+            <div style={{fontSize:36,opacity:0.4,marginBottom:10}}>🗂️</div>
+            <div style={{fontSize:13}}>좌측에서 시험지를 선택하거나 "+ 새 시험지"를 눌러주세요.</div>
+          </div>
+        ) : (
+          <div style={{display:"grid",gap:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontSize:14,fontWeight:800,color:T.navy}}>{editing.id?"시험지 편집":"새 시험지"}</div>
+              <div style={{display:"flex",gap:6}}>
+                {editing.id && <button style={{...css.btnGhost,padding:"7px 14px",fontSize:11,color:"#DC2626"}} onClick={()=>remove(editing)}>삭제</button>}
+                <button style={{...css.btnGhost,padding:"7px 14px",fontSize:11}} onClick={()=>setEditing(null)}>취소</button>
+                <button style={{...css.btnOrange,padding:"7px 14px",fontSize:11}} onClick={save}>저장</button>
+              </div>
+            </div>
+
+            <div>
+              <label style={css.label}>제목</label>
+              <input value={editing.title} onChange={e=>setEditing({...editing,title:e.target.value})}
+                style={{...css.input,padding:"8px 12px",fontSize:13}}/>
+            </div>
+            <div>
+              <label style={css.label}>설명 (선택)</label>
+              <input value={editing.description||""} onChange={e=>setEditing({...editing,description:e.target.value})}
+                style={{...css.input,padding:"8px 12px",fontSize:13}}/>
+            </div>
+            <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+              <input type="checkbox" checked={editing.is_published}
+                onChange={e=>setEditing({...editing,is_published:e.target.checked})}/>
+              <span style={{fontSize:13,fontWeight:700,color:T.navy}}>공개 — 학생 목록에 노출</span>
+            </label>
+
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <label style={{...css.label,marginBottom:0}}>포함된 문항 ({editingQids.length})</label>
+                <button style={{...css.btnOutline,padding:"6px 12px",fontSize:11}} onClick={()=>setShowPicker(true)}>+ 문항 추가</button>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {editingQids.length===0 ? <div style={{fontSize:11,color:T.muted,textAlign:"center",padding:"14px 0"}}>문항을 추가해주세요.</div> :
+                  editingQids.map((qid,i)=>{
+                    const q=qMap[qid];
+                    return (
+                      <div key={qid} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",border:`1px solid ${T.border}`,borderRadius:8,background:T.surfaceAlt}}>
+                        <div style={{fontSize:11,fontWeight:700,color:T.muted,width:24}}>{i+1}.</div>
+                        <Pill color={q?.q_type==="short"?"#0EA5E9":"#A855F7"}>{q?.q_type==="short"?"단답":"객관식"}</Pill>
+                        <div style={{flex:1,fontSize:12,color:T.navy,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                          {q?.prompt || "(삭제된 문항)"}
+                        </div>
+                        <button style={{...css.btnGhost,padding:"4px 8px",fontSize:11}} onClick={()=>move(i,-1)}>↑</button>
+                        <button style={{...css.btnGhost,padding:"4px 8px",fontSize:11}} onClick={()=>move(i,1)}>↓</button>
+                        <button style={{...css.btnGhost,padding:"4px 8px",fontSize:11,color:"#DC2626"}}
+                          onClick={()=>setEditingQids(prev=>prev.filter(x=>x!==qid))}>✕</button>
+                      </div>
+                    );
+                  })
+                }
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 문항 선택 모달 */}
+        {showPicker && (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}
+            onClick={()=>setShowPicker(false)}>
+            <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:14,padding:20,maxWidth:600,width:"100%",maxHeight:"80vh",display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{fontSize:14,fontWeight:800,color:T.navy}}>문항 추가</div>
+              <input value={pickerKw} onChange={e=>setPickerKw(e.target.value)}
+                placeholder="본문 검색" style={{...css.input,padding:"8px 12px",fontSize:13}}/>
+              <PickerList list={pickerList} onAdd={addQuestions}/>
+              <button style={{...css.btnGhost,padding:"7px 14px",fontSize:12,alignSelf:"flex-end"}} onClick={()=>setShowPicker(false)}>닫기</button>
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+};
+
+const PickerList = ({list, onAdd}) => {
+  const [sel, setSel] = useState(new Set());
+  const toggle = (id) => setSel(prev=>{ const n=new Set(prev); if(n.has(id)) n.delete(id); else n.add(id); return n; });
+  return (
+    <>
+      <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:6,minHeight:200}}>
+        {list.length===0 ? <div style={{fontSize:12,color:T.muted,textAlign:"center",padding:20}}>일치하는 문항이 없습니다.</div> :
+          list.map(q=>(
+            <label key={q.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",border:`1px solid ${sel.has(q.id)?T.navy:T.border}`,borderRadius:8,background:sel.has(q.id)?"#EEF2FF":T.surfaceAlt,cursor:"pointer"}}>
+              <input type="checkbox" checked={sel.has(q.id)} onChange={()=>toggle(q.id)}/>
+              <Pill color={q.q_type==="short"?"#0EA5E9":"#A855F7"}>{q.q_type==="short"?"단답":"객관식"}</Pill>
+              <div style={{flex:1,fontSize:12,color:T.navy,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{q.prompt}</div>
+            </label>
+          ))
+        }
+      </div>
+      <button style={{...css.btnOrange,padding:"8px 16px",fontSize:12,alignSelf:"flex-end"}}
+        disabled={sel.size===0} onClick={()=>onAdd([...sel])}>선택한 {sel.size}개 추가</button>
+    </>
+  );
+};
+
+// ── 배정 관리 ────────────────────────────────────────
+const ManjeomAssignTab = ({allProfiles}) => {
+  const [tests, setTests] = useState([]);
+  const [selectedTestId, setSelectedTestId] = useState(null);
+  const [assignedIds, setAssignedIds] = useState(new Set());
+  const [originalIds, setOriginalIds] = useState(new Set());
+  const [kw, setKw] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const students = (allProfiles||[]).filter(p=>p.role==="student" && p.approval_status==="approved");
+
+  const loadTests = async () => {
+    const {data} = await supabase.from("manjeom_tests").select("id,title,is_published").order("created_at",{ascending:false});
+    setTests(data||[]);
+  };
+  useEffect(()=>{ loadTests(); }, []);
+
+  const loadAssignments = async (testId) => {
+    const {data} = await supabase.from("manjeom_assignments").select("student_id").eq("test_id",testId);
+    const ids = new Set((data||[]).map(r=>r.student_id));
+    setAssignedIds(ids); setOriginalIds(new Set(ids));
+  };
+  useEffect(()=>{ if(selectedTestId) loadAssignments(selectedTestId); }, [selectedTestId]);
+
+  const toggle = (id) => setAssignedIds(prev=>{ const n=new Set(prev); if(n.has(id)) n.delete(id); else n.add(id); return n; });
+
+  const save = async () => {
+    if(!selectedTestId) return;
+    setSaving(true);
+    const {error} = await supabase.rpc("set_manjeom_assignments",{
+      p_test_id: selectedTestId,
+      p_student_ids: [...assignedIds],
+    });
+    if(error){ alert("저장 실패: "+error.message); setSaving(false); return; }
+    setOriginalIds(new Set(assignedIds));
+    setSaving(false);
+    alert("배정이 저장되었습니다.");
+  };
+
+  const filtered = students.filter(s=>!kw || (s.name||"").includes(kw) || (s.email||"").includes(kw));
+  const dirty = assignedIds.size !== originalIds.size ||
+    [...assignedIds].some(id=>!originalIds.has(id));
+
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"320px 1fr",gap:14,alignItems:"start"}}>
+      <Card style={{padding:"14px 16px"}}>
+        <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10}}>시험지 선택</div>
+        <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:520,overflowY:"auto"}}>
+          {tests.length===0 ? <div style={{fontSize:11,color:T.muted,textAlign:"center",padding:"20px 0"}}>시험지가 없습니다.</div> :
+            tests.map(t=>(
+              <div key={t.id} onClick={()=>setSelectedTestId(t.id)}
+                style={{padding:"10px 12px",borderRadius:8,border:`1px solid ${selectedTestId===t.id?T.navy:T.border}`,
+                  background:selectedTestId===t.id?"#EEF2FF":T.surfaceAlt,cursor:"pointer"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                  <Pill color={t.is_published?"#16A34A":"#94A3B8"}>{t.is_published?"🟢 공개":"📝 초안"}</Pill>
+                </div>
+                <div style={{fontSize:13,fontWeight:700,color:T.navy}}>{t.title}</div>
+              </div>
+            ))
+          }
+        </div>
+      </Card>
+
+      <Card style={{padding:"18px 20px"}}>
+        {!selectedTestId ? (
+          <div style={{textAlign:"center",padding:"60px 0",color:T.muted}}>
+            <div style={{fontSize:36,opacity:0.4,marginBottom:10}}>👥</div>
+            <div style={{fontSize:13}}>좌측에서 시험지를 선택해주세요.</div>
+          </div>
+        ) : (
+          <div style={{display:"grid",gap:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontSize:14,fontWeight:800,color:T.navy}}>
+                배정 학생 ({assignedIds.size}/{students.length})
+              </div>
+              <button style={{...css.btnOrange,padding:"7px 14px",fontSize:12}}
+                disabled={!dirty||saving} onClick={save}>
+                {saving ? <Spinner size={12}/> : (dirty ? "저장" : "변경 없음")}
+              </button>
+            </div>
+            <input value={kw} onChange={e=>setKw(e.target.value)} placeholder="학생 이름·이메일 검색"
+              style={{...css.input,padding:"8px 12px",fontSize:13}}/>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:6,maxHeight:480,overflowY:"auto"}}>
+              {filtered.map(s=>(
+                <label key={s.id} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 10px",
+                  border:`1px solid ${assignedIds.has(s.id)?"#16A34A":T.border}`,borderRadius:8,
+                  background:assignedIds.has(s.id)?"#F0FDF4":T.surfaceAlt,cursor:"pointer"}}>
+                  <input type="checkbox" checked={assignedIds.has(s.id)} onChange={()=>toggle(s.id)}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:700,color:T.navy}}>{s.name||"(이름 없음)"}</div>
+                    <div style={{fontSize:9,color:T.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.email}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+};
+
+// ── 결과 (시험지별 / 학생별) ──────────────────────────
+const ManjeomResultsTab = ({allProfiles}) => {
+  const [mode, setMode] = useState("by_test"); // by_test | by_student
+  const [tests, setTests] = useState([]);
+  const [selTestId, setSelTestId] = useState(null);
+  const [selStudentId, setSelStudentId] = useState(null);
+  const [byTestRows, setByTestRows] = useState([]);
+  const [byStudentRows, setByStudentRows] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [expanded, setExpanded] = useState(null); // {testId, studentId}
+  const [details, setDetails] = useState([]);
+  const [questionsMap, setQuestionsMap] = useState({});
+
+  useEffect(()=>{ (async()=>{
+    const {data} = await supabase.from("manjeom_tests").select("id,title,is_published").order("created_at",{ascending:false});
+    setTests(data||[]);
+  })(); }, []);
+
+  useEffect(()=>{ if(mode==="by_test" && selTestId){
+    (async()=>{
+      const [{data:rows},{data:stat}] = await Promise.all([
+        supabase.rpc("get_manjeom_results_by_test",{p_test_id:selTestId}),
+        supabase.rpc("get_manjeom_test_stats",{p_test_id:selTestId}),
+      ]);
+      setByTestRows(rows||[]); setStats((stat&&stat[0])||null);
+      // 문항 prompt 미리 캐싱
+      const {data:qs} = await supabase.from("manjeom_test_questions").select("question_id,q_order,manjeom_questions(id,prompt,q_type)").eq("test_id",selTestId).order("q_order");
+      const map={}; (qs||[]).forEach(r=>{
+        const q=r.manjeom_questions; if(q) map[q.id]={...q,q_order:r.q_order};
+      });
+      setQuestionsMap(map);
+      setExpanded(null);
+    })();
+  } }, [mode, selTestId]);
+
+  useEffect(()=>{ if(mode==="by_student" && selStudentId){
+    (async()=>{
+      const {data} = await supabase.rpc("get_manjeom_results_by_student",{p_student_id:selStudentId});
+      setByStudentRows(data||[]);
+      setExpanded(null);
+    })();
+  } }, [mode, selStudentId]);
+
+  const loadDetails = async (testId, studentId) => {
+    const {data} = await supabase.rpc("get_manjeom_attempts_detail",{p_test_id:testId,p_student_id:studentId});
+    setDetails(data||[]);
+  };
+
+  const students = (allProfiles||[]).filter(p=>p.role==="student"&&p.approval_status==="approved");
+
+  return (
+    <div style={{display:"grid",gap:14}}>
+      <div style={{display:"flex",gap:8}}>
+        {[{k:"by_test",l:"📋 시험지별 보기"},{k:"by_student",l:"👤 학생별 보기"}].map(({k,l})=>(
+          <button key={k} onClick={()=>setMode(k)}
+            style={{...mode===k?css.btnOrange:css.btnOutline,padding:"7px 14px",fontSize:12,fontWeight:700}}>{l}</button>
+        ))}
+      </div>
+
+      {mode==="by_test" && (
+        <div style={{display:"grid",gridTemplateColumns:"280px 1fr",gap:14,alignItems:"start"}}>
+          <Card style={{padding:"14px 16px"}}>
+            <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10}}>시험지</div>
+            <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:520,overflowY:"auto"}}>
+              {tests.map(t=>(
+                <div key={t.id} onClick={()=>setSelTestId(t.id)}
+                  style={{padding:"10px 12px",borderRadius:8,border:`1px solid ${selTestId===t.id?T.navy:T.border}`,
+                    background:selTestId===t.id?"#EEF2FF":T.surfaceAlt,cursor:"pointer",fontSize:12,fontWeight:700,color:T.navy}}>
+                  {t.title}
+                </div>
+              ))}
+            </div>
+          </Card>
+          <div style={{display:"grid",gap:10}}>
+            {!selTestId ? <Card style={{padding:30,textAlign:"center",color:T.muted}}>좌측에서 시험지를 선택해주세요.</Card> : (
+              <>
+                {stats && (
+                  <Card style={{padding:"14px 18px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+                    {[
+                      {l:"배정 학생",v:stats.assigned_count},
+                      {l:"통과",v:stats.pass_count},
+                      {l:"진행 중",v:stats.in_progress_count},
+                      {l:"평균 시도(통과자)",v:stats.avg_pass_attempts??"-"},
+                    ].map(({l,v})=>(
+                      <div key={l}>
+                        <div style={{fontSize:10,color:T.muted,marginBottom:2}}>{l}</div>
+                        <div style={{fontSize:18,fontWeight:800,color:T.navy}}>{v}</div>
+                      </div>
+                    ))}
+                  </Card>
+                )}
+                <Card style={{padding:"14px 18px"}}>
+                  <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10}}>학생별 결과</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                    {byTestRows.length===0 ? <div style={{fontSize:11,color:T.muted,textAlign:"center",padding:20}}>배정된 학생이 없습니다.</div> :
+                      byTestRows.map(r=>{
+                        const expandKey = `${selTestId}-${r.student_id}`;
+                        const isExp = expanded===expandKey;
+                        return (
+                          <div key={r.student_id}>
+                            <div onClick={()=>{ if(isExp){setExpanded(null);} else {setExpanded(expandKey); loadDetails(selTestId,r.student_id);} }}
+                              style={{display:"grid",gridTemplateColumns:"1fr 80px 90px 140px 80px",gap:8,alignItems:"center",
+                                padding:"8px 10px",borderRadius:8,background:isExp?"#EEF2FF":"transparent",cursor:"pointer",
+                                borderBottom:`1px solid ${T.border}`}}>
+                              <div style={{fontSize:13,fontWeight:700,color:T.navy}}>{r.student_name}</div>
+                              <div style={{fontSize:12,color:T.muted}}>{r.attempt_count}회</div>
+                              <Pill color={r.is_passed?"#16A34A":"#94A3B8"}>{r.is_passed?`✅ ${r.pass_attempt_no}회`:"🔄 진행"}</Pill>
+                              <div style={{fontSize:11,color:T.muted}}>{r.last_attempt_at?new Date(r.last_attempt_at).toLocaleString("ko-KR"):"-"}</div>
+                              <div style={{fontSize:11,color:T.navy,textAlign:"right"}}>{isExp?"▲ 접기":"▼ 상세"}</div>
+                            </div>
+                            {isExp && (
+                              <div style={{padding:"10px 14px",background:T.surfaceAlt,borderRadius:8,marginTop:4,marginBottom:8}}>
+                                {details.length===0 ? <div style={{fontSize:11,color:T.muted}}>시도 기록이 없습니다.</div> :
+                                  details.map(d=>(
+                                    <div key={d.attempt_no} style={{fontSize:11,marginBottom:6,padding:"6px 8px",background:T.surface,borderRadius:6}}>
+                                      <div style={{fontWeight:700,color:T.navy,marginBottom:3}}>
+                                        시도 {d.attempt_no} · {new Date(d.submitted_at).toLocaleString("ko-KR")} ·
+                                        <span style={{color:d.is_pass?"#16A34A":"#DC2626",marginLeft:6}}>{d.is_pass?"통과":"미통과"}</span>
+                                      </div>
+                                      <div style={{color:T.muted}}>
+                                        틀린 문항: {(d.wrong_q_ids||[]).length===0 ? "없음" :
+                                          (d.wrong_q_ids||[]).map(qid=>{
+                                            const q=questionsMap[qid]; return q?`Q${q.q_order}`:"?";
+                                          }).join(", ")}
+                                      </div>
+                                    </div>
+                                  ))
+                                }
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    }
+                  </div>
+                </Card>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {mode==="by_student" && (
+        <div style={{display:"grid",gridTemplateColumns:"280px 1fr",gap:14,alignItems:"start"}}>
+          <Card style={{padding:"14px 16px"}}>
+            <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10}}>학생</div>
+            <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:520,overflowY:"auto"}}>
+              {students.map(s=>(
+                <div key={s.id} onClick={()=>setSelStudentId(s.id)}
+                  style={{padding:"8px 12px",borderRadius:8,border:`1px solid ${selStudentId===s.id?T.navy:T.border}`,
+                    background:selStudentId===s.id?"#EEF2FF":T.surfaceAlt,cursor:"pointer",fontSize:12,fontWeight:700,color:T.navy}}>
+                  {s.name}
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card style={{padding:"14px 18px"}}>
+            {!selStudentId ? <div style={{padding:30,textAlign:"center",color:T.muted}}>좌측에서 학생을 선택해주세요.</div> : (
+              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10}}>배정된 시험지</div>
+                {byStudentRows.length===0 ? <div style={{fontSize:11,color:T.muted,textAlign:"center",padding:20}}>배정된 시험지가 없습니다.</div> :
+                  byStudentRows.map(r=>(
+                    <div key={r.test_id} style={{display:"grid",gridTemplateColumns:"1fr 80px 100px 140px",gap:8,alignItems:"center",
+                      padding:"8px 10px",borderBottom:`1px solid ${T.border}`}}>
+                      <div style={{fontSize:13,fontWeight:700,color:T.navy}}>{r.title}</div>
+                      <div style={{fontSize:12,color:T.muted}}>{r.attempt_count}회</div>
+                      <Pill color={r.is_passed?"#16A34A":"#94A3B8"}>{r.is_passed?`✅ ${r.pass_attempt_no}회`:"🔄 진행"}</Pill>
+                      <div style={{fontSize:11,color:T.muted}}>{r.last_attempt_at?new Date(r.last_attempt_at).toLocaleString("ko-KR"):"-"}</div>
+                    </div>
+                  ))
+                }
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── 메인 ────────────────────────────────────────────
+const ManjeomView = ({onRefresh, allProfiles}) => {
+  const [tab, setTab] = useState("manage"); // manage | results
+  const [subTab, setSubTab] = useState("questions"); // questions | tests | assign
 
   return (
     <div style={{display:"grid",gap:14}}>
       <div style={{fontSize:18,fontWeight:800,color:T.navy}}>💯 만점 테스트</div>
 
-      {/* 하위 탭 */}
       <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
         {[
           {k:"manage", l:"📝 만점 테스트 관리"},
           {k:"results", l:"📊 만점 테스트 결과"},
         ].map(({k,l})=>(
           <button key={k} onClick={()=>setTab(k)}
-            style={{...tab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>
-            {l}
-          </button>
+            style={{...tab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>{l}</button>
         ))}
       </div>
 
-      {/* 탭 컨텐츠 */}
       {tab==="manage" && (
-        <Card style={{padding:"24px",textAlign:"center"}}>
-          <div style={{fontSize:36,opacity:0.4,marginBottom:10}}>📝</div>
-          <div style={{fontSize:15,fontWeight:700,color:T.navy,marginBottom:6}}>만점 테스트 관리</div>
-          <div style={{fontSize:12,color:T.muted}}>준비 중입니다.</div>
-        </Card>
+        <>
+          <div style={{display:"flex",gap:6,borderBottom:`1px solid ${T.border}`,paddingBottom:0}}>
+            {[
+              {k:"questions",l:"📚 문항 관리"},
+              {k:"tests",l:"🗂️ 시험지 관리"},
+              {k:"assign",l:"👥 배정 관리"},
+            ].map(({k,l})=>(
+              <button key={k} onClick={()=>setSubTab(k)}
+                style={{background:"transparent",border:"none",borderBottom:`3px solid ${subTab===k?T.orange:"transparent"}`,
+                  padding:"8px 14px",fontSize:13,fontWeight:700,color:subTab===k?T.navy:T.muted,cursor:"pointer"}}>{l}</button>
+            ))}
+          </div>
+          {subTab==="questions" && <ManjeomQuestionsTab/>}
+          {subTab==="tests"     && <ManjeomTestsTab/>}
+          {subTab==="assign"    && <ManjeomAssignTab allProfiles={allProfiles}/>}
+        </>
       )}
 
-      {tab==="results" && (
-        <Card style={{padding:"24px",textAlign:"center"}}>
-          <div style={{fontSize:36,opacity:0.4,marginBottom:10}}>📊</div>
-          <div style={{fontSize:15,fontWeight:700,color:T.navy,marginBottom:6}}>만점 테스트 결과</div>
-          <div style={{fontSize:12,color:T.muted}}>준비 중입니다.</div>
+      {tab==="results" && <ManjeomResultsTab allProfiles={allProfiles}/>}
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════
+// STUDENT/PARENT: 만점 테스트 (시험지 풀이)
+// ══════════════════════════════════════════════════════
+const ManjeomStudentView = ({profile}) => {
+  const [tests, setTests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [active, setActive] = useState(null); // { test, questions, last_answers, is_passed }
+  const [answers, setAnswers] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState(null); // {type:"ok"|"err", text}
+
+  const isParentView = profile.id !== undefined; // dummy — profile prop always present
+  const studentId = profile.id;
+
+  const loadList = async () => {
+    setLoading(true);
+    // 본인이면 get_my_manjeom_tests, 학부모/관리자가 자녀 보는 경우 get_child_manjeom_tests
+    const {data, error} = await supabase.rpc("get_child_manjeom_tests",{p_child_id:studentId});
+    if(error){ console.error(error); setTests([]); }
+    else setTests(data||[]);
+    setLoading(false);
+  };
+  useEffect(()=>{ loadList(); }, [studentId]);
+
+  const open = async (testId) => {
+    const {data, error} = await supabase.rpc("get_my_manjeom_test_detail",{p_test_id:testId,p_student_id:studentId});
+    if(error || !data){ alert("시험지를 불러오지 못했습니다."); return; }
+    setActive(data);
+    setAnswers(data.last_answers || {});
+    setFeedback(null);
+  };
+
+  const submit = async () => {
+    setSubmitting(true);
+    const {data, error} = await supabase.rpc("submit_manjeom_attempt",{p_test_id:active.test.id,p_answers:answers});
+    setSubmitting(false);
+    if(error){ alert("제출 실패: "+error.message); return; }
+    if(data.is_pass){
+      setFeedback({type:"ok",text:`🎉 통과! ${data.attempt_no}번째 시도에 성공했어요.`});
+      await loadList();
+      setTimeout(()=>{ setActive(null); setFeedback(null); }, 2500);
+    } else {
+      setFeedback({type:"err",text:`❌ 아직 만점이 아니에요. 답을 다시 확인해 보세요. (시도 ${data.attempt_no}회)`});
+    }
+  };
+
+  if(active){
+    const isPassed = active.is_passed;
+    return (
+      <div style={{display:"grid",gap:14}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <button style={{...css.btnGhost,padding:"7px 14px",fontSize:12}} onClick={()=>{setActive(null); setFeedback(null);}}>← 목록</button>
+          <div style={{fontSize:18,fontWeight:800,color:T.navy}}>{active.test.title}</div>
+          {isPassed && <Pill color="#16A34A">✅ 통과</Pill>}
+        </div>
+        {active.test.description && <div style={{fontSize:13,color:T.muted}}>{active.test.description}</div>}
+
+        {feedback && (
+          <Card style={{padding:"14px 18px",background:feedback.type==="ok"?"#F0FDF4":"#FEF2F2",
+            border:`2px solid ${feedback.type==="ok"?"#86EFAC":"#FCA5A5"}`}}>
+            <div style={{fontSize:14,fontWeight:800,color:feedback.type==="ok"?"#16A34A":"#DC2626"}}>{feedback.text}</div>
+          </Card>
+        )}
+
+        <Card style={{padding:"18px 20px"}}>
+          <div style={{display:"flex",flexDirection:"column",gap:18}}>
+            {(active.questions||[]).map((q,i)=>(
+              <div key={q.id}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+                  <div style={{fontSize:13,fontWeight:800,color:T.navy}}>Q{i+1}.</div>
+                  <Pill color={q.q_type==="short"?"#0EA5E9":"#A855F7"}>{q.q_type==="short"?"단답":"객관식"}</Pill>
+                </div>
+                <div style={{fontSize:14,color:T.navy,whiteSpace:"pre-wrap",marginBottom:10}}>{q.prompt}</div>
+                {q.image_url && (
+                  <div style={{marginBottom:10}}>
+                    <img src={q.image_url} alt={`Q${i+1}`} style={{maxWidth:"100%",height:"auto",borderRadius:8,border:`1px solid ${T.border}`}}/>
+                  </div>
+                )}
+                {q.q_type==="short" ? (
+                  <input value={answers[q.id]||""} onChange={e=>setAnswers(a=>({...a,[q.id]:e.target.value}))}
+                    disabled={isPassed}
+                    placeholder="정답 입력"
+                    style={{...css.input,padding:"10px 14px",maxWidth:400}}/>
+                ) : (
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {(q.choices||[]).map((c,ci)=>(
+                      <label key={ci} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",
+                        border:`1px solid ${answers[q.id]===c?T.navy:T.border}`,borderRadius:8,
+                        background:answers[q.id]===c?"#EEF2FF":T.surfaceAlt,cursor:isPassed?"default":"pointer"}}>
+                        <input type="radio" name={`q-${q.id}`} value={c} checked={answers[q.id]===c}
+                          disabled={isPassed}
+                          onChange={()=>setAnswers(a=>({...a,[q.id]:c}))}/>
+                        <span style={{fontSize:11,color:T.muted,width:18}}>{"①②③④⑤"[ci]||(ci+1)}</span>
+                        <span style={{fontSize:13,color:T.navy}}>{c}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {!isPassed && (
+            <div style={{marginTop:24,display:"flex",justifyContent:"flex-end"}}>
+              <button style={{...css.btnOrange,padding:"12px 32px",fontSize:14,fontWeight:800}}
+                disabled={submitting} onClick={submit}>
+                {submitting ? <Spinner size={14} color="#fff"/> : "제출"}
+              </button>
+            </div>
+          )}
         </Card>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{display:"grid",gap:14}}>
+      <div style={{fontSize:18,fontWeight:800,color:T.navy}}>💯 만점 테스트</div>
+      <div style={{fontSize:13,color:T.muted}}>
+        시험지의 <b style={{color:T.navy}}>모든 문항을 정답</b>으로 맞춰야 통과합니다. 한 개라도 틀리면 다시 풀어주세요 (어느 문제가 틀렸는지는 알려주지 않습니다).
+      </div>
+
+      {loading ? <Card style={{padding:30,textAlign:"center"}}><Spinner/></Card> :
+        tests.length===0 ? (
+          <Card style={{padding:30,textAlign:"center",color:T.muted}}>
+            <div style={{fontSize:36,opacity:0.4,marginBottom:10}}>💯</div>
+            <div style={{fontSize:13}}>배정된 시험지가 없습니다.</div>
+          </Card>
+        ) : (
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:12}}>
+            {tests.map(t=>(
+              <div key={t.test_id} onClick={()=>open(t.test_id)}
+                style={{padding:"16px 18px",borderRadius:12,border:`1px solid ${T.border}`,background:T.surface,
+                  cursor:"pointer",boxShadow:"0 1px 6px rgba(25,29,84,0.06)",transition:"transform .15s"}}
+                onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"}
+                onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+                  {t.is_passed ? <Pill color="#16A34A">✅ 통과</Pill> :
+                    t.attempt_count>0 ? <Pill color="#F59E0B">🔄 {t.attempt_count}회 시도</Pill> :
+                    <Pill color="#94A3B8">시작 전</Pill>}
+                </div>
+                <div style={{fontSize:14,fontWeight:800,color:T.navy,marginBottom:4}}>{t.title}</div>
+                {t.description && <div style={{fontSize:11,color:T.muted,marginBottom:6}}>{t.description}</div>}
+                <div style={{fontSize:11,color:T.muted}}>문항 {t.question_count}개{t.last_attempt_at?` · 최근 ${new Date(t.last_attempt_at).toLocaleDateString("ko-KR")}`:""}</div>
+              </div>
+            ))}
+          </div>
+        )
+      }
     </div>
   );
 };
