@@ -3504,6 +3504,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
             {k:"scoresheet", l:"📋 인증글 점수표"},
             {k:"grading",    l:"📝 인증글 채점"},
             {k:"session",    l:"🔢 회차별 확인"},
+            {k:"makeup",     l:"📚 Make-up"},
             {k:"attendance", l:"📋 출석체크"},
           ].map(({k,l})=>(
             <button key={k} onClick={()=>setRoster2Tab(k)}
@@ -3515,6 +3516,11 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
       {/* ── 출석체크 (CSV 업로드) ── */}
       {adminTab==="roster2" && roster2Tab==="attendance" && (
         <AttendanceUploadView onRefresh={onRefresh}/>
+      )}
+
+      {/* ── Make-up 대상자 ── */}
+      {adminTab==="roster2" && roster2Tab==="makeup" && (
+        <MakeupView/>
       )}
 
       {/* ── 인증 현황 (점수표 / 채점) — 2기 현황의 하위 탭 ── */}
@@ -6769,7 +6775,7 @@ export default function App() {
     if(path === "/roster2") return "roster2";
     if(path === "/attendance") return "attendance";
     if(path === "/manjeom")    return "manjeom";
-    if(path === "/makeup")     return "makeup";
+    if(path === "/makeup")     return "roster2"; // backward-compat → roster2 makeup sub-tab
     return "dashboard";
   };
   const [view, setView]           = useState(getInitialView);
@@ -6787,7 +6793,6 @@ export default function App() {
       : v === "roster2" ? "/roster2"
       : v === "attendance" ? "/attendance"
       : v === "manjeom" ? "/manjeom"
-      : v === "makeup" ? "/makeup"
       : "/";
     window.history.pushState({ view:v, input }, "", path);
     setView(v);
@@ -6804,7 +6809,7 @@ export default function App() {
       else if(path==="/roster2")    { setView("roster2");    setShowInput(false); }
       else if(path==="/attendance") { setView("attendance"); setShowInput(false); }
       else if(path==="/manjeom")    { setView("manjeom");    setShowInput(false); }
-      else if(path==="/makeup")     { setView("makeup");     setShowInput(false); }
+      else if(path==="/makeup")     { setView("roster2");    setShowInput(false); }
       else if(path==="/history")    { setView("history");    setShowInput(false); }
       else                          { setView("dashboard");  setShowInput(false); }
     };
@@ -6981,7 +6986,6 @@ export default function App() {
     ? [
         { key:"users",       label:"회원 관리",          icon:"users"     },
         { key:"roster2",     label:"20HA 2기 현황",      icon:"trophy"    },
-        { key:"makeup",      label:"Make-up",            icon:"calendar"  },
         { key:"manjeom",     label:"만점 테스트",         icon:"cap"       },
         { key:"history",     label:"전체 기록",           icon:"calendar"  },
       ]
@@ -7094,15 +7098,14 @@ export default function App() {
             <StudentCertView profile={profile}/>
           ) : view === "manjeom" && isAdmin ? (
             <ManjeomView onRefresh={refreshData} allProfiles={allProfiles}/>
-          ) : view === "makeup" && isAdmin ? (
-            <MakeupView/>
           ) : (view === "users" || view === "cert" || view === "roster2" || view === "attendance") && isAdmin ? (
             <AdminDashboard
               allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData}
               defaultTab={view === "users" ? "users" : "roster2"}
               defaultRoster2Tab={
                 view === "cert" ? "grading" :
-                view === "attendance" ? "attendance" : "overview"
+                view === "attendance" ? "attendance" :
+                (window.location.pathname === "/makeup") ? "makeup" : "overview"
               }/>
           ) : isParent && view.startsWith("child-") ? (
             (() => {
