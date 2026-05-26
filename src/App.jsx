@@ -2993,6 +2993,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
   const [certNickEdit, setCertNickEdit] = useState({}); // {profile_id: editing_value}
   const [invalidCerts, setInvalidCerts] = useState([]);
   const [sessionViewIdx, setSessionViewIdx] = useState(0); // 회차별 확인: 선택 회차 인덱스 (0-based)
+  const [certSessionModal, setCertSessionModal] = useState(null); // {id, postTitle, posted_at, sessions: number[]}
   const [certScoreModal, setCertScoreModal] = useState(null); // {id, postTitle, submit, mission, fidelity}
   const [certScoreSaving, setCertScoreSaving] = useState(false);
   const [lastCrawledAt, setLastCrawledAt] = useState(null);
@@ -3104,6 +3105,19 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
       if(maxAt) setLastCrawledAt(maxAt);
     }
     setCertRecordsLoading(false);
+  };
+
+  const updateCertSessions = async (certId, sessions) => {
+    const arr = (sessions||[]).map(Number).filter(n=>n>=1 && n<=ROSTER2_NAVER_DATES.length);
+    arr.sort((a,b)=>a-b);
+    const dedup = [...new Set(arr)];
+    await supabase.rpc("update_cert_sessions", {
+      p_cert_id: certId,
+      p_sessions: dedup.length ? dedup : null,
+    });
+    const patch = { session_override: dedup.length ? dedup : null };
+    setCertRecords(prev => prev.map(r => r.id===certId ? {...r, ...patch} : r));
+    setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, ...patch} : c));
   };
 
   const updateCertScore = async (certId, parts) => {
@@ -3518,7 +3532,19 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           }
           return { sessionNum: null, isLate: false };
         };
-        // 회차 단위 매칭: 해당 회차의 정시·지각 글을 모두 포함
+        // 회차 배열 결정: session_override가 있으면 그것, 없으면 작성일 자동 매칭
+        const getCertSessions = (cert) => {
+          if (cert.session_override && cert.session_override.length > 0) return cert.session_override.map(Number);
+          const auto = getSessionInfo(cert.posted_at).sessionNum;
+          return auto ? [auto] : [];
+        };
+        // 회차당 지각 여부 (작성일이 회차 일자보다 KST 늦은 날짜면 지각)
+        const isLateForSession = (cert, sessionNum) => {
+          const sessionDate = ROSTER2_NAVER_DATES[sessionNum-1];
+          if (!sessionDate) return false;
+          return kstDateStr(cert.posted_at) > roster2FmtKey(sessionDate);
+        };
+        // 회차 단위 매칭: 해당 회차의 정시·지각 글을 모두 포함, 다중 회차 글 포함
         // 같은 회차에 글이 여러 개면 가장 먼저 올린 글 1건만 채택
         const getStudentCertOnDate = (student, date) => {
           const sessionIdx = ROSTER2_NAVER_DATES.findIndex(d => roster2FmtKey(d) === roster2FmtKey(date));
@@ -3526,7 +3552,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           const targetSessionNum = sessionIdx + 1;
           const candidates = attendanceCerts
             .filter(c => c.assigned_student_id === student.id)
-            .filter(c => getSessionInfo(c.posted_at).sessionNum === targetSessionNum)
+            .filter(c => getCertSessions(c).includes(targetSessionNum))
             .sort((a,b) => new Date(a.posted_at) - new Date(b.posted_at));
           return candidates[0] || null;
         };
@@ -3700,7 +3726,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                       </div>
                     )}
                     {pageRecords.map((rec,i)=>{
-                      const {sessionNum, isLate} = getSessionInfo(rec.posted_at);
+                      const recSessions = getCertSessions(rec);
+                      const isOverride = !!(rec.session_override && rec.session_override.length > 0);
                       const rowBg = i%2===0?T.white:"#F9FAFB";
                       const articleId = rec.post_url ? rec.post_url.split("/").pop() : rec.id;
                       const hasScore = rec.completeness_score !== null && rec.completeness_score !== undefined;
@@ -3712,6 +3739,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                         submit:   hasSubmit   ? String(rec.submit_score)   : "",
                         mission:  hasMission  ? String(rec.mission_score)  : "",
                         fidelity: hasFidelity ? String(rec.fidelity_score) : "",
+                      });
+                      const openSessionModal = () => setCertSessionModal({
+                        id: rec.id, postTitle: rec.post_title, posted_at: rec.posted_at,
+                        sessions: recSessions.slice(),
                       });
                       const scoreCellStyle = (has) => ({
                         cursor:"pointer", fontSize:13, fontWeight:800, padding:"3px 4px",
@@ -3728,25 +3759,42 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                           <div style={{fontSize:12,fontWeight:700,color:rec.matched_student_name?T.navy:T.muted,textAlign:"center"}}>
                             {rec.matched_student_name||"—"}
                           </div>
-                          {/* 회차 + 날짜 */}
-                          <div style={{textAlign:"center",fontSize:11,fontWeight:700,color:sessionNum?T.navy:T.muted}}>
-                            {sessionNum
-                              ? <>
-                                  {sessionNum}회
-                                  <span style={{fontSize:10,fontWeight:400,color:T.muted,marginLeft:3}}>
-                                    ({(()=>{const d=ROSTER2_NAVER_DATES[sessionNum-1];return d?`${d.getMonth()+1}/${d.getDate()}`:"";})()})
-                                  </span>
-                                </>
-                              : "—"}
-                          </div>
-                          {/* 정시여부 */}
-                          <div style={{textAlign:"center",fontSize:11}}>
-                            {sessionNum===null
+                          {/* 회차 (클릭 → 편집 모달, 다중 회차 칩) */}
+                          <div onClick={openSessionModal}
+                            style={{textAlign:"center",fontSize:11,cursor:"pointer",padding:"2px 0",
+                              borderRadius:4,border:`1px dashed ${isOverride?"#4F46E5":"transparent"}`}}
+                            title={isOverride?"수동 지정됨":"작성일 기반 자동"}
+                            onMouseOver={e=>{if(!isOverride)e.currentTarget.style.borderColor="#D1D5DB";}}
+                            onMouseOut={e=>{if(!isOverride)e.currentTarget.style.borderColor="transparent";}}>
+                            {recSessions.length === 0
                               ? <span style={{color:T.muted}}>—</span>
-                              : isLate
-                                ? <span style={{color:"#B45309",fontWeight:700}}>⚠️ 지각</span>
-                                : <span style={{color:"#065F46",fontWeight:700}}>✅ 정시</span>
-                            }
+                              : <div style={{display:"flex",flexWrap:"wrap",gap:2,justifyContent:"center"}}>
+                                  {recSessions.map(sn => (
+                                    <span key={sn} style={{
+                                      fontSize:10,fontWeight:700,
+                                      padding:"1px 5px",borderRadius:8,
+                                      background:isOverride?"#EEF2FF":"#F3F4F6",
+                                      color:isOverride?"#4F46E5":T.navy,
+                                      border:`1px solid ${isOverride?"#C7D2FE":T.border}`,
+                                    }}>{sn}회</span>
+                                  ))}
+                                </div>}
+                          </div>
+                          {/* 정시여부 (회차별, 다중이면 모두 표기) */}
+                          <div style={{textAlign:"center",fontSize:10,lineHeight:1.3}}>
+                            {recSessions.length === 0
+                              ? <span style={{color:T.muted}}>—</span>
+                              : recSessions.map(sn => {
+                                  const late = isLateForSession(rec, sn);
+                                  return (
+                                    <div key={sn}>
+                                      {recSessions.length>1 && <span style={{color:T.muted,marginRight:2}}>{sn}회</span>}
+                                      {late
+                                        ? <span style={{color:"#B45309",fontWeight:700}}>⚠️ 지각</span>
+                                        : <span style={{color:"#065F46",fontWeight:700}}>✅ 정시</span>}
+                                    </div>
+                                  );
+                                })}
                           </div>
                           {/* 제목 (링크, 좌측 정렬) */}
                           <div style={{fontSize:11,overflow:"hidden"}}>
@@ -3815,6 +3863,75 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                       style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${T.border}`,cursor:safePage===totalPages?"default":"pointer",fontSize:12,color:safePage===totalPages?T.muted:T.navy,background:"transparent"}}>»</button>
                   </div>
                 )}
+              </div>
+              );
+            })()}
+
+            {/* ── 회차 편집 모달 (다중 선택) ── */}
+            {certSessionModal && (() => {
+              const cur = certSessionModal.sessions || [];
+              const autoNum = getSessionInfo(certSessionModal.posted_at).sessionNum;
+              const postedKstDate = (()=>{const k=new Date(new Date(certSessionModal.posted_at).getTime()+9*3600*1000);return`${k.getUTCMonth()+1}/${k.getUTCDate()}`;})();
+              const toggle = (n) => {
+                setCertSessionModal(p => {
+                  const set = new Set(p.sessions);
+                  if (set.has(n)) set.delete(n); else set.add(n);
+                  return {...p, sessions: [...set].sort((a,b)=>a-b)};
+                });
+              };
+              const save = async () => {
+                await updateCertSessions(certSessionModal.id, certSessionModal.sessions);
+                setCertSessionModal(null);
+              };
+              const resetAuto = () => {
+                setCertSessionModal(p => ({...p, sessions: autoNum ? [autoNum] : []}));
+              };
+              return (
+              <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}
+                onClick={()=>setCertSessionModal(null)}>
+                <div style={{background:T.white,borderRadius:16,padding:22,maxWidth:520,width:"92%",boxShadow:"0 8px 32px rgba(0,0,0,0.18)"}}
+                  onClick={e=>e.stopPropagation()}>
+                  <div style={{fontWeight:800,fontSize:15,color:T.navy,marginBottom:4}}>회차 지정</div>
+                  <div style={{fontSize:12,color:T.muted,marginBottom:6,wordBreak:"break-word",lineHeight:1.4}}>
+                    {certSessionModal.postTitle}
+                  </div>
+                  <div style={{fontSize:11,color:T.muted,marginBottom:14}}>
+                    작성일 {postedKstDate} · 자동 추천: {autoNum?`${autoNum}회`:"없음"}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(4, 1fr)",gap:6,marginBottom:14}}>
+                    {ROSTER2_NAVER_DATES.map((dt,idx)=>{
+                      const sn = idx+1;
+                      const checked = cur.includes(sn);
+                      const isAuto = sn===autoNum;
+                      return (
+                        <button key={sn} onClick={()=>toggle(sn)}
+                          style={{
+                            padding:"7px 6px",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer",
+                            textAlign:"center",lineHeight:1.3,
+                            border:`1px solid ${checked?T.navy:isAuto?"#C7D2FE":T.border}`,
+                            background:checked?T.navy:isAuto?"#EEF2FF":T.white,
+                            color:checked?T.white:isAuto?"#4F46E5":T.navy,
+                          }}>
+                          <div>{sn}회{isAuto?" ⭐":""}</div>
+                          <div style={{fontSize:9,fontWeight:500,opacity:0.85}}>{dt.getMonth()+1}/{dt.getDate()}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{fontSize:10,color:T.muted,marginBottom:14}}>
+                    ⭐ = 작성일 기준 자동 추천 회차 · 모두 해제 시 자동 매칭으로 복귀
+                  </div>
+                  <div style={{display:"flex",gap:8,justifyContent:"space-between",alignItems:"center"}}>
+                    <button onClick={resetAuto}
+                      style={{...css.btnOutline,padding:"6px 12px",fontSize:12}}>자동 복귀</button>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>setCertSessionModal(null)}
+                        style={{...css.btnOutline,padding:"7px 18px",fontSize:13}}>취소</button>
+                      <button onClick={save}
+                        style={{...css.btnOrange,padding:"7px 18px",fontSize:13}}>확인</button>
+                    </div>
+                  </div>
+                </div>
               </div>
               );
             })()}
@@ -3907,6 +4024,11 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           }
           return { sessionNum: null, isLate: false };
         };
+        const getCertSessions = (cert) => {
+          if (cert.session_override && cert.session_override.length > 0) return cert.session_override.map(Number);
+          const auto = getSessionInfo(cert.posted_at).sessionNum;
+          return auto ? [auto] : [];
+        };
 
         // 테스트학생 제외한 실제 학생
         const realStudents = certStudents.filter(s => s.name !== "테스트학생");
@@ -3915,11 +4037,11 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
         const targetSession = sessionViewIdx + 1;
         const sessionDate = ROSTER2_NAVER_DATES[sessionViewIdx];
 
-        // 해당 회차에 글 올린 학생별 best 점수글 (가장 먼저 올린 글 1건)
+        // 해당 회차에 글 올린 학생별 best 점수글 (가장 먼저 올린 글 1건, 다중 회차 글 포함)
         const studentCertMap = new Map();
         attendanceCerts.forEach(c => {
           if (!c.assigned_student_id) return;
-          if (getSessionInfo(c.posted_at).sessionNum !== targetSession) return;
+          if (!getCertSessions(c).includes(targetSession)) return;
           const prev = studentCertMap.get(c.assigned_student_id);
           if (!prev || new Date(c.posted_at) < new Date(prev.posted_at)) {
             studentCertMap.set(c.assigned_student_id, c);
@@ -4269,15 +4391,24 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           }
           return { sessionIdx: -1, isLate: false };
         };
-        // 학생의 sessionIdx별 cert(있으면 정시/지각 구분)
+        // cert의 회차 배열 (session_override 우선)
+        const getCertSessionsLocal = (cert) => {
+          if (cert.session_override && cert.session_override.length > 0) return cert.session_override.map(Number);
+          const auto = getSessionForPostedAt(cert.posted_at).sessionIdx;
+          return auto >= 0 ? [auto+1] : [];
+        };
+        // 학생의 sessionIdx별 cert(있으면 정시/지각 구분, 다중 회차 글 포함)
         const getNaverCertForSession = (studentName, sessionIdx) => {
           const csId = certStudentByName[studentName];
           if (csId === undefined) return null;
+          const targetSession = sessionIdx + 1;
           for (const cert of attendanceCerts) {
             if (cert.assigned_student_id !== csId) continue;
-            const info = getSessionForPostedAt(cert.posted_at);
-            if (info.sessionIdx === sessionIdx) {
-              return { cert, isLate: info.isLate };
+            const sessions = getCertSessionsLocal(cert);
+            if (sessions.includes(targetSession)) {
+              const sessionDate = naverDates[sessionIdx];
+              const late = sessionDate ? kstDateStr(cert.posted_at) > fmtKey(sessionDate) : false;
+              return { cert, isLate: late };
             }
           }
           return null;
@@ -4532,6 +4663,146 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           </div>
         );
       })()}
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════
+// ADMIN: Make-up — 경고 2회 이상 누적자
+// 경고 = 미제출(어제 이전 회차 한정) OR 80점 미만
+// ══════════════════════════════════════════════════════
+const MakeupView = () => {
+  const [students, setStudents] = useState([]);
+  const [certs, setCerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(()=>{
+    (async()=>{
+      setLoading(true);
+      const [{data:s}, {data:c}] = await Promise.all([
+        supabase.rpc("get_cert_students"),
+        supabase.rpc("get_attendance_certs", {
+          p_from: new Date(ROSTER2_NAVER_DATES[0]).toISOString(),
+          p_to:   new Date(ROSTER2_NAVER_DATES[ROSTER2_NAVER_DATES.length-1].getTime()+86400000).toISOString(),
+        }),
+      ]);
+      setStudents(s||[]);
+      setCerts(c||[]);
+      setLoading(false);
+    })();
+  },[]);
+
+  const kstDateStr = ts => {
+    const k = new Date(new Date(ts).getTime() + 9*3600*1000);
+    return `${k.getUTCFullYear()}-${String(k.getUTCMonth()+1).padStart(2,'0')}-${String(k.getUTCDate()).padStart(2,'0')}`;
+  };
+  const getSessionAuto = (posted_at) => {
+    const postStr = kstDateStr(posted_at);
+    for (let i = ROSTER2_NAVER_DATES.length - 1; i >= 0; i--) {
+      if (postStr >= roster2FmtKey(ROSTER2_NAVER_DATES[i])) return i+1;
+    }
+    return null;
+  };
+  const getCertSessions = (cert) => {
+    if (cert.session_override && cert.session_override.length > 0) return cert.session_override.map(Number);
+    const auto = getSessionAuto(cert.posted_at);
+    return auto ? [auto] : [];
+  };
+
+  // 어제 KST 일자
+  const now = new Date();
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1);
+  const yesterdayKey = roster2FmtKey(yesterday);
+
+  // 회차 중 어제까지 끝난 회차만 검사 (회차 일자 <= 어제)
+  const elapsedSessions = ROSTER2_NAVER_DATES
+    .map((d,i)=>({idx:i, sn:i+1, date:d, key:roster2FmtKey(d)}))
+    .filter(s => s.key <= yesterdayKey);
+
+  // 학생별 분석
+  const realStudents = students.filter(s => s.name !== "테스트학생");
+  const studentReports = realStudents.map(stu => {
+    const warnings = [];
+    elapsedSessions.forEach(sess => {
+      // 해당 회차의 cert (가장 먼저 올린 글)
+      const candidate = certs
+        .filter(c => c.assigned_student_id === stu.id)
+        .filter(c => getCertSessions(c).includes(sess.sn))
+        .sort((a,b) => new Date(a.posted_at) - new Date(b.posted_at))[0];
+      if (!candidate) {
+        warnings.push({sn: sess.sn, date: sess.date, reason: "미제출"});
+      } else if (candidate.completeness_score !== null && candidate.completeness_score !== undefined && Number(candidate.completeness_score) < 80) {
+        warnings.push({sn: sess.sn, date: sess.date, reason: `80점 미만 (${candidate.completeness_score}점)`, score: Number(candidate.completeness_score)});
+      }
+    });
+    return {student: stu, warnings};
+  }).filter(r => r.warnings.length >= 2)
+    .sort((a,b) => b.warnings.length - a.warnings.length || a.student.name.localeCompare(b.student.name));
+
+  if (loading) {
+    return <Card style={{padding:40, textAlign:"center", color:T.muted}}>불러오는 중...</Card>;
+  }
+
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        <div style={{fontSize:18,fontWeight:800,color:T.navy}}>📚 Make-up 대상자</div>
+        <div style={{fontSize:12,color:T.muted}}>
+          ※ 미제출은 어제({yesterday.getMonth()+1}/{yesterday.getDate()})까지의 회차만 검사 · 경고 2회 이상 누적 시 대상자
+        </div>
+      </div>
+
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <div style={{fontSize:13,fontWeight:700,color:T.navy}}>
+          현재 검사 회차: <span style={{color:"#4F46E5"}}>{elapsedSessions.length}개</span>
+          {elapsedSessions.length>0 && <span style={{fontSize:11,color:T.muted,marginLeft:6}}>
+            (1회 ~ {elapsedSessions[elapsedSessions.length-1].sn}회)
+          </span>}
+        </div>
+        <div style={{marginLeft:"auto",fontSize:13,fontWeight:700,color:T.navy}}>
+          대상자 <span style={{color:"#DC2626"}}>{studentReports.length}명</span>
+        </div>
+      </div>
+
+      {studentReports.length === 0 ? (
+        <Card style={{padding:40, textAlign:"center", color:T.muted, fontSize:13}}>
+          현재 Make-up 대상자가 없습니다 🎉
+        </Card>
+      ) : (
+        <div style={{display:"grid",gap:10}}>
+          {studentReports.map(({student, warnings}) => (
+            <Card key={student.id} style={{padding:"14px 16px"}}>
+              <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:10,borderBottom:`1px solid ${T.border}`,paddingBottom:8}}>
+                <div style={{fontSize:15,fontWeight:800,color:T.navy}}>{student.name}</div>
+                <div style={{fontSize:11,color:T.muted}}>{student.phone||""}</div>
+                <div style={{marginLeft:"auto",fontSize:12,fontWeight:700,
+                  color:warnings.length>=4?"#DC2626":warnings.length>=3?"#B45309":"#92400E",
+                  background:warnings.length>=4?"#FEE2E2":warnings.length>=3?"#FEF3C7":"#FEF3C7",
+                  padding:"3px 10px",borderRadius:10,border:`1px solid ${warnings.length>=4?"#FECACA":"#FDE68A"}`}}>
+                  경고 {warnings.length}회
+                </div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(180px,1fr))",gap:6}}>
+                {warnings.map(w => {
+                  const isLow = w.reason.startsWith("80점");
+                  return (
+                    <div key={w.sn} style={{
+                      padding:"6px 10px",borderRadius:8,fontSize:12,
+                      background:isLow?"#FEF3C7":"#FEE2E2",
+                      border:`1px solid ${isLow?"#FDE68A":"#FECACA"}`,
+                      color:isLow?"#92400E":"#991B1B",
+                    }}>
+                      <span style={{fontWeight:800}}>{w.sn}회</span>
+                      <span style={{fontSize:10,marginLeft:3,opacity:0.8}}>({w.date.getMonth()+1}/{w.date.getDate()})</span>
+                      <span style={{marginLeft:6,fontWeight:600}}>· {w.reason}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -6498,6 +6769,7 @@ export default function App() {
     if(path === "/roster2") return "roster2";
     if(path === "/attendance") return "attendance";
     if(path === "/manjeom")    return "manjeom";
+    if(path === "/makeup")     return "makeup";
     return "dashboard";
   };
   const [view, setView]           = useState(getInitialView);
@@ -6515,6 +6787,7 @@ export default function App() {
       : v === "roster2" ? "/roster2"
       : v === "attendance" ? "/attendance"
       : v === "manjeom" ? "/manjeom"
+      : v === "makeup" ? "/makeup"
       : "/";
     window.history.pushState({ view:v, input }, "", path);
     setView(v);
@@ -6531,6 +6804,7 @@ export default function App() {
       else if(path==="/roster2")    { setView("roster2");    setShowInput(false); }
       else if(path==="/attendance") { setView("attendance"); setShowInput(false); }
       else if(path==="/manjeom")    { setView("manjeom");    setShowInput(false); }
+      else if(path==="/makeup")     { setView("makeup");     setShowInput(false); }
       else if(path==="/history")    { setView("history");    setShowInput(false); }
       else                          { setView("dashboard");  setShowInput(false); }
     };
@@ -6707,6 +6981,7 @@ export default function App() {
     ? [
         { key:"users",       label:"회원 관리",          icon:"users"     },
         { key:"roster2",     label:"20HA 2기 현황",      icon:"trophy"    },
+        { key:"makeup",      label:"Make-up",            icon:"calendar"  },
         { key:"manjeom",     label:"만점 테스트",         icon:"cap"       },
         { key:"history",     label:"전체 기록",           icon:"calendar"  },
       ]
@@ -6819,6 +7094,8 @@ export default function App() {
             <StudentCertView profile={profile}/>
           ) : view === "manjeom" && isAdmin ? (
             <ManjeomView onRefresh={refreshData} allProfiles={allProfiles}/>
+          ) : view === "makeup" && isAdmin ? (
+            <MakeupView/>
           ) : (view === "users" || view === "cert" || view === "roster2" || view === "attendance") && isAdmin ? (
             <AdminDashboard
               allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData}
