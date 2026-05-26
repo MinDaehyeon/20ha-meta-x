@@ -3064,12 +3064,11 @@ const StudentCertView = ({profile}) => {
             </Card>
             <Card style={{padding:"14px 16px"}}>
               <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10,display:"flex",alignItems:"center",gap:5}}>
-                {HI.cap(14,T.navy)} 같은 학교급 BEST 3
-                {myGroup&&<span style={{fontSize:10,color:T.muted,fontWeight:400,marginLeft:4}}>({myGroup})</span>}
+                {HI.cap(14,T.navy)} {myGroup ? `${myGroup} BEST 3` : "BEST 3"}
               </div>
               {sameGroupRanked.length===0 ? (
                 <div style={{fontSize:11,color:T.muted,textAlign:"center",padding:"16px 0"}}>
-                  {Object.keys(peerGrades).length===0?"학년 정보 로딩 중...":"같은 학교급 데이터 없음"}
+                  {Object.keys(peerGrades).length===0?"학년 정보 로딩 중...":"같은 그룹 데이터 없음"}
                 </div>
               ) : (
                 <div style={{display:"grid",gap:5}}>
