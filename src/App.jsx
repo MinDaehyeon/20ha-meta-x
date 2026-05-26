@@ -2991,7 +2991,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
   const [certNickEdit, setCertNickEdit] = useState({}); // {profile_id: editing_value}
   const [invalidCerts, setInvalidCerts] = useState([]);
   const [certSubTab, setCertSubTab] = useState("roster"); // "roster" | "records"
-  const [certScoreModal, setCertScoreModal] = useState(null); // {id, postTitle, compliance, completeness}
+  const [certScoreModal, setCertScoreModal] = useState(null); // {id, postTitle, submit, mission, fidelity}
   const [certScoreSaving, setCertScoreSaving] = useState(false);
   const [lastCrawledAt, setLastCrawledAt] = useState(null);
   const [certRecordsPage, setCertRecordsPage] = useState(1);
@@ -3104,18 +3104,28 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
     setCertRecordsLoading(false);
   };
 
-  const updateCertScore = async (certId, scoreVal) => {
+  const updateCertScore = async (certId, parts) => {
     setCertScoreSaving(true);
-    const score = scoreVal==="" || scoreVal==null ? null : Number(scoreVal);
-    // 단일 점수 — completeness_score만 사용 (compliance는 null로 리셋)
+    const toNum = v => v==="" || v==null ? null : Number(v);
+    const submit   = toNum(parts.submit);
+    const mission  = toNum(parts.mission);
+    const fidelity = toNum(parts.fidelity);
+    const total = (submit===null && mission===null && fidelity===null)
+      ? null
+      : (submit||0) + (mission||0) + (fidelity||0);
     await supabase.rpc("update_cert_scores", {
       p_cert_id: certId,
-      p_compliance: null,
-      p_completeness: score,
+      p_submit: submit,
+      p_mission: mission,
+      p_fidelity: fidelity,
     });
     setCertScoreSaving(false);
-    setCertRecords(prev => prev.map(r => r.id===certId ? {...r, completeness_score: score, compliance_score: null} : r));
-    setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, completeness_score: score, compliance_score: null} : c));
+    const patch = {
+      submit_score: submit, mission_score: mission, fidelity_score: fidelity,
+      completeness_score: total, compliance_score: null,
+    };
+    setCertRecords(prev => prev.map(r => r.id===certId ? {...r, ...patch} : r));
+    setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, ...patch} : c));
   };
 
   const updateCertRecord = async (id, updates) => {
@@ -3660,9 +3670,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                 ):(
                   <Card style={{padding:0,overflow:"hidden"}}>
                     {/* 헤더 */}
-                    <div style={{display:"grid",gridTemplateColumns:"50px 80px 80px 60px 1fr 90px 65px 70px",
+                    <div style={{display:"grid",gridTemplateColumns:"50px 80px 80px 60px 1fr 90px 65px 50px 50px 50px 56px",
                       background:T.navy,padding:"9px 12px",gap:6,alignItems:"center"}}>
-                      {["글번호","학생","회차","정시여부","제목","닉네임","작성일","점수"].map(h=>(
+                      {["글번호","학생","회차","정시여부","제목","닉네임","작성일","제출","미션","충실도","종합"].map(h=>(
                         <div key={h} style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:h==="제목"?"left":"center"}}>{h}</div>
                       ))}
                     </div>
@@ -3676,8 +3686,22 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                       const rowBg = i%2===0?T.white:"#F9FAFB";
                       const articleId = rec.post_url ? rec.post_url.split("/").pop() : rec.id;
                       const hasScore = rec.completeness_score !== null && rec.completeness_score !== undefined;
+                      const hasSubmit   = rec.submit_score   !== null && rec.submit_score   !== undefined;
+                      const hasMission  = rec.mission_score  !== null && rec.mission_score  !== undefined;
+                      const hasFidelity = rec.fidelity_score !== null && rec.fidelity_score !== undefined;
+                      const openScoreModal = () => setCertScoreModal({
+                        id: rec.id, postTitle: rec.post_title,
+                        submit:   hasSubmit   ? String(rec.submit_score)   : "",
+                        mission:  hasMission  ? String(rec.mission_score)  : "",
+                        fidelity: hasFidelity ? String(rec.fidelity_score) : "",
+                      });
+                      const scoreCellStyle = (has) => ({
+                        cursor:"pointer", fontSize:13, fontWeight:800, padding:"3px 4px",
+                        borderRadius:4, border:"1px dashed transparent",
+                        color: has ? T.navy : T.muted, textAlign:"center",
+                      });
                       return (
-                        <div key={rec.id} style={{display:"grid",gridTemplateColumns:"50px 80px 80px 60px 1fr 90px 65px 70px",
+                        <div key={rec.id} style={{display:"grid",gridTemplateColumns:"50px 80px 80px 60px 1fr 90px 65px 50px 50px 50px 56px",
                           padding:"8px 12px",gap:6,borderTop:`1px solid ${T.border}`,
                           background:rowBg,alignItems:"center"}}>
                           {/* 글번호 */}
@@ -3723,19 +3747,26 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                           <div style={{fontSize:11,color:T.muted,textAlign:"center"}}>
                             {(()=>{const k=new Date(new Date(rec.posted_at).getTime()+9*3600*1000);return`${k.getUTCMonth()+1}/${k.getUTCDate()}`;})()}
                           </div>
-                          {/* 점수 (완성도, 100점) — 클릭 → 모달 */}
-                          <div style={{textAlign:"center"}}>
-                            <div onClick={()=>setCertScoreModal({
-                                id:rec.id, postTitle:rec.post_title,
-                                score: hasScore ? String(rec.completeness_score) : "",
-                              })}
-                              style={{cursor:"pointer",fontSize:13,fontWeight:800,padding:"3px 4px",
-                                borderRadius:4,border:"1px dashed transparent",
-                                color: hasScore ? "#16A34A" : T.muted}}
-                              onMouseOver={e=>e.currentTarget.style.borderColor="#D1D5DB"}
-                              onMouseOut={e=>e.currentTarget.style.borderColor="transparent"}>
-                              {hasScore ? rec.completeness_score : "—"}
-                            </div>
+                          {/* 점수 4열 (제출/미션/충실도/종합) — 어디든 클릭 → 모달 */}
+                          <div onClick={openScoreModal} style={scoreCellStyle(hasSubmit)}
+                            onMouseOver={e=>e.currentTarget.style.borderColor="#D1D5DB"}
+                            onMouseOut={e=>e.currentTarget.style.borderColor="transparent"}>
+                            {hasSubmit ? rec.submit_score : "—"}
+                          </div>
+                          <div onClick={openScoreModal} style={scoreCellStyle(hasMission)}
+                            onMouseOver={e=>e.currentTarget.style.borderColor="#D1D5DB"}
+                            onMouseOut={e=>e.currentTarget.style.borderColor="transparent"}>
+                            {hasMission ? rec.mission_score : "—"}
+                          </div>
+                          <div onClick={openScoreModal} style={scoreCellStyle(hasFidelity)}
+                            onMouseOver={e=>e.currentTarget.style.borderColor="#D1D5DB"}
+                            onMouseOut={e=>e.currentTarget.style.borderColor="transparent"}>
+                            {hasFidelity ? rec.fidelity_score : "—"}
+                          </div>
+                          <div onClick={openScoreModal} style={{...scoreCellStyle(hasScore), color: hasScore ? "#16A34A" : T.muted}}
+                            onMouseOver={e=>e.currentTarget.style.borderColor="#D1D5DB"}
+                            onMouseOut={e=>e.currentTarget.style.borderColor="transparent"}>
+                            {hasScore ? rec.completeness_score : "—"}
                           </div>
                         </div>
                       );
@@ -3770,44 +3801,76 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
               );
             })()}
 
-            {/* ── 점수 입력 팝업 모달 (완성도 100점) ── */}
-            {certScoreModal && (
+            {/* ── 점수 입력 팝업 모달 (제출 50 + 필수미션 30 + 충실도 20 = 100) ── */}
+            {certScoreModal && (() => {
+              const clamp = (v,max) => {
+                if(v==="" || v==null) return "";
+                const n = Math.max(0, Math.min(max, Number(v)));
+                return Number.isFinite(n) ? String(n) : "";
+              };
+              const toNum = v => v==="" || v==null ? 0 : Number(v);
+              const total = toNum(certScoreModal.submit) + toNum(certScoreModal.mission) + toNum(certScoreModal.fidelity);
+              const submit = async () => {
+                await updateCertScore(certScoreModal.id, {
+                  submit: certScoreModal.submit, mission: certScoreModal.mission, fidelity: certScoreModal.fidelity,
+                });
+                setCertScoreModal(null);
+              };
+              const rowStyle = {display:"grid",gridTemplateColumns:"1fr 110px",alignItems:"center",gap:10,marginBottom:10};
+              const inputStyle = {...css.input,width:"100%",padding:"8px 12px",fontSize:14,boxSizing:"border-box"};
+              const labelStyle = {fontSize:12,fontWeight:700,color:T.navy};
+              const hintStyle  = {fontSize:10,color:T.muted,fontWeight:400,marginLeft:4};
+              return (
               <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}
                 onClick={()=>setCertScoreModal(null)}>
-                <div style={{background:T.white,borderRadius:16,padding:24,maxWidth:420,width:"90%",boxShadow:"0 8px 32px rgba(0,0,0,0.18)"}}
-                  onClick={e=>e.stopPropagation()}>
+                <div style={{background:T.white,borderRadius:16,padding:24,maxWidth:460,width:"90%",boxShadow:"0 8px 32px rgba(0,0,0,0.18)"}}
+                  onClick={e=>e.stopPropagation()}
+                  onKeyDown={e=>{
+                    if(e.key==="Enter"){ e.preventDefault(); submit(); }
+                    if(e.key==="Escape") setCertScoreModal(null);
+                  }}>
                   <div style={{fontWeight:800,fontSize:15,color:T.navy,marginBottom:6}}>점수 입력</div>
                   <div style={{fontSize:12,color:T.muted,marginBottom:18,wordBreak:"break-word",lineHeight:1.4}}>
                     {certScoreModal.postTitle}
                   </div>
-                  <label style={{fontSize:11,fontWeight:700,color:"#16A34A",display:"block",marginBottom:6}}>완성도 (0~100점)</label>
-                  <input type="number" min="0" max="100" autoFocus
-                    value={certScoreModal.score}
-                    onChange={e=>setCertScoreModal(p=>({...p,score:e.target.value}))}
-                    onKeyDown={async e=>{
-                      if(e.key==="Enter"){
-                        await updateCertScore(certScoreModal.id, certScoreModal.score);
-                        setCertScoreModal(null);
-                      }
-                      if(e.key==="Escape") setCertScoreModal(null);
-                    }}
-                    style={{...css.input,width:"100%",padding:"10px 14px",fontSize:15,marginBottom:6,boxSizing:"border-box"}}
-                    placeholder="예: 85" />
-                  <div style={{fontSize:10,color:T.muted,marginBottom:16}}>※ 비우고 확인 시 점수 삭제</div>
+                  <div style={rowStyle}>
+                    <div style={labelStyle}>① 제출<span style={hintStyle}>인증 주기 내 제출 (0~50)</span></div>
+                    <input type="number" min="0" max="50" autoFocus
+                      value={certScoreModal.submit}
+                      onChange={e=>setCertScoreModal(p=>({...p,submit:clamp(e.target.value,50)}))}
+                      style={inputStyle} placeholder="0~50" />
+                  </div>
+                  <div style={rowStyle}>
+                    <div style={labelStyle}>② 필수 미션<span style={hintStyle}>모두 30 / 일부 15 (0~30)</span></div>
+                    <input type="number" min="0" max="30"
+                      value={certScoreModal.mission}
+                      onChange={e=>setCertScoreModal(p=>({...p,mission:clamp(e.target.value,30)}))}
+                      style={inputStyle} placeholder="0~30" />
+                  </div>
+                  <div style={rowStyle}>
+                    <div style={labelStyle}>③ 내용 충실도<span style={hintStyle}>매우우수 20 / 우수 15 / 보통 10 / 미흡 5 (0~20)</span></div>
+                    <input type="number" min="0" max="20"
+                      value={certScoreModal.fidelity}
+                      onChange={e=>setCertScoreModal(p=>({...p,fidelity:clamp(e.target.value,20)}))}
+                      style={inputStyle} placeholder="0~20" />
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:14,marginBottom:14,padding:"10px 14px",background:"#F0FDF4",borderRadius:8,border:"1px solid #BBF7D0"}}>
+                    <div style={{fontSize:13,fontWeight:700,color:T.navy}}>종합</div>
+                    <div style={{fontSize:18,fontWeight:800,color:"#16A34A"}}>{total}<span style={{fontSize:12,fontWeight:600,marginLeft:2}}>/ 100점</span></div>
+                  </div>
+                  <div style={{fontSize:10,color:T.muted,marginBottom:14}}>※ 세 칸 모두 비우고 확인 시 점수 삭제</div>
                   <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
                     <button onClick={()=>setCertScoreModal(null)}
                       style={{...css.btnOutline,padding:"7px 18px",fontSize:13}}>취소</button>
-                    <button onClick={async()=>{
-                      await updateCertScore(certScoreModal.id, certScoreModal.score);
-                      setCertScoreModal(null);
-                    }} disabled={certScoreSaving}
+                    <button onClick={submit} disabled={certScoreSaving}
                       style={{...css.btnOrange,padding:"7px 18px",fontSize:13,opacity:certScoreSaving?0.6:1}}>
                       {certScoreSaving?"저장 중...":"확인"}
                     </button>
                   </div>
                 </div>
               </div>
-            )}
+              );
+            })()}
           </div>
         );
       })()}
