@@ -3026,10 +3026,10 @@ const StudentCertView = ({profile}) => {
                       return (
                         <>
                           <ReferenceLine y={80} stroke="#DC2626" strokeDasharray="4 4" strokeWidth={1.5}
-                            label={{value:"80 안전선", position:"right", fontSize:10, fill:"#DC2626", dy:safeDy, dx:6}}/>
+                            label={{value:"안전선(80)", position:"right", fontSize:10, fill:"#DC2626", dy:safeDy, dx:6}}/>
                           {myAvgVal!==null && (
                             <ReferenceLine y={myAvgVal} stroke="#2563EB" strokeDasharray="6 3" strokeWidth={1.5}
-                              label={{value:`내 평균 ${Math.round(myAvgVal*10)/10}`, position:"right", fontSize:10, fill:"#2563EB", dy:myAvgDy, dx:6}}/>
+                              label={{value:`내 평균(${Math.round(myAvgVal*10)/10})`, position:"right", fontSize:10, fill:"#2563EB", dy:myAvgDy, dx:6}}/>
                           )}
                         </>
                       );
