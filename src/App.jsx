@@ -2261,6 +2261,7 @@ const StudentCertView = ({profile}) => {
   const [peerGrades, setPeerGrades] = useState({});
   const [myCafeCerts, setMyCafeCerts] = useState([]);
   const [classCertStats, setClassCertStats] = useState({}); // {name: cert_count}
+  const [classSessionAvgs, setClassSessionAvgs] = useState({}); // {sessionNum: avg_score}
   const [myAttLogs, setMyAttLogs] = useState([]);            // [{session_date, session_type}]
   const [classAttStats, setClassAttStats] = useState({});    // {name: {morning, night}}
   const isMobile = useMobile();
@@ -2283,6 +2284,12 @@ const StudentCertView = ({profile}) => {
       const map = {};
       (data||[]).forEach(r => { map[r.student_name] = r.cert_count; });
       setClassCertStats(map);
+    });
+    // 회차별 클래스 평균 점수 (그래프용)
+    supabase.rpc("get_class_cert_session_avgs").then(({data}) => {
+      const map = {};
+      (data||[]).forEach(r => { map[r.session_num] = Number(r.avg_score); });
+      setClassSessionAvgs(map);
     });
     // 본인 출석 (모닝/나잇)
     supabase.rpc("get_my_attendance_logs").then(({data}) => {
@@ -2653,11 +2660,20 @@ const StudentCertView = ({profile}) => {
       {/* ③ 8주 전체 일정 */}
       {(()=>{
         const myGrade = calcGrade(profile.birth_year, profile.birth_month) || profile.grade || "";
-        const sameGradeRanked = myGrade && Object.keys(peerGrades).length>0
-          ? [...allStats].filter(s=>(peerGrades[s.name]||"")===myGrade).sort((a,b)=>b.total-a.total).slice(0,3)
+        // 학년 → 학교급 그룹 변환 ("초N"→"초등부", "중N"→"중등부", "고N"→"고등부")
+        const gradeGroup = (g) => {
+          if (!g) return "";
+          if (g.startsWith("초")) return "초등부";
+          if (g.startsWith("중")) return "중등부";
+          if (g.startsWith("고")) return "고등부";
+          return "";
+        };
+        const myGroup = gradeGroup(myGrade);
+        const sameGroupRanked = myGroup && Object.keys(peerGrades).length>0
+          ? [...allStats].filter(s=>gradeGroup(peerGrades[s.name]||"")===myGroup).sort((a,b)=>b.total-a.total).slice(0,3)
           : [];
         const meInTop3 = ranked.slice(0,3).some(s => s.name === profile.name);
-        const meInGradeTop3 = sameGradeRanked.some(s => s.name === profile.name);
+        const meInGroupTop3 = sameGroupRanked.some(s => s.name === profile.name);
         const ACTIVITIES = [
           {label:"미라클모닝", dates:ROSTER2_MORNING_DATES, type:"M",   color:"#EA580C"},
           {label:"카페 인증",  dates:ROSTER2_NAVER_DATES,   type:"N",   color:"#03C75A"},
@@ -2903,6 +2919,151 @@ const StudentCertView = ({profile}) => {
             })()}
           </Card>
 
+          {/* ③-3 카페 인증 점수 그래프 */}
+          <Card style={{padding:"16px 18px"}}>
+            {(()=>{
+              const kstStr = ts => {
+                const k = new Date(new Date(ts).getTime() + 9*3600*1000);
+                return `${k.getUTCFullYear()}-${String(k.getUTCMonth()+1).padStart(2,'0')}-${String(k.getUTCDate()).padStart(2,'0')}`;
+              };
+              // 회차별 본인 점수 매핑 (지각 포함, 다중 글은 최고점)
+              const myBySession = {};
+              myCafeCerts.forEach(c => {
+                const postStr = kstStr(c.posted_at);
+                let sn = null;
+                for (let i = ROSTER2_NAVER_DATES.length - 1; i >= 0; i--) {
+                  if (postStr >= fk(ROSTER2_NAVER_DATES[i])) { sn = i+1; break; }
+                }
+                if (!sn) return;
+                const sc = c.completeness_score;
+                if (sc === null || sc === undefined) return;
+                if (myBySession[sn] === undefined || Number(sc) > myBySession[sn]) {
+                  myBySession[sn] = Number(sc);
+                }
+              });
+              const myScores = Object.values(myBySession);
+              const myAvg = myScores.length ? myScores.reduce((a,b)=>a+b,0)/myScores.length : null;
+              const myHigh = myScores.length ? Math.max(...myScores) : null;
+              const myLow  = myScores.length ? Math.min(...myScores) : null;
+              const safeCount = myScores.filter(s => s>=80).length;
+              const classAvgAll = Object.values(classSessionAvgs);
+              const classAvgOverall = classAvgAll.length ? classAvgAll.reduce((a,b)=>a+b,0)/classAvgAll.length : null;
+              const avgDiff = (myAvg!==null && classAvgOverall!==null) ? Math.round((myAvg - classAvgOverall) * 10) / 10 : null;
+              const chartData = ROSTER2_NAVER_DATES.map((dt, idx) => {
+                const sn = idx+1;
+                return {
+                  name: `${sn}회`,
+                  date: `${dt.getMonth()+1}/${dt.getDate()}`,
+                  myScore: myBySession[sn] ?? null,
+                  classAvg: classSessionAvgs[sn] ?? null,
+                };
+              });
+              const ChartTooltip = ({active, payload, label}) => {
+                if (!active || !payload || !payload.length) return null;
+                const me = payload.find(p=>p.dataKey==="myScore")?.value;
+                const cls = payload.find(p=>p.dataKey==="classAvg")?.value;
+                const d = chartData.find(x=>x.name===label);
+                return (
+                  <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 12px",fontSize:11,boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>
+                    <div style={{fontWeight:800,color:T.navy,marginBottom:4}}>{label} {d&&<span style={{color:T.muted,fontWeight:500}}>({d.date})</span>}</div>
+                    <div style={{color:"#16A34A",fontWeight:700}}>내 점수: {me!==null&&me!==undefined?`${me}점`:"미제출"}</div>
+                    <div style={{color:T.muted}}>전체 평균: {cls!==null&&cls!==undefined?`${cls}점`:"-"}</div>
+                  </div>
+                );
+              };
+
+              return (
+              <>
+                <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:12,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                  📊 카페 인증 점수 그래프
+                  <span style={{fontSize:10,fontWeight:400,color:T.muted}}>· 회차별 내 점수 vs 전체 평균</span>
+                </div>
+
+                {/* 요약 미니 카드 4개 */}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4, 1fr)",gap:8,marginBottom:14}}>
+                  <div style={{padding:"8px 10px",borderRadius:8,background:"#F0FDF4",border:"1px solid #BBF7D0",textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#15803D",fontWeight:700}}>📈 내 평균</div>
+                    <div style={{fontSize:16,fontWeight:900,color:"#16A34A",marginTop:2}}>
+                      {myAvg!==null ? `${Math.round(myAvg*10)/10}` : "—"}
+                    </div>
+                  </div>
+                  <div style={{padding:"8px 10px",borderRadius:8,background:"#EFF6FF",border:"1px solid #BFDBFE",textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#1D4ED8",fontWeight:700}}>🎯 80점 이상</div>
+                    <div style={{fontSize:16,fontWeight:900,color:"#2563EB",marginTop:2}}>
+                      {myScores.length>0 ? `${safeCount}/${myScores.length}` : "—"}
+                    </div>
+                  </div>
+                  <div style={{padding:"8px 10px",borderRadius:8,background:"#FEF3C7",border:"1px solid #FDE68A",textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#92400E",fontWeight:700}}>⭐ 최고/최저</div>
+                    <div style={{fontSize:13,fontWeight:900,color:"#B45309",marginTop:2}}>
+                      {myHigh!==null ? `${myHigh}/${myLow}` : "—"}
+                    </div>
+                  </div>
+                  <div style={{padding:"8px 10px",borderRadius:8,
+                    background: avgDiff===null?"#F8FAFC": avgDiff>=0?"#F0FDF4":"#FEE2E2",
+                    border:`1px solid ${avgDiff===null?T.border: avgDiff>=0?"#BBF7D0":"#FECACA"}`,textAlign:"center"}}>
+                    <div style={{fontSize:10,color:avgDiff===null?T.muted: avgDiff>=0?"#15803D":"#991B1B",fontWeight:700}}>📊 전체 대비</div>
+                    <div style={{fontSize:16,fontWeight:900,color:avgDiff===null?T.muted: avgDiff>=0?"#16A34A":"#DC2626",marginTop:2}}>
+                      {avgDiff===null ? "—" : `${avgDiff>=0?"+":""}${avgDiff}`}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 그래프 */}
+                <ResponsiveContainer width="100%" height={isMobile?240:280}>
+                  <ComposedChart data={chartData} margin={{top:20,right:84,left:-8,bottom:0}}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB"/>
+                    <XAxis dataKey="name" tick={{fontSize:10,fill:T.muted}} interval={0}/>
+                    <YAxis domain={[0,100]} tick={{fontSize:10,fill:T.muted}} ticks={[0,20,40,60,80,100]}/>
+                    <Tooltip content={<ChartTooltip/>}/>
+                    {(()=>{
+                      // 두 기준선 라벨이 겹치지 않도록 dy 자동 분리
+                      // myAvg가 80 위면 myAvg 위쪽·80 아래쪽 / myAvg가 80 아래면 반대
+                      const myAvgVal = myAvg;
+                      const aboveOrEq = myAvgVal !== null && myAvgVal >= 80;
+                      const safeDy   = aboveOrEq ? 12 : -4;   // 80 라벨
+                      const myAvgDy  = aboveOrEq ? -4 : 12;   // 내 평균 라벨
+                      return (
+                        <>
+                          <ReferenceLine y={80} stroke="#DC2626" strokeDasharray="4 4" strokeWidth={1.5}
+                            label={{value:"안전선(80)", position:"right", fontSize:10, fill:"#DC2626", dy:safeDy, dx:6}}/>
+                          {myAvgVal!==null && (
+                            <ReferenceLine y={myAvgVal} stroke="#2563EB" strokeDasharray="6 3" strokeWidth={1.5}
+                              label={{value:`내 평균(${Math.round(myAvgVal*10)/10})`, position:"right", fontSize:10, fill:"#2563EB", dy:myAvgDy, dx:6}}/>
+                          )}
+                        </>
+                      );
+                    })()}
+                    <Bar dataKey="myScore" name="내 점수" radius={[6,6,0,0]} barSize={isMobile?10:14}>
+                      {chartData.map((entry, i) => (
+                        <Cell key={i} fill={entry.myScore===null ? "#E5E7EB" : entry.myScore < 80 ? "#DC2626" : "#16A34A"}/>
+                      ))}
+                    </Bar>
+                    <Line type="monotone" dataKey="classAvg" name="전체 평균" stroke="#94A3B8" strokeWidth={2}
+                      dot={{r:3,fill:"#94A3B8",strokeWidth:0}} activeDot={{r:5}} connectNulls={false}/>
+                  </ComposedChart>
+                </ResponsiveContainer>
+                <div style={{display:"flex",justifyContent:"center",gap:14,fontSize:10,color:T.muted,marginTop:6,flexWrap:"wrap"}}>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <span style={{display:"inline-block",width:10,height:10,background:"#16A34A",borderRadius:2}}/>내 점수 (80 이상)
+                  </span>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <span style={{display:"inline-block",width:10,height:10,background:"#DC2626",borderRadius:2}}/>내 점수 (80 미만)
+                  </span>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <span style={{display:"inline-block",width:14,height:2,background:"#94A3B8"}}/>전체 평균 (회차별)
+                  </span>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <span style={{display:"inline-block",width:14,borderTop:"2px dashed #2563EB"}}/>내 평균
+                  </span>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <span style={{display:"inline-block",width:14,borderTop:"2px dashed #DC2626"}}/>80점 안전선
+                  </span>
+                </div>
+              </>);
+            })()}
+          </Card>
+
           {/* ④ 랭킹 2열 */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <Card style={{padding:"14px 16px"}}>
@@ -2915,17 +3076,16 @@ const StudentCertView = ({profile}) => {
             </Card>
             <Card style={{padding:"14px 16px"}}>
               <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10,display:"flex",alignItems:"center",gap:5}}>
-                {HI.cap(14,T.navy)} 같은 학년 BEST 3
-                {myGrade&&<span style={{fontSize:10,color:T.muted,fontWeight:400,marginLeft:4}}>({myGrade})</span>}
+                {HI.cap(14,T.navy)} {myGroup ? `${myGroup} BEST 3` : "BEST 3"}
               </div>
-              {sameGradeRanked.length===0 ? (
+              {sameGroupRanked.length===0 ? (
                 <div style={{fontSize:11,color:T.muted,textAlign:"center",padding:"16px 0"}}>
-                  {Object.keys(peerGrades).length===0?"학년 정보 로딩 중...":"같은 학년 데이터 없음"}
+                  {Object.keys(peerGrades).length===0?"학년 정보 로딩 중...":"같은 그룹 데이터 없음"}
                 </div>
               ) : (
                 <div style={{display:"grid",gap:5}}>
-                  {sameGradeRanked.map((s,rank)=>(
-                    <RankRow key={rank} s={s} rank={rank} isMe={s.name===profile.name} highlightFirst={meInGradeTop3}/>
+                  {sameGroupRanked.map((s,rank)=>(
+                    <RankRow key={rank} s={s} rank={rank} isMe={s.name===profile.name} highlightFirst={meInGroupTop3}/>
                   ))}
                 </div>
               )}
@@ -2956,9 +3116,11 @@ const StudentCertView = ({profile}) => {
 };
 
 // ══════════════════════════════════════════════════════
-const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) => {
+const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", defaultRoster2Tab="overview"}) => {
   const [adminTab, setAdminTab] = useState(defaultTab);
   useEffect(() => { setAdminTab(defaultTab); }, [defaultTab]);
+  const [roster2Tab, setRoster2Tab] = useState(defaultRoster2Tab); // "overview" | "scoresheet" | "grading" | "attendance"
+  useEffect(() => { setRoster2Tab(defaultRoster2Tab); }, [defaultRoster2Tab]);
   const [rosterSearch, setRosterSearch] = useState("");
   const [rosterSort, setRosterSort] = useState({by:"name",dir:"asc"});
   const [attendance2, setAttendance2] = useState({}); // attendance_logs에서 로드 (key: "${roster2Idx}-${type}-${YYYY-MM-DD}")
@@ -2990,8 +3152,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
   const [certWeekOffset, setCertWeekOffset] = useState(0); // 0=이번주, -1=지난주 ...
   const [certNickEdit, setCertNickEdit] = useState({}); // {profile_id: editing_value}
   const [invalidCerts, setInvalidCerts] = useState([]);
-  const [certSubTab, setCertSubTab] = useState("roster"); // "roster" | "records"
-  const [certScoreModal, setCertScoreModal] = useState(null); // {id, postTitle, compliance, completeness}
+  const [sessionViewIdx, setSessionViewIdx] = useState(0); // 회차별 확인: 선택 회차 인덱스 (0-based)
+  const [certSessionModal, setCertSessionModal] = useState(null); // {id, postTitle, posted_at, sessions: number[]}
+  const [certScoreModal, setCertScoreModal] = useState(null); // {id, postTitle, submit, mission, fidelity}
   const [certScoreSaving, setCertScoreSaving] = useState(false);
   const [lastCrawledAt, setLastCrawledAt] = useState(null);
   const [certRecordsPage, setCertRecordsPage] = useState(1);
@@ -3051,15 +3214,15 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
   };
 
   useEffect(()=>{
-    if(adminTab!=="cert" && adminTab!=="roster2") return;
+    if(adminTab!=="roster2") return;
     loadCertStudents();
-    if(adminTab==="cert") loadCertRecords("all");
+    loadCertRecords("all");
     // 카페 인증 현황: ROSTER2_NAVER_DATES 전체 기간 로드
     const certFrom = new Date(ROSTER2_NAVER_DATES[0]); certFrom.setHours(0,0,0,0);
     const certTo = new Date(ROSTER2_NAVER_DATES[ROSTER2_NAVER_DATES.length-1]); certTo.setHours(23,59,59,999);
     loadAttendanceCerts(certFrom, certTo);
     // 모닝/나잇 출석 로그 로드 → 전체 활동 기간(5/17~)
-    if(adminTab==="roster2"){
+    {
       const allDates = [...ROSTER2_MORNING_DATES, ...ROSTER2_NIGHT_DATES];
       const minMs = Math.min(...allDates.map(d=>d.getTime()));
       const maxMs = Math.max(...allDates.map(d=>d.getTime()));
@@ -3104,18 +3267,41 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
     setCertRecordsLoading(false);
   };
 
-  const updateCertScore = async (certId, scoreVal) => {
+  const updateCertSessions = async (certId, sessions) => {
+    const arr = (sessions||[]).map(Number).filter(n=>n>=1 && n<=ROSTER2_NAVER_DATES.length);
+    arr.sort((a,b)=>a-b);
+    const dedup = [...new Set(arr)];
+    await supabase.rpc("update_cert_sessions", {
+      p_cert_id: certId,
+      p_sessions: dedup.length ? dedup : null,
+    });
+    const patch = { session_override: dedup.length ? dedup : null };
+    setCertRecords(prev => prev.map(r => r.id===certId ? {...r, ...patch} : r));
+    setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, ...patch} : c));
+  };
+
+  const updateCertScore = async (certId, parts) => {
     setCertScoreSaving(true);
-    const score = scoreVal==="" || scoreVal==null ? null : Number(scoreVal);
-    // 단일 점수 — completeness_score만 사용 (compliance는 null로 리셋)
+    const toNum = v => v==="" || v==null ? null : Number(v);
+    const submit   = toNum(parts.submit);
+    const mission  = toNum(parts.mission);
+    const fidelity = toNum(parts.fidelity);
+    const total = (submit===null && mission===null && fidelity===null)
+      ? null
+      : (submit||0) + (mission||0) + (fidelity||0);
     await supabase.rpc("update_cert_scores", {
       p_cert_id: certId,
-      p_compliance: null,
-      p_completeness: score,
+      p_submit: submit,
+      p_mission: mission,
+      p_fidelity: fidelity,
     });
     setCertScoreSaving(false);
-    setCertRecords(prev => prev.map(r => r.id===certId ? {...r, completeness_score: score, compliance_score: null} : r));
-    setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, completeness_score: score, compliance_score: null} : c));
+    const patch = {
+      submit_score: submit, mission_score: mission, fidelity_score: fidelity,
+      completeness_score: total, compliance_score: null,
+    };
+    setCertRecords(prev => prev.map(r => r.id===certId ? {...r, ...patch} : r));
+    setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, ...patch} : c));
   };
 
   const updateCertRecord = async (id, updates) => {
@@ -3470,25 +3656,39 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
         </div>
       )}
 
-      {/* ── 진단 센터 탭 ── */}
-      {/* ── 인증 현황 탭 ── */}
-      {adminTab==="cert"&&(()=>{
+      {/* ── 20HA 2기 현황 하위 탭 바 (overview 외 모든 서브뷰 공통) ── */}
+      {adminTab==="roster2" && (
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+          {[
+            {k:"overview",   l:"📊 전체 현황"},
+            {k:"scoresheet", l:"📋 인증글 점수표"},
+            {k:"grading",    l:"📝 인증글 채점"},
+            {k:"session",    l:"🔢 회차별 확인"},
+            {k:"makeup",     l:"📚 Make-up"},
+            {k:"attendance", l:"📋 출석체크"},
+          ].map(({k,l})=>(
+            <button key={k} onClick={()=>setRoster2Tab(k)}
+              style={{...roster2Tab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>{l}</button>
+          ))}
+        </div>
+      )}
+
+      {/* ── 출석체크 (CSV 업로드) ── */}
+      {adminTab==="roster2" && roster2Tab==="attendance" && (
+        <AttendanceUploadView onRefresh={onRefresh}/>
+      )}
+
+      {/* ── Make-up 대상자 ── */}
+      {adminTab==="roster2" && roster2Tab==="makeup" && (
+        <MakeupView/>
+      )}
+
+      {/* ── 인증 현황 (점수표 / 채점) — 2기 현황의 하위 탭 ── */}
+      {adminTab==="roster2" && (roster2Tab==="scoresheet" || roster2Tab==="grading") && (()=>{
         // ── 헬퍼 ──
         const kstDateStr = ts => {
           const k = new Date(new Date(ts).getTime() + 9*3600*1000);
           return `${k.getUTCFullYear()}-${String(k.getUTCMonth()+1).padStart(2,'0')}-${String(k.getUTCDate()).padStart(2,'0')}`;
-        };
-        const studentHasCert = (student, date) => {
-          const dk = roster2FmtKey(date);
-          return attendanceCerts.some(c =>
-            c.assigned_student_id === student.id && kstDateStr(c.posted_at) === dk
-          );
-        };
-        const getStudentCertOnDate = (student, date) => {
-          const dk = roster2FmtKey(date);
-          return attendanceCerts.find(c =>
-            c.assigned_student_id === student.id && kstDateStr(c.posted_at) === dk
-          ) || null;
         };
         const getSessionInfo = (posted_at) => {
           const postStr = kstDateStr(posted_at);
@@ -3498,6 +3698,31 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
           }
           return { sessionNum: null, isLate: false };
         };
+        // 회차 배열 결정: session_override가 있으면 그것, 없으면 작성일 자동 매칭
+        const getCertSessions = (cert) => {
+          if (cert.session_override && cert.session_override.length > 0) return cert.session_override.map(Number);
+          const auto = getSessionInfo(cert.posted_at).sessionNum;
+          return auto ? [auto] : [];
+        };
+        // 회차당 지각 여부 (작성일이 회차 일자보다 KST 늦은 날짜면 지각)
+        const isLateForSession = (cert, sessionNum) => {
+          const sessionDate = ROSTER2_NAVER_DATES[sessionNum-1];
+          if (!sessionDate) return false;
+          return kstDateStr(cert.posted_at) > roster2FmtKey(sessionDate);
+        };
+        // 회차 단위 매칭: 해당 회차의 정시·지각 글을 모두 포함, 다중 회차 글 포함
+        // 같은 회차에 글이 여러 개면 가장 먼저 올린 글 1건만 채택
+        const getStudentCertOnDate = (student, date) => {
+          const sessionIdx = ROSTER2_NAVER_DATES.findIndex(d => roster2FmtKey(d) === roster2FmtKey(date));
+          if (sessionIdx < 0) return null;
+          const targetSessionNum = sessionIdx + 1;
+          const candidates = attendanceCerts
+            .filter(c => c.assigned_student_id === student.id)
+            .filter(c => getCertSessions(c).includes(targetSessionNum))
+            .sort((a,b) => new Date(a.posted_at) - new Date(b.posted_at));
+          return candidates[0] || null;
+        };
+        const studentHasCert = (student, date) => !!getStudentCertOnDate(student, date);
         const fmtCrawledAt = ts => {
           if (!ts) return null;
           const k = new Date(new Date(ts).getTime() + 9*3600*1000);
@@ -3510,25 +3735,19 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
 
         return (
           <div>
-            {/* 헤더: 서브탭 + 크롤링 버튼 */}
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-              {[{k:"roster",l:"👥 2기 명단"},{k:"records",l:"📝 인증글 채점"}].map(({k,l})=>(
-                <button key={k} onClick={()=>setCertSubTab(k)}
-                  style={{...certSubTab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>{l}</button>
-              ))}
-              <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
-                {lastCrawledAt&&(
-                  <span style={{fontSize:11,color:T.muted}}>최근: {fmtCrawledAt(lastCrawledAt)}</span>
-                )}
-                <button onClick={triggerCrawl} disabled={crawlRunning}
-                  style={{...css.btnOrange,padding:"7px 16px",fontSize:13,background:"#059669",opacity:crawlRunning?0.6:1}}>
-                  {crawlRunning?"⏳ 실행 중...":"🔄 지금 크롤링"}
-                </button>
-              </div>
+            {/* 헤더: 크롤링 버튼 (서브탭은 상위 SubTabBar에서 처리) */}
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap",justifyContent:"flex-end"}}>
+              {lastCrawledAt&&(
+                <span style={{fontSize:11,color:T.muted}}>최근: {fmtCrawledAt(lastCrawledAt)}</span>
+              )}
+              <button onClick={triggerCrawl} disabled={crawlRunning}
+                style={{...css.btnOrange,padding:"7px 16px",fontSize:13,background:"#059669",opacity:crawlRunning?0.6:1}}>
+                {crawlRunning?"⏳ 실행 중...":"🔄 지금 크롤링"}
+              </button>
             </div>
 
-            {/* ── 2기 명단 탭 ── */}
-            {certSubTab==="roster"&&(
+            {/* ── 인증글 점수표 (회차×명단 그리드) ── */}
+            {roster2Tab==="scoresheet"&&(
               <div>
                 <div style={{fontSize:12,color:T.muted,marginBottom:10}}>
                   총 {certStudents.length}명 · 닉네임은 크롤링 시 제목 파싱으로 자동 등록됩니다
@@ -3607,8 +3826,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                                 <span style={{fontSize:9,fontWeight:600,color:"#6D28D9"}}>/{ROSTER2_NAVER_DATES.length}</span>
                               </td>
                               {/* 점수 평균 */}
-                              <td style={{width:44,minWidth:44,textAlign:"center",verticalAlign:"middle",background:"#F0FDF4",borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,height:38}}>
-                                <div style={{fontSize:13,fontWeight:800,color:avgScore!==null?"#16A34A":T.muted}}>
+                              <td style={{width:44,minWidth:44,textAlign:"center",verticalAlign:"middle",background:avgScore!==null&&avgScore<80?"#FEE2E2":"#F0FDF4",borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,height:38}}>
+                                <div style={{fontSize:13,fontWeight:800,color:avgScore===null?T.muted:avgScore<80?"#DC2626":"#16A34A"}}>
                                   {avgScore!==null ? avgScore : "—"}
                                 </div>
                               </td>
@@ -3617,17 +3836,18 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                                 const cert = getStudentCertOnDate(s,dt);
                                 const has = !!cert;
                                 const ev = has && cert.completeness_score !== null && cert.completeness_score !== undefined ? cert.completeness_score : null;
+                                const isLow = ev !== null && Number(ev) < 80;
                                 return (
                                   <td key={di} style={{
                                     width:CELL_W,minWidth:CELL_W,height:38,
                                     textAlign:"center",verticalAlign:"middle",
                                     borderBottom:`1px solid ${T.border}`,
                                     borderLeft:di===0?`2px solid #4F46E5`:`1px solid ${T.border}`,
-                                    background:has?"#D1FAE5":rowBg,
+                                    background:has ? (isLow ? "#FEE2E2" : "#D1FAE5") : rowBg,
                                   }}>
                                     {has
                                       ? (ev!==null
-                                          ? <span style={{fontSize:11,fontWeight:800,color:"#065F46"}}>{ev}</span>
+                                          ? <span style={{fontSize:11,fontWeight:800,color:isLow?"#991B1B":"#065F46"}}>{ev}</span>
                                           : <span style={{fontSize:10,color:"#94A3B8",fontStyle:"italic"}}>—</span>)
                                       : <span style={{fontSize:10,color:"#D1D5DB"}}>·</span>
                                     }
@@ -3645,7 +3865,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
             )}
 
             {/* ── 크롤링된 인증글 탭 ── */}
-            {certSubTab==="records"&&(()=>{
+            {roster2Tab==="grading"&&(()=>{
               const totalPages = Math.max(1, Math.ceil(certRecords.length / CERT_RECORDS_PAGE_SIZE));
               const safePage = Math.min(certRecordsPage, totalPages);
               const pageStart = (safePage-1)*CERT_RECORDS_PAGE_SIZE;
@@ -3660,9 +3880,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                 ):(
                   <Card style={{padding:0,overflow:"hidden"}}>
                     {/* 헤더 */}
-                    <div style={{display:"grid",gridTemplateColumns:"50px 80px 80px 60px 1fr 90px 65px 70px",
+                    <div style={{display:"grid",gridTemplateColumns:"50px 80px 80px 60px 1fr 90px 65px 50px 50px 50px 56px",
                       background:T.navy,padding:"9px 12px",gap:6,alignItems:"center"}}>
-                      {["글번호","학생","회차","정시여부","제목","닉네임","작성일","점수"].map(h=>(
+                      {["글번호","학생","회차","정시여부","제목","닉네임","작성일","제출","미션","충실도","종합"].map(h=>(
                         <div key={h} style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:h==="제목"?"left":"center"}}>{h}</div>
                       ))}
                     </div>
@@ -3672,12 +3892,31 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                       </div>
                     )}
                     {pageRecords.map((rec,i)=>{
-                      const {sessionNum, isLate} = getSessionInfo(rec.posted_at);
+                      const recSessions = getCertSessions(rec);
+                      const isOverride = !!(rec.session_override && rec.session_override.length > 0);
                       const rowBg = i%2===0?T.white:"#F9FAFB";
                       const articleId = rec.post_url ? rec.post_url.split("/").pop() : rec.id;
                       const hasScore = rec.completeness_score !== null && rec.completeness_score !== undefined;
+                      const hasSubmit   = rec.submit_score   !== null && rec.submit_score   !== undefined;
+                      const hasMission  = rec.mission_score  !== null && rec.mission_score  !== undefined;
+                      const hasFidelity = rec.fidelity_score !== null && rec.fidelity_score !== undefined;
+                      const openScoreModal = () => setCertScoreModal({
+                        id: rec.id, postTitle: rec.post_title,
+                        submit:   hasSubmit   ? String(rec.submit_score)   : "",
+                        mission:  hasMission  ? String(rec.mission_score)  : "",
+                        fidelity: hasFidelity ? String(rec.fidelity_score) : "",
+                      });
+                      const openSessionModal = () => setCertSessionModal({
+                        id: rec.id, postTitle: rec.post_title, posted_at: rec.posted_at,
+                        sessions: recSessions.slice(),
+                      });
+                      const scoreCellStyle = (has) => ({
+                        cursor:"pointer", fontSize:13, fontWeight:800, padding:"3px 4px",
+                        borderRadius:4, border:"1px dashed transparent",
+                        color: has ? T.navy : T.muted, textAlign:"center",
+                      });
                       return (
-                        <div key={rec.id} style={{display:"grid",gridTemplateColumns:"50px 80px 80px 60px 1fr 90px 65px 70px",
+                        <div key={rec.id} style={{display:"grid",gridTemplateColumns:"50px 80px 80px 60px 1fr 90px 65px 50px 50px 50px 56px",
                           padding:"8px 12px",gap:6,borderTop:`1px solid ${T.border}`,
                           background:rowBg,alignItems:"center"}}>
                           {/* 글번호 */}
@@ -3686,25 +3925,42 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                           <div style={{fontSize:12,fontWeight:700,color:rec.matched_student_name?T.navy:T.muted,textAlign:"center"}}>
                             {rec.matched_student_name||"—"}
                           </div>
-                          {/* 회차 + 날짜 */}
-                          <div style={{textAlign:"center",fontSize:11,fontWeight:700,color:sessionNum?T.navy:T.muted}}>
-                            {sessionNum
-                              ? <>
-                                  {sessionNum}회
-                                  <span style={{fontSize:10,fontWeight:400,color:T.muted,marginLeft:3}}>
-                                    ({(()=>{const d=ROSTER2_NAVER_DATES[sessionNum-1];return d?`${d.getMonth()+1}/${d.getDate()}`:"";})()})
-                                  </span>
-                                </>
-                              : "—"}
-                          </div>
-                          {/* 정시여부 */}
-                          <div style={{textAlign:"center",fontSize:11}}>
-                            {sessionNum===null
+                          {/* 회차 (클릭 → 편집 모달, 다중 회차 칩) */}
+                          <div onClick={openSessionModal}
+                            style={{textAlign:"center",fontSize:11,cursor:"pointer",padding:"2px 0",
+                              borderRadius:4,border:`1px dashed ${isOverride?"#4F46E5":"transparent"}`}}
+                            title={isOverride?"수동 지정됨":"작성일 기반 자동"}
+                            onMouseOver={e=>{if(!isOverride)e.currentTarget.style.borderColor="#D1D5DB";}}
+                            onMouseOut={e=>{if(!isOverride)e.currentTarget.style.borderColor="transparent";}}>
+                            {recSessions.length === 0
                               ? <span style={{color:T.muted}}>—</span>
-                              : isLate
-                                ? <span style={{color:"#B45309",fontWeight:700}}>⚠️ 지각</span>
-                                : <span style={{color:"#065F46",fontWeight:700}}>✅ 정시</span>
-                            }
+                              : <div style={{display:"flex",flexWrap:"wrap",gap:2,justifyContent:"center"}}>
+                                  {recSessions.map(sn => (
+                                    <span key={sn} style={{
+                                      fontSize:10,fontWeight:700,
+                                      padding:"1px 5px",borderRadius:8,
+                                      background:isOverride?"#EEF2FF":"#F3F4F6",
+                                      color:isOverride?"#4F46E5":T.navy,
+                                      border:`1px solid ${isOverride?"#C7D2FE":T.border}`,
+                                    }}>{sn}회</span>
+                                  ))}
+                                </div>}
+                          </div>
+                          {/* 정시여부 (회차별, 다중이면 모두 표기) */}
+                          <div style={{textAlign:"center",fontSize:10,lineHeight:1.3}}>
+                            {recSessions.length === 0
+                              ? <span style={{color:T.muted}}>—</span>
+                              : recSessions.map(sn => {
+                                  const late = isLateForSession(rec, sn);
+                                  return (
+                                    <div key={sn}>
+                                      {recSessions.length>1 && <span style={{color:T.muted,marginRight:2}}>{sn}회</span>}
+                                      {late
+                                        ? <span style={{color:"#B45309",fontWeight:700}}>⚠️ 지각</span>
+                                        : <span style={{color:"#065F46",fontWeight:700}}>✅ 정시</span>}
+                                    </div>
+                                  );
+                                })}
                           </div>
                           {/* 제목 (링크, 좌측 정렬) */}
                           <div style={{fontSize:11,overflow:"hidden"}}>
@@ -3723,19 +3979,26 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
                           <div style={{fontSize:11,color:T.muted,textAlign:"center"}}>
                             {(()=>{const k=new Date(new Date(rec.posted_at).getTime()+9*3600*1000);return`${k.getUTCMonth()+1}/${k.getUTCDate()}`;})()}
                           </div>
-                          {/* 점수 (완성도, 100점) — 클릭 → 모달 */}
-                          <div style={{textAlign:"center"}}>
-                            <div onClick={()=>setCertScoreModal({
-                                id:rec.id, postTitle:rec.post_title,
-                                score: hasScore ? String(rec.completeness_score) : "",
-                              })}
-                              style={{cursor:"pointer",fontSize:13,fontWeight:800,padding:"3px 4px",
-                                borderRadius:4,border:"1px dashed transparent",
-                                color: hasScore ? "#16A34A" : T.muted}}
-                              onMouseOver={e=>e.currentTarget.style.borderColor="#D1D5DB"}
-                              onMouseOut={e=>e.currentTarget.style.borderColor="transparent"}>
-                              {hasScore ? rec.completeness_score : "—"}
-                            </div>
+                          {/* 점수 4열 (제출/미션/충실도/종합) — 어디든 클릭 → 모달 */}
+                          <div onClick={openScoreModal} style={scoreCellStyle(hasSubmit)}
+                            onMouseOver={e=>e.currentTarget.style.borderColor="#D1D5DB"}
+                            onMouseOut={e=>e.currentTarget.style.borderColor="transparent"}>
+                            {hasSubmit ? rec.submit_score : "—"}
+                          </div>
+                          <div onClick={openScoreModal} style={scoreCellStyle(hasMission)}
+                            onMouseOver={e=>e.currentTarget.style.borderColor="#D1D5DB"}
+                            onMouseOut={e=>e.currentTarget.style.borderColor="transparent"}>
+                            {hasMission ? rec.mission_score : "—"}
+                          </div>
+                          <div onClick={openScoreModal} style={scoreCellStyle(hasFidelity)}
+                            onMouseOver={e=>e.currentTarget.style.borderColor="#D1D5DB"}
+                            onMouseOut={e=>e.currentTarget.style.borderColor="transparent"}>
+                            {hasFidelity ? rec.fidelity_score : "—"}
+                          </div>
+                          <div onClick={openScoreModal} style={{...scoreCellStyle(hasScore), color: hasScore ? "#16A34A" : T.muted}}
+                            onMouseOver={e=>e.currentTarget.style.borderColor="#D1D5DB"}
+                            onMouseOut={e=>e.currentTarget.style.borderColor="transparent"}>
+                            {hasScore ? rec.completeness_score : "—"}
                           </div>
                         </div>
                       );
@@ -3770,44 +4033,289 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
               );
             })()}
 
-            {/* ── 점수 입력 팝업 모달 (완성도 100점) ── */}
-            {certScoreModal && (
+            {/* ── 회차 편집 모달 (다중 선택) ── */}
+            {certSessionModal && (() => {
+              const cur = certSessionModal.sessions || [];
+              const autoNum = getSessionInfo(certSessionModal.posted_at).sessionNum;
+              const postedKstDate = (()=>{const k=new Date(new Date(certSessionModal.posted_at).getTime()+9*3600*1000);return`${k.getUTCMonth()+1}/${k.getUTCDate()}`;})();
+              const toggle = (n) => {
+                setCertSessionModal(p => {
+                  const set = new Set(p.sessions);
+                  if (set.has(n)) set.delete(n); else set.add(n);
+                  return {...p, sessions: [...set].sort((a,b)=>a-b)};
+                });
+              };
+              const save = async () => {
+                await updateCertSessions(certSessionModal.id, certSessionModal.sessions);
+                setCertSessionModal(null);
+              };
+              const resetAuto = () => {
+                setCertSessionModal(p => ({...p, sessions: autoNum ? [autoNum] : []}));
+              };
+              return (
+              <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}
+                onClick={()=>setCertSessionModal(null)}>
+                <div style={{background:T.white,borderRadius:16,padding:22,maxWidth:520,width:"92%",boxShadow:"0 8px 32px rgba(0,0,0,0.18)"}}
+                  onClick={e=>e.stopPropagation()}>
+                  <div style={{fontWeight:800,fontSize:15,color:T.navy,marginBottom:4}}>회차 지정</div>
+                  <div style={{fontSize:12,color:T.muted,marginBottom:6,wordBreak:"break-word",lineHeight:1.4}}>
+                    {certSessionModal.postTitle}
+                  </div>
+                  <div style={{fontSize:11,color:T.muted,marginBottom:14}}>
+                    작성일 {postedKstDate} · 자동 추천: {autoNum?`${autoNum}회`:"없음"}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(4, 1fr)",gap:6,marginBottom:14}}>
+                    {ROSTER2_NAVER_DATES.map((dt,idx)=>{
+                      const sn = idx+1;
+                      const checked = cur.includes(sn);
+                      const isAuto = sn===autoNum;
+                      return (
+                        <button key={sn} onClick={()=>toggle(sn)}
+                          style={{
+                            padding:"7px 6px",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer",
+                            textAlign:"center",lineHeight:1.3,
+                            border:`1px solid ${checked?T.navy:isAuto?"#C7D2FE":T.border}`,
+                            background:checked?T.navy:isAuto?"#EEF2FF":T.white,
+                            color:checked?T.white:isAuto?"#4F46E5":T.navy,
+                          }}>
+                          <div>{sn}회{isAuto?" ⭐":""}</div>
+                          <div style={{fontSize:9,fontWeight:500,opacity:0.85}}>{dt.getMonth()+1}/{dt.getDate()}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{fontSize:10,color:T.muted,marginBottom:14}}>
+                    ⭐ = 작성일 기준 자동 추천 회차 · 모두 해제 시 자동 매칭으로 복귀
+                  </div>
+                  <div style={{display:"flex",gap:8,justifyContent:"space-between",alignItems:"center"}}>
+                    <button onClick={resetAuto}
+                      style={{...css.btnOutline,padding:"6px 12px",fontSize:12}}>자동 복귀</button>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>setCertSessionModal(null)}
+                        style={{...css.btnOutline,padding:"7px 18px",fontSize:13}}>취소</button>
+                      <button onClick={save}
+                        style={{...css.btnOrange,padding:"7px 18px",fontSize:13}}>확인</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              );
+            })()}
+
+            {/* ── 점수 입력 팝업 모달 (제출 50 + 필수미션 30 + 충실도 20 = 100) ── */}
+            {certScoreModal && (() => {
+              const clamp = (v,max) => {
+                if(v==="" || v==null) return "";
+                const n = Math.max(0, Math.min(max, Number(v)));
+                return Number.isFinite(n) ? String(n) : "";
+              };
+              const toNum = v => v==="" || v==null ? 0 : Number(v);
+              const total = toNum(certScoreModal.submit) + toNum(certScoreModal.mission) + toNum(certScoreModal.fidelity);
+              const submit = async () => {
+                await updateCertScore(certScoreModal.id, {
+                  submit: certScoreModal.submit, mission: certScoreModal.mission, fidelity: certScoreModal.fidelity,
+                });
+                setCertScoreModal(null);
+              };
+              const rowStyle = {display:"grid",gridTemplateColumns:"1fr 110px",alignItems:"center",gap:10,marginBottom:10};
+              const inputStyle = {...css.input,width:"100%",padding:"8px 12px",fontSize:14,boxSizing:"border-box"};
+              const labelStyle = {fontSize:12,fontWeight:700,color:T.navy};
+              const hintStyle  = {fontSize:10,color:T.muted,fontWeight:400,marginLeft:4};
+              return (
               <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}
                 onClick={()=>setCertScoreModal(null)}>
-                <div style={{background:T.white,borderRadius:16,padding:24,maxWidth:420,width:"90%",boxShadow:"0 8px 32px rgba(0,0,0,0.18)"}}
-                  onClick={e=>e.stopPropagation()}>
+                <div style={{background:T.white,borderRadius:16,padding:24,maxWidth:460,width:"90%",boxShadow:"0 8px 32px rgba(0,0,0,0.18)"}}
+                  onClick={e=>e.stopPropagation()}
+                  onKeyDown={e=>{
+                    if(e.key==="Enter"){ e.preventDefault(); submit(); }
+                    if(e.key==="Escape") setCertScoreModal(null);
+                  }}>
                   <div style={{fontWeight:800,fontSize:15,color:T.navy,marginBottom:6}}>점수 입력</div>
                   <div style={{fontSize:12,color:T.muted,marginBottom:18,wordBreak:"break-word",lineHeight:1.4}}>
                     {certScoreModal.postTitle}
                   </div>
-                  <label style={{fontSize:11,fontWeight:700,color:"#16A34A",display:"block",marginBottom:6}}>완성도 (0~100점)</label>
-                  <input type="number" min="0" max="100" autoFocus
-                    value={certScoreModal.score}
-                    onChange={e=>setCertScoreModal(p=>({...p,score:e.target.value}))}
-                    onKeyDown={async e=>{
-                      if(e.key==="Enter"){
-                        await updateCertScore(certScoreModal.id, certScoreModal.score);
-                        setCertScoreModal(null);
-                      }
-                      if(e.key==="Escape") setCertScoreModal(null);
-                    }}
-                    style={{...css.input,width:"100%",padding:"10px 14px",fontSize:15,marginBottom:6,boxSizing:"border-box"}}
-                    placeholder="예: 85" />
-                  <div style={{fontSize:10,color:T.muted,marginBottom:16}}>※ 비우고 확인 시 점수 삭제</div>
+                  <div style={rowStyle}>
+                    <div style={labelStyle}>① 제출<span style={hintStyle}>인증 주기 내 제출 (0~50)</span></div>
+                    <input type="number" min="0" max="50" autoFocus
+                      value={certScoreModal.submit}
+                      onChange={e=>setCertScoreModal(p=>({...p,submit:clamp(e.target.value,50)}))}
+                      style={inputStyle} placeholder="0~50" />
+                  </div>
+                  <div style={rowStyle}>
+                    <div style={labelStyle}>② 필수 미션<span style={hintStyle}>모두 30 / 일부 15 (0~30)</span></div>
+                    <input type="number" min="0" max="30"
+                      value={certScoreModal.mission}
+                      onChange={e=>setCertScoreModal(p=>({...p,mission:clamp(e.target.value,30)}))}
+                      style={inputStyle} placeholder="0~30" />
+                  </div>
+                  <div style={rowStyle}>
+                    <div style={labelStyle}>③ 내용 충실도<span style={hintStyle}>매우우수 20 / 우수 15 / 보통 10 / 미흡 5 (0~20)</span></div>
+                    <input type="number" min="0" max="20"
+                      value={certScoreModal.fidelity}
+                      onChange={e=>setCertScoreModal(p=>({...p,fidelity:clamp(e.target.value,20)}))}
+                      style={inputStyle} placeholder="0~20" />
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:14,marginBottom:14,padding:"10px 14px",background:"#F0FDF4",borderRadius:8,border:"1px solid #BBF7D0"}}>
+                    <div style={{fontSize:13,fontWeight:700,color:T.navy}}>종합</div>
+                    <div style={{fontSize:18,fontWeight:800,color:"#16A34A"}}>{total}<span style={{fontSize:12,fontWeight:600,marginLeft:2}}>/ 100점</span></div>
+                  </div>
+                  <div style={{fontSize:10,color:T.muted,marginBottom:14}}>※ 세 칸 모두 비우고 확인 시 점수 삭제</div>
                   <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
                     <button onClick={()=>setCertScoreModal(null)}
                       style={{...css.btnOutline,padding:"7px 18px",fontSize:13}}>취소</button>
-                    <button onClick={async()=>{
-                      await updateCertScore(certScoreModal.id, certScoreModal.score);
-                      setCertScoreModal(null);
-                    }} disabled={certScoreSaving}
+                    <button onClick={submit} disabled={certScoreSaving}
                       style={{...css.btnOrange,padding:"7px 18px",fontSize:13,opacity:certScoreSaving?0.6:1}}>
                       {certScoreSaving?"저장 중...":"확인"}
                     </button>
                   </div>
                 </div>
               </div>
-            )}
+              );
+            })()}
+          </div>
+        );
+      })()}
+
+      {/* ── 회차별 확인 ── */}
+      {adminTab==="roster2" && roster2Tab==="session" && (()=>{
+        const kstDateStr = ts => {
+          const k = new Date(new Date(ts).getTime() + 9*3600*1000);
+          return `${k.getUTCFullYear()}-${String(k.getUTCMonth()+1).padStart(2,'0')}-${String(k.getUTCDate()).padStart(2,'0')}`;
+        };
+        const getSessionInfo = (posted_at) => {
+          const postStr = kstDateStr(posted_at);
+          for (let i = ROSTER2_NAVER_DATES.length - 1; i >= 0; i--) {
+            const certStr = roster2FmtKey(ROSTER2_NAVER_DATES[i]);
+            if (postStr >= certStr) return { sessionNum: i+1, isLate: postStr > certStr };
+          }
+          return { sessionNum: null, isLate: false };
+        };
+        const getCertSessions = (cert) => {
+          if (cert.session_override && cert.session_override.length > 0) return cert.session_override.map(Number);
+          const auto = getSessionInfo(cert.posted_at).sessionNum;
+          return auto ? [auto] : [];
+        };
+
+        // 테스트학생 제외한 실제 학생
+        const realStudents = certStudents.filter(s => s.name !== "테스트학생");
+        const totalStudents = realStudents.length;
+
+        const targetSession = sessionViewIdx + 1;
+        const sessionDate = ROSTER2_NAVER_DATES[sessionViewIdx];
+
+        // 해당 회차에 글 올린 학생별 best 점수글 (가장 먼저 올린 글 1건, 다중 회차 글 포함)
+        const studentCertMap = new Map();
+        attendanceCerts.forEach(c => {
+          if (!c.assigned_student_id) return;
+          if (!getCertSessions(c).includes(targetSession)) return;
+          const prev = studentCertMap.get(c.assigned_student_id);
+          if (!prev || new Date(c.posted_at) < new Date(prev.posted_at)) {
+            studentCertMap.set(c.assigned_student_id, c);
+          }
+        });
+
+        const submitted = realStudents.filter(s => studentCertMap.has(s.id));
+        const notSubmitted = realStudents.filter(s => !studentCertMap.has(s.id));
+        const submitRate = totalStudents > 0 ? Math.round(submitted.length/totalStudents*100) : 0;
+
+        const scored = submitted
+          .map(s => ({ name:s.name, cert: studentCertMap.get(s.id) }))
+          .filter(x => x.cert.completeness_score !== null && x.cert.completeness_score !== undefined);
+        const avgScore = scored.length > 0
+          ? Math.round(scored.reduce((acc,x)=>acc+Number(x.cert.completeness_score),0)/scored.length)
+          : null;
+        const lowScored = scored
+          .filter(x => Number(x.cert.completeness_score) < 80)
+          .sort((a,b) => Number(a.cert.completeness_score) - Number(b.cert.completeness_score));
+
+        const Stat = ({label, value, color}) => (
+          <Card style={{padding:"14px 16px",textAlign:"center"}}>
+            <div style={{fontSize:11,color:T.muted,fontWeight:600,marginBottom:4}}>{label}</div>
+            <div style={{fontSize:22,fontWeight:900,color:color||T.navy,lineHeight:1.1}}>{value}</div>
+          </Card>
+        );
+        const NameChip = ({label, color, bg, border}) => (
+          <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"4px 10px",borderRadius:14,
+            background:bg,color,border:`1px solid ${border}`,fontSize:12,fontWeight:700,margin:"3px 4px 3px 0"}}>{label}</span>
+        );
+
+        return (
+          <div>
+            {/* 회차 선택 버튼 */}
+            <Card style={{padding:"12px 14px",marginBottom:16}}>
+              <div style={{fontSize:11,color:T.muted,fontWeight:700,marginBottom:8}}>회차 선택</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {ROSTER2_NAVER_DATES.map((dt,idx)=>{
+                  const active = idx===sessionViewIdx;
+                  return (
+                    <button key={idx} onClick={()=>setSessionViewIdx(idx)}
+                      style={{padding:"6px 10px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",
+                        border:`1px solid ${active?T.navy:T.border}`,
+                        background:active?T.navy:T.white,
+                        color:active?T.white:T.navy}}>
+                      {idx+1}회 <span style={{fontSize:10,fontWeight:500,opacity:0.8,marginLeft:2}}>
+                        ({dt.getMonth()+1}/{dt.getDate()} {ROSTER2_DAY_KO[dt.getDay()]})
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+
+            {/* 통계 카드 5개 */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(5, 1fr)",gap:10,marginBottom:16}}>
+              <Stat label="전체 인원" value={`${totalStudents}명`}/>
+              <Stat label="인증 제출" value={`${submitted.length}명`} color="#16A34A"/>
+              <Stat label="인증 미제출" value={`${notSubmitted.length}명`} color="#DC2626"/>
+              <Stat label="제출률" value={`${submitRate}%`} color={submitRate>=80?"#16A34A":submitRate>=50?"#B45309":"#DC2626"}/>
+              <Stat label="제출자 평균" value={avgScore!==null ? `${avgScore}점` : "—"} color="#4F46E5"/>
+            </div>
+
+            {/* 미제출자 명단 */}
+            <Card style={{padding:"14px 16px",marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+                ⚠️ 미제출자 명단
+                <span style={{fontSize:11,fontWeight:600,color:"#DC2626",background:"#FEE2E2",padding:"2px 8px",borderRadius:10}}>
+                  {notSubmitted.length}명
+                </span>
+              </div>
+              {notSubmitted.length===0 ? (
+                <div style={{fontSize:12,color:T.muted,padding:"8px 4px"}}>전원 제출했습니다 🎉</div>
+              ) : (
+                <div>
+                  {notSubmitted.map(s => (
+                    <NameChip key={s.id} label={s.name} color="#991B1B" bg="#FEE2E2" border="#FECACA"/>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* 80점 이하 명단 */}
+            <Card style={{padding:"14px 16px"}}>
+              <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+                📉 80점 미만 제출자
+                <span style={{fontSize:11,fontWeight:600,color:"#B45309",background:"#FEF3C7",padding:"2px 8px",borderRadius:10}}>
+                  {lowScored.length}명
+                </span>
+                <span style={{fontSize:10,fontWeight:500,color:T.muted,marginLeft:2}}>점수 낮은 순</span>
+              </div>
+              {lowScored.length===0 ? (
+                <div style={{fontSize:12,color:T.muted,padding:"8px 4px"}}>해당 학생 없음</div>
+              ) : (
+                <div>
+                  {lowScored.map(x => (
+                    <NameChip key={x.name}
+                      label={`${x.name} · ${x.cert.completeness_score}점`}
+                      color="#92400E" bg="#FEF3C7" border="#FDE68A"/>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            <div style={{fontSize:10,color:T.muted,marginTop:10,textAlign:"right"}}>
+              ※ 회차 매칭: 정시·지각 글 모두 포함 (같은 회차 다중 글은 가장 먼저 올린 1건 기준) · 테스트학생 제외
+              {sessionDate && ` · 기준일 ${sessionDate.getMonth()+1}/${sessionDate.getDate()}(${ROSTER2_DAY_KO[sessionDate.getDay()]})`}
+            </div>
           </div>
         );
       })()}
@@ -4022,8 +4530,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
         </div>
       )}
 
-      {/* ── 2기 명단 탭 ── */}
-      {adminTab==="roster2"&&(()=>{
+      {/* ── 전체 현황 (회차×명단 종합 그리드) ── */}
+      {adminTab==="roster2" && roster2Tab==="overview" && (()=>{
         // ROSTER2, 날짜 배열은 컴포넌트 외부 상수 사용 (렌더마다 재생성 방지)
         const naverDates   = ROSTER2_NAVER_DATES;
         const morningDates = ROSTER2_MORNING_DATES;
@@ -4049,15 +4557,24 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
           }
           return { sessionIdx: -1, isLate: false };
         };
-        // 학생의 sessionIdx별 cert(있으면 정시/지각 구분)
+        // cert의 회차 배열 (session_override 우선)
+        const getCertSessionsLocal = (cert) => {
+          if (cert.session_override && cert.session_override.length > 0) return cert.session_override.map(Number);
+          const auto = getSessionForPostedAt(cert.posted_at).sessionIdx;
+          return auto >= 0 ? [auto+1] : [];
+        };
+        // 학생의 sessionIdx별 cert(있으면 정시/지각 구분, 다중 회차 글 포함)
         const getNaverCertForSession = (studentName, sessionIdx) => {
           const csId = certStudentByName[studentName];
           if (csId === undefined) return null;
+          const targetSession = sessionIdx + 1;
           for (const cert of attendanceCerts) {
             if (cert.assigned_student_id !== csId) continue;
-            const info = getSessionForPostedAt(cert.posted_at);
-            if (info.sessionIdx === sessionIdx) {
-              return { cert, isLate: info.isLate };
+            const sessions = getCertSessionsLocal(cert);
+            if (sessions.includes(targetSession)) {
+              const sessionDate = naverDates[sessionIdx];
+              const late = sessionDate ? kstDateStr(cert.posted_at) > fmtKey(sessionDate) : false;
+              return { cert, isLate: late };
             }
           }
           return null;
@@ -4312,6 +4829,146 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
           </div>
         );
       })()}
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════
+// ADMIN: Make-up — 경고 2회 이상 누적자
+// 경고 = 미제출(어제 이전 회차 한정) OR 80점 미만
+// ══════════════════════════════════════════════════════
+const MakeupView = () => {
+  const [students, setStudents] = useState([]);
+  const [certs, setCerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(()=>{
+    (async()=>{
+      setLoading(true);
+      const [{data:s}, {data:c}] = await Promise.all([
+        supabase.rpc("get_cert_students"),
+        supabase.rpc("get_attendance_certs", {
+          p_from: new Date(ROSTER2_NAVER_DATES[0]).toISOString(),
+          p_to:   new Date(ROSTER2_NAVER_DATES[ROSTER2_NAVER_DATES.length-1].getTime()+86400000).toISOString(),
+        }),
+      ]);
+      setStudents(s||[]);
+      setCerts(c||[]);
+      setLoading(false);
+    })();
+  },[]);
+
+  const kstDateStr = ts => {
+    const k = new Date(new Date(ts).getTime() + 9*3600*1000);
+    return `${k.getUTCFullYear()}-${String(k.getUTCMonth()+1).padStart(2,'0')}-${String(k.getUTCDate()).padStart(2,'0')}`;
+  };
+  const getSessionAuto = (posted_at) => {
+    const postStr = kstDateStr(posted_at);
+    for (let i = ROSTER2_NAVER_DATES.length - 1; i >= 0; i--) {
+      if (postStr >= roster2FmtKey(ROSTER2_NAVER_DATES[i])) return i+1;
+    }
+    return null;
+  };
+  const getCertSessions = (cert) => {
+    if (cert.session_override && cert.session_override.length > 0) return cert.session_override.map(Number);
+    const auto = getSessionAuto(cert.posted_at);
+    return auto ? [auto] : [];
+  };
+
+  // 어제 KST 일자
+  const now = new Date();
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1);
+  const yesterdayKey = roster2FmtKey(yesterday);
+
+  // 회차 중 어제까지 끝난 회차만 검사 (회차 일자 <= 어제)
+  const elapsedSessions = ROSTER2_NAVER_DATES
+    .map((d,i)=>({idx:i, sn:i+1, date:d, key:roster2FmtKey(d)}))
+    .filter(s => s.key <= yesterdayKey);
+
+  // 학생별 분석
+  const realStudents = students.filter(s => s.name !== "테스트학생");
+  const studentReports = realStudents.map(stu => {
+    const warnings = [];
+    elapsedSessions.forEach(sess => {
+      // 해당 회차의 cert (가장 먼저 올린 글)
+      const candidate = certs
+        .filter(c => c.assigned_student_id === stu.id)
+        .filter(c => getCertSessions(c).includes(sess.sn))
+        .sort((a,b) => new Date(a.posted_at) - new Date(b.posted_at))[0];
+      if (!candidate) {
+        warnings.push({sn: sess.sn, date: sess.date, reason: "미제출"});
+      } else if (candidate.completeness_score !== null && candidate.completeness_score !== undefined && Number(candidate.completeness_score) < 80) {
+        warnings.push({sn: sess.sn, date: sess.date, reason: `80점 미만 (${candidate.completeness_score}점)`, score: Number(candidate.completeness_score)});
+      }
+    });
+    return {student: stu, warnings};
+  }).filter(r => r.warnings.length >= 2)
+    .sort((a,b) => b.warnings.length - a.warnings.length || a.student.name.localeCompare(b.student.name));
+
+  if (loading) {
+    return <Card style={{padding:40, textAlign:"center", color:T.muted}}>불러오는 중...</Card>;
+  }
+
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        <div style={{fontSize:18,fontWeight:800,color:T.navy}}>📚 Make-up 대상자</div>
+        <div style={{fontSize:12,color:T.muted}}>
+          ※ 미제출은 어제({yesterday.getMonth()+1}/{yesterday.getDate()})까지의 회차만 검사 · 경고 2회 이상 누적 시 대상자
+        </div>
+      </div>
+
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <div style={{fontSize:13,fontWeight:700,color:T.navy}}>
+          현재 검사 회차: <span style={{color:"#4F46E5"}}>{elapsedSessions.length}개</span>
+          {elapsedSessions.length>0 && <span style={{fontSize:11,color:T.muted,marginLeft:6}}>
+            (1회 ~ {elapsedSessions[elapsedSessions.length-1].sn}회)
+          </span>}
+        </div>
+        <div style={{marginLeft:"auto",fontSize:13,fontWeight:700,color:T.navy}}>
+          대상자 <span style={{color:"#DC2626"}}>{studentReports.length}명</span>
+        </div>
+      </div>
+
+      {studentReports.length === 0 ? (
+        <Card style={{padding:40, textAlign:"center", color:T.muted, fontSize:13}}>
+          현재 Make-up 대상자가 없습니다 🎉
+        </Card>
+      ) : (
+        <div style={{display:"grid",gap:10}}>
+          {studentReports.map(({student, warnings}) => (
+            <Card key={student.id} style={{padding:"14px 16px"}}>
+              <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:10,borderBottom:`1px solid ${T.border}`,paddingBottom:8}}>
+                <div style={{fontSize:15,fontWeight:800,color:T.navy}}>{student.name}</div>
+                <div style={{fontSize:11,color:T.muted}}>{student.phone||""}</div>
+                <div style={{marginLeft:"auto",fontSize:12,fontWeight:700,
+                  color:warnings.length>=4?"#DC2626":warnings.length>=3?"#B45309":"#92400E",
+                  background:warnings.length>=4?"#FEE2E2":warnings.length>=3?"#FEF3C7":"#FEF3C7",
+                  padding:"3px 10px",borderRadius:10,border:`1px solid ${warnings.length>=4?"#FECACA":"#FDE68A"}`}}>
+                  경고 {warnings.length}회
+                </div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(180px,1fr))",gap:6}}>
+                {warnings.map(w => {
+                  const isLow = w.reason.startsWith("80점");
+                  return (
+                    <div key={w.sn} style={{
+                      padding:"6px 10px",borderRadius:8,fontSize:12,
+                      background:isLow?"#FEF3C7":"#FEE2E2",
+                      border:`1px solid ${isLow?"#FDE68A":"#FECACA"}`,
+                      color:isLow?"#92400E":"#991B1B",
+                    }}>
+                      <span style={{fontWeight:800}}>{w.sn}회</span>
+                      <span style={{fontSize:10,marginLeft:3,opacity:0.8}}>({w.date.getMonth()+1}/{w.date.getDate()})</span>
+                      <span style={{marginLeft:6,fontWeight:600}}>· {w.reason}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -6278,6 +6935,7 @@ export default function App() {
     if(path === "/roster2") return "roster2";
     if(path === "/attendance") return "attendance";
     if(path === "/manjeom")    return "manjeom";
+    if(path === "/makeup")     return "roster2"; // backward-compat → roster2 makeup sub-tab
     return "dashboard";
   };
   const [view, setView]           = useState(getInitialView);
@@ -6311,6 +6969,7 @@ export default function App() {
       else if(path==="/roster2")    { setView("roster2");    setShowInput(false); }
       else if(path==="/attendance") { setView("attendance"); setShowInput(false); }
       else if(path==="/manjeom")    { setView("manjeom");    setShowInput(false); }
+      else if(path==="/makeup")     { setView("roster2");    setShowInput(false); }
       else if(path==="/history")    { setView("history");    setShowInput(false); }
       else                          { setView("dashboard");  setShowInput(false); }
     };
@@ -6487,8 +7146,6 @@ export default function App() {
     ? [
         { key:"users",       label:"회원 관리",          icon:"users"     },
         { key:"roster2",     label:"20HA 2기 현황",      icon:"trophy"    },
-        { key:"cert",        label:"20HA 2기 인증글 관리", icon:"clipboard" },
-        { key:"attendance",  label:"20HA 2기 출석체크",   icon:"calendar"  },
         { key:"manjeom",     label:"만점 테스트",         icon:"cap"       },
         { key:"history",     label:"전체 기록",           icon:"calendar"  },
       ]
@@ -6599,12 +7256,17 @@ export default function App() {
             </div>
           ) : view === "cert" && !isAdmin && !isParent && isIn2ki ? (
             <StudentCertView profile={profile}/>
-          ) : view === "attendance" && isAdmin ? (
-            <AttendanceUploadView onRefresh={refreshData}/>
           ) : view === "manjeom" && isAdmin ? (
             <ManjeomView onRefresh={refreshData} allProfiles={allProfiles}/>
-          ) : (view === "users" || view === "cert" || view === "roster2") && isAdmin ? (
-            <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData} defaultTab={view}/>
+          ) : (view === "users" || view === "cert" || view === "roster2" || view === "attendance") && isAdmin ? (
+            <AdminDashboard
+              allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData}
+              defaultTab={view === "users" ? "users" : "roster2"}
+              defaultRoster2Tab={
+                view === "cert" ? "grading" :
+                view === "attendance" ? "attendance" :
+                (window.location.pathname === "/makeup") ? "makeup" : "overview"
+              }/>
           ) : isParent && view.startsWith("child-") ? (
             (() => {
               // 만점 테스트는 관리자 검토 중 — child-manjeom-* 라우트는 admin 전환 전까지 비활성
