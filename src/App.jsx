@@ -3481,6 +3481,26 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
         </div>
       )}
 
+      {/* ── 20HA 2기 현황 하위 탭 바 (overview 외 모든 서브뷰 공통) ── */}
+      {adminTab==="roster2" && (
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+          {[
+            {k:"overview",   l:"📊 전체 현황"},
+            {k:"scoresheet", l:"📋 인증글 점수표"},
+            {k:"grading",    l:"📝 인증글 채점"},
+            {k:"attendance", l:"📋 출석체크"},
+          ].map(({k,l})=>(
+            <button key={k} onClick={()=>setRoster2Tab(k)}
+              style={{...roster2Tab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>{l}</button>
+          ))}
+        </div>
+      )}
+
+      {/* ── 출석체크 (CSV 업로드) ── */}
+      {adminTab==="roster2" && roster2Tab==="attendance" && (
+        <AttendanceUploadView onRefresh={onRefresh}/>
+      )}
+
       {/* ── 인증 현황 (점수표 / 채점) — 2기 현황의 하위 탭 ── */}
       {adminTab==="roster2" && (roster2Tab==="scoresheet" || roster2Tab==="grading") && (()=>{
         // ── 헬퍼 ──
@@ -4078,26 +4098,6 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
             </div>
           )}
         </div>
-      )}
-
-      {/* ── 20HA 2기 현황 하위 탭 바 ── */}
-      {adminTab==="roster2" && (
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-          {[
-            {k:"overview",   l:"📊 전체 현황"},
-            {k:"scoresheet", l:"📋 인증글 점수표"},
-            {k:"grading",    l:"📝 인증글 채점"},
-            {k:"attendance", l:"📋 출석체크"},
-          ].map(({k,l})=>(
-            <button key={k} onClick={()=>setRoster2Tab(k)}
-              style={{...roster2Tab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>{l}</button>
-          ))}
-        </div>
-      )}
-
-      {/* ── 출석체크 (CSV 업로드) ── */}
-      {adminTab==="roster2" && roster2Tab==="attendance" && (
-        <AttendanceUploadView onRefresh={onRefresh}/>
       )}
 
       {/* ── 전체 현황 (회차×명단 종합 그리드) ── */}
