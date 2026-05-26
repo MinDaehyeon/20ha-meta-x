@@ -3936,7 +3936,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           ? Math.round(scored.reduce((acc,x)=>acc+Number(x.cert.completeness_score),0)/scored.length)
           : null;
         const lowScored = scored
-          .filter(x => Number(x.cert.completeness_score) <= 80)
+          .filter(x => Number(x.cert.completeness_score) < 80)
           .sort((a,b) => Number(a.cert.completeness_score) - Number(b.cert.completeness_score));
 
         const Stat = ({label, value, color}) => (
@@ -4004,7 +4004,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
             {/* 80점 이하 명단 */}
             <Card style={{padding:"14px 16px"}}>
               <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
-                📉 80점 이하 제출자
+                📉 80점 미만 제출자
                 <span style={{fontSize:11,fontWeight:600,color:"#B45309",background:"#FEF3C7",padding:"2px 8px",borderRadius:10}}>
                   {lowScored.length}명
                 </span>
