@@ -3010,18 +3010,25 @@ const StudentCertView = ({profile}) => {
                 </div>
 
                 {/* 그래프 */}
-                <ResponsiveContainer width="100%" height={isMobile?220:260}>
-                  <ComposedChart data={chartData} margin={{top:8,right:12,left:-8,bottom:0}}>
+                <ResponsiveContainer width="100%" height={isMobile?240:280}>
+                  <ComposedChart data={chartData} margin={{top:20,right:24,left:-8,bottom:0}}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB"/>
                     <XAxis dataKey="name" tick={{fontSize:10,fill:T.muted}} interval={0}/>
                     <YAxis domain={[0,100]} tick={{fontSize:10,fill:T.muted}} ticks={[0,20,40,60,80,100]}/>
                     <Tooltip content={<ChartTooltip/>}/>
                     <ReferenceLine y={80} stroke="#DC2626" strokeDasharray="4 4" strokeWidth={1.5}
-                      label={{value:"80점 (안전)", position:"right", fontSize:10, fill:"#DC2626"}}/>
-                    {myAvg!==null && (
-                      <ReferenceLine y={myAvg} stroke="#2563EB" strokeDasharray="6 3" strokeWidth={1.5}
-                        label={{value:`내 평균 ${Math.round(myAvg*10)/10}`, position:"insideTopLeft", fontSize:10, fill:"#2563EB"}}/>
-                    )}
+                      label={{value:"80 안전선", position:"insideTopLeft", fontSize:10, fill:"#DC2626", offset:4}}/>
+                    {myAvg!==null && (()=>{
+                      // 80점과 가까우면(±6) 라벨을 위/아래로 분리해서 겹침 방지
+                      const closeTo80 = Math.abs(myAvg - 80) < 6;
+                      const pos = closeTo80
+                        ? (myAvg >= 80 ? "insideBottomRight" : "insideTopRight")
+                        : "insideTopRight";
+                      return (
+                        <ReferenceLine y={myAvg} stroke="#2563EB" strokeDasharray="6 3" strokeWidth={1.5}
+                          label={{value:`내 평균 ${Math.round(myAvg*10)/10}`, position:pos, fontSize:10, fill:"#2563EB", offset:4}}/>
+                      );
+                    })()}
                     <Bar dataKey="myScore" name="내 점수" radius={[6,6,0,0]} barSize={isMobile?10:14}>
                       {chartData.map((entry, i) => (
                         <Cell key={i} fill={entry.myScore===null ? "#E5E7EB" : entry.myScore < 80 ? "#DC2626" : "#16A34A"}/>
