@@ -2992,6 +2992,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
   const [certWeekOffset, setCertWeekOffset] = useState(0); // 0=이번주, -1=지난주 ...
   const [certNickEdit, setCertNickEdit] = useState({}); // {profile_id: editing_value}
   const [invalidCerts, setInvalidCerts] = useState([]);
+  const [sessionViewIdx, setSessionViewIdx] = useState(0); // 회차별 확인: 선택 회차 인덱스 (0-based)
   const [certScoreModal, setCertScoreModal] = useState(null); // {id, postTitle, submit, mission, fidelity}
   const [certScoreSaving, setCertScoreSaving] = useState(false);
   const [lastCrawledAt, setLastCrawledAt] = useState(null);
@@ -3488,6 +3489,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
             {k:"overview",   l:"📊 전체 현황"},
             {k:"scoresheet", l:"📋 인증글 점수표"},
             {k:"grading",    l:"📝 인증글 채점"},
+            {k:"session",    l:"🔢 회차별 확인"},
             {k:"attendance", l:"📋 출석체크"},
           ].map(({k,l})=>(
             <button key={k} onClick={()=>setRoster2Tab(k)}
@@ -3886,6 +3888,145 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
               </div>
               );
             })()}
+          </div>
+        );
+      })()}
+
+      {/* ── 회차별 확인 ── */}
+      {adminTab==="roster2" && roster2Tab==="session" && (()=>{
+        const kstDateStr = ts => {
+          const k = new Date(new Date(ts).getTime() + 9*3600*1000);
+          return `${k.getUTCFullYear()}-${String(k.getUTCMonth()+1).padStart(2,'0')}-${String(k.getUTCDate()).padStart(2,'0')}`;
+        };
+        const getSessionInfo = (posted_at) => {
+          const postStr = kstDateStr(posted_at);
+          for (let i = ROSTER2_NAVER_DATES.length - 1; i >= 0; i--) {
+            const certStr = roster2FmtKey(ROSTER2_NAVER_DATES[i]);
+            if (postStr >= certStr) return { sessionNum: i+1, isLate: postStr > certStr };
+          }
+          return { sessionNum: null, isLate: false };
+        };
+
+        // 테스트학생 제외한 실제 학생
+        const realStudents = certStudents.filter(s => s.name !== "테스트학생");
+        const totalStudents = realStudents.length;
+
+        const targetSession = sessionViewIdx + 1;
+        const sessionDate = ROSTER2_NAVER_DATES[sessionViewIdx];
+
+        // 해당 회차에 글 올린 학생별 best 점수글 (가장 먼저 올린 글 1건)
+        const studentCertMap = new Map();
+        attendanceCerts.forEach(c => {
+          if (!c.assigned_student_id) return;
+          if (getSessionInfo(c.posted_at).sessionNum !== targetSession) return;
+          const prev = studentCertMap.get(c.assigned_student_id);
+          if (!prev || new Date(c.posted_at) < new Date(prev.posted_at)) {
+            studentCertMap.set(c.assigned_student_id, c);
+          }
+        });
+
+        const submitted = realStudents.filter(s => studentCertMap.has(s.id));
+        const notSubmitted = realStudents.filter(s => !studentCertMap.has(s.id));
+        const submitRate = totalStudents > 0 ? Math.round(submitted.length/totalStudents*100) : 0;
+
+        const scored = submitted
+          .map(s => ({ name:s.name, cert: studentCertMap.get(s.id) }))
+          .filter(x => x.cert.completeness_score !== null && x.cert.completeness_score !== undefined);
+        const avgScore = scored.length > 0
+          ? Math.round(scored.reduce((acc,x)=>acc+Number(x.cert.completeness_score),0)/scored.length)
+          : null;
+        const lowScored = scored
+          .filter(x => Number(x.cert.completeness_score) <= 80)
+          .sort((a,b) => Number(a.cert.completeness_score) - Number(b.cert.completeness_score));
+
+        const Stat = ({label, value, color}) => (
+          <Card style={{padding:"14px 16px",textAlign:"center"}}>
+            <div style={{fontSize:11,color:T.muted,fontWeight:600,marginBottom:4}}>{label}</div>
+            <div style={{fontSize:22,fontWeight:900,color:color||T.navy,lineHeight:1.1}}>{value}</div>
+          </Card>
+        );
+        const NameChip = ({label, color, bg, border}) => (
+          <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"4px 10px",borderRadius:14,
+            background:bg,color,border:`1px solid ${border}`,fontSize:12,fontWeight:700,margin:"3px 4px 3px 0"}}>{label}</span>
+        );
+
+        return (
+          <div>
+            {/* 회차 선택 버튼 */}
+            <Card style={{padding:"12px 14px",marginBottom:16}}>
+              <div style={{fontSize:11,color:T.muted,fontWeight:700,marginBottom:8}}>회차 선택</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {ROSTER2_NAVER_DATES.map((dt,idx)=>{
+                  const active = idx===sessionViewIdx;
+                  return (
+                    <button key={idx} onClick={()=>setSessionViewIdx(idx)}
+                      style={{padding:"6px 10px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",
+                        border:`1px solid ${active?T.navy:T.border}`,
+                        background:active?T.navy:T.white,
+                        color:active?T.white:T.navy}}>
+                      {idx+1}회 <span style={{fontSize:10,fontWeight:500,opacity:0.8,marginLeft:2}}>
+                        ({dt.getMonth()+1}/{dt.getDate()} {ROSTER2_DAY_KO[dt.getDay()]})
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+
+            {/* 통계 카드 5개 */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(5, 1fr)",gap:10,marginBottom:16}}>
+              <Stat label="전체 인원" value={`${totalStudents}명`}/>
+              <Stat label="인증 제출" value={`${submitted.length}명`} color="#16A34A"/>
+              <Stat label="인증 미제출" value={`${notSubmitted.length}명`} color="#DC2626"/>
+              <Stat label="제출률" value={`${submitRate}%`} color={submitRate>=80?"#16A34A":submitRate>=50?"#B45309":"#DC2626"}/>
+              <Stat label="제출자 평균" value={avgScore!==null ? `${avgScore}점` : "—"} color="#4F46E5"/>
+            </div>
+
+            {/* 미제출자 명단 */}
+            <Card style={{padding:"14px 16px",marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+                ⚠️ 미제출자 명단
+                <span style={{fontSize:11,fontWeight:600,color:"#DC2626",background:"#FEE2E2",padding:"2px 8px",borderRadius:10}}>
+                  {notSubmitted.length}명
+                </span>
+              </div>
+              {notSubmitted.length===0 ? (
+                <div style={{fontSize:12,color:T.muted,padding:"8px 4px"}}>전원 제출했습니다 🎉</div>
+              ) : (
+                <div>
+                  {notSubmitted.map(s => (
+                    <NameChip key={s.id} label={s.name} color="#991B1B" bg="#FEE2E2" border="#FECACA"/>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* 80점 이하 명단 */}
+            <Card style={{padding:"14px 16px"}}>
+              <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+                📉 80점 이하 제출자
+                <span style={{fontSize:11,fontWeight:600,color:"#B45309",background:"#FEF3C7",padding:"2px 8px",borderRadius:10}}>
+                  {lowScored.length}명
+                </span>
+                <span style={{fontSize:10,fontWeight:500,color:T.muted,marginLeft:2}}>점수 낮은 순</span>
+              </div>
+              {lowScored.length===0 ? (
+                <div style={{fontSize:12,color:T.muted,padding:"8px 4px"}}>해당 학생 없음</div>
+              ) : (
+                <div>
+                  {lowScored.map(x => (
+                    <NameChip key={x.name}
+                      label={`${x.name} · ${x.cert.completeness_score}점`}
+                      color="#92400E" bg="#FEF3C7" border="#FDE68A"/>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            <div style={{fontSize:10,color:T.muted,marginTop:10,textAlign:"right"}}>
+              ※ 회차 매칭: 정시·지각 글 모두 포함 (같은 회차 다중 글은 가장 먼저 올린 1건 기준) · 테스트학생 제외
+              {sessionDate && ` · 기준일 ${sessionDate.getMonth()+1}/${sessionDate.getDate()}(${ROSTER2_DAY_KO[sessionDate.getDay()]})`}
+            </div>
           </div>
         );
       })()}
