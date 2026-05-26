@@ -3634,8 +3634,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                                 <span style={{fontSize:9,fontWeight:600,color:"#6D28D9"}}>/{ROSTER2_NAVER_DATES.length}</span>
                               </td>
                               {/* 점수 평균 */}
-                              <td style={{width:44,minWidth:44,textAlign:"center",verticalAlign:"middle",background:"#F0FDF4",borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,height:38}}>
-                                <div style={{fontSize:13,fontWeight:800,color:avgScore!==null?"#16A34A":T.muted}}>
+                              <td style={{width:44,minWidth:44,textAlign:"center",verticalAlign:"middle",background:avgScore!==null&&avgScore<80?"#FEE2E2":"#F0FDF4",borderBottom:`1px solid ${T.border}`,borderLeft:`1px solid ${T.border}`,height:38}}>
+                                <div style={{fontSize:13,fontWeight:800,color:avgScore===null?T.muted:avgScore<80?"#DC2626":"#16A34A"}}>
                                   {avgScore!==null ? avgScore : "—"}
                                 </div>
                               </td>
@@ -3644,17 +3644,18 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                                 const cert = getStudentCertOnDate(s,dt);
                                 const has = !!cert;
                                 const ev = has && cert.completeness_score !== null && cert.completeness_score !== undefined ? cert.completeness_score : null;
+                                const isLow = ev !== null && Number(ev) < 80;
                                 return (
                                   <td key={di} style={{
                                     width:CELL_W,minWidth:CELL_W,height:38,
                                     textAlign:"center",verticalAlign:"middle",
                                     borderBottom:`1px solid ${T.border}`,
                                     borderLeft:di===0?`2px solid #4F46E5`:`1px solid ${T.border}`,
-                                    background:has?"#D1FAE5":rowBg,
+                                    background:has ? (isLow ? "#FEE2E2" : "#D1FAE5") : rowBg,
                                   }}>
                                     {has
                                       ? (ev!==null
-                                          ? <span style={{fontSize:11,fontWeight:800,color:"#065F46"}}>{ev}</span>
+                                          ? <span style={{fontSize:11,fontWeight:800,color:isLow?"#991B1B":"#065F46"}}>{ev}</span>
                                           : <span style={{fontSize:10,color:"#94A3B8",fontStyle:"italic"}}>—</span>)
                                       : <span style={{fontSize:10,color:"#D1D5DB"}}>·</span>
                                     }
