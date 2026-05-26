@@ -3488,18 +3488,6 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
           const k = new Date(new Date(ts).getTime() + 9*3600*1000);
           return `${k.getUTCFullYear()}-${String(k.getUTCMonth()+1).padStart(2,'0')}-${String(k.getUTCDate()).padStart(2,'0')}`;
         };
-        const studentHasCert = (student, date) => {
-          const dk = roster2FmtKey(date);
-          return attendanceCerts.some(c =>
-            c.assigned_student_id === student.id && kstDateStr(c.posted_at) === dk
-          );
-        };
-        const getStudentCertOnDate = (student, date) => {
-          const dk = roster2FmtKey(date);
-          return attendanceCerts.find(c =>
-            c.assigned_student_id === student.id && kstDateStr(c.posted_at) === dk
-          ) || null;
-        };
         const getSessionInfo = (posted_at) => {
           const postStr = kstDateStr(posted_at);
           for (let i = ROSTER2_NAVER_DATES.length - 1; i >= 0; i--) {
@@ -3508,6 +3496,19 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
           }
           return { sessionNum: null, isLate: false };
         };
+        // 회차 단위 매칭: 해당 회차의 정시·지각 글을 모두 포함
+        // 같은 회차에 글이 여러 개면 가장 먼저 올린 글 1건만 채택
+        const getStudentCertOnDate = (student, date) => {
+          const sessionIdx = ROSTER2_NAVER_DATES.findIndex(d => roster2FmtKey(d) === roster2FmtKey(date));
+          if (sessionIdx < 0) return null;
+          const targetSessionNum = sessionIdx + 1;
+          const candidates = attendanceCerts
+            .filter(c => c.assigned_student_id === student.id)
+            .filter(c => getSessionInfo(c.posted_at).sessionNum === targetSessionNum)
+            .sort((a,b) => new Date(a.posted_at) - new Date(b.posted_at));
+          return candidates[0] || null;
+        };
+        const studentHasCert = (student, date) => !!getStudentCertOnDate(student, date);
         const fmtCrawledAt = ts => {
           if (!ts) return null;
           const k = new Date(new Date(ts).getTime() + 9*3600*1000);
