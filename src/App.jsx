@@ -2956,9 +2956,11 @@ const StudentCertView = ({profile}) => {
 };
 
 // ══════════════════════════════════════════════════════
-const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) => {
+const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", defaultRoster2Tab="overview"}) => {
   const [adminTab, setAdminTab] = useState(defaultTab);
   useEffect(() => { setAdminTab(defaultTab); }, [defaultTab]);
+  const [roster2Tab, setRoster2Tab] = useState(defaultRoster2Tab); // "overview" | "scoresheet" | "grading" | "attendance"
+  useEffect(() => { setRoster2Tab(defaultRoster2Tab); }, [defaultRoster2Tab]);
   const [rosterSearch, setRosterSearch] = useState("");
   const [rosterSort, setRosterSort] = useState({by:"name",dir:"asc"});
   const [attendance2, setAttendance2] = useState({}); // attendance_logs에서 로드 (key: "${roster2Idx}-${type}-${YYYY-MM-DD}")
@@ -2990,7 +2992,6 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
   const [certWeekOffset, setCertWeekOffset] = useState(0); // 0=이번주, -1=지난주 ...
   const [certNickEdit, setCertNickEdit] = useState({}); // {profile_id: editing_value}
   const [invalidCerts, setInvalidCerts] = useState([]);
-  const [certSubTab, setCertSubTab] = useState("roster"); // "roster" | "records"
   const [certScoreModal, setCertScoreModal] = useState(null); // {id, postTitle, submit, mission, fidelity}
   const [certScoreSaving, setCertScoreSaving] = useState(false);
   const [lastCrawledAt, setLastCrawledAt] = useState(null);
@@ -3480,9 +3481,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
         </div>
       )}
 
-      {/* ── 진단 센터 탭 ── */}
-      {/* ── 인증 현황 탭 ── */}
-      {adminTab==="cert"&&(()=>{
+      {/* ── 인증 현황 (점수표 / 채점) — 2기 현황의 하위 탭 ── */}
+      {adminTab==="roster2" && (roster2Tab==="scoresheet" || roster2Tab==="grading") && (()=>{
         // ── 헬퍼 ──
         const kstDateStr = ts => {
           const k = new Date(new Date(ts).getTime() + 9*3600*1000);
@@ -3521,25 +3521,19 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
 
         return (
           <div>
-            {/* 헤더: 서브탭 + 크롤링 버튼 */}
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-              {[{k:"roster",l:"👥 2기 명단"},{k:"records",l:"📝 인증글 채점"}].map(({k,l})=>(
-                <button key={k} onClick={()=>setCertSubTab(k)}
-                  style={{...certSubTab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>{l}</button>
-              ))}
-              <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
-                {lastCrawledAt&&(
-                  <span style={{fontSize:11,color:T.muted}}>최근: {fmtCrawledAt(lastCrawledAt)}</span>
-                )}
-                <button onClick={triggerCrawl} disabled={crawlRunning}
-                  style={{...css.btnOrange,padding:"7px 16px",fontSize:13,background:"#059669",opacity:crawlRunning?0.6:1}}>
-                  {crawlRunning?"⏳ 실행 중...":"🔄 지금 크롤링"}
-                </button>
-              </div>
+            {/* 헤더: 크롤링 버튼 (서브탭은 상위 SubTabBar에서 처리) */}
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap",justifyContent:"flex-end"}}>
+              {lastCrawledAt&&(
+                <span style={{fontSize:11,color:T.muted}}>최근: {fmtCrawledAt(lastCrawledAt)}</span>
+              )}
+              <button onClick={triggerCrawl} disabled={crawlRunning}
+                style={{...css.btnOrange,padding:"7px 16px",fontSize:13,background:"#059669",opacity:crawlRunning?0.6:1}}>
+                {crawlRunning?"⏳ 실행 중...":"🔄 지금 크롤링"}
+              </button>
             </div>
 
-            {/* ── 2기 명단 탭 ── */}
-            {certSubTab==="roster"&&(
+            {/* ── 인증글 점수표 (회차×명단 그리드) ── */}
+            {roster2Tab==="scoresheet"&&(
               <div>
                 <div style={{fontSize:12,color:T.muted,marginBottom:10}}>
                   총 {certStudents.length}명 · 닉네임은 크롤링 시 제목 파싱으로 자동 등록됩니다
@@ -3656,7 +3650,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
             )}
 
             {/* ── 크롤링된 인증글 탭 ── */}
-            {certSubTab==="records"&&(()=>{
+            {roster2Tab==="grading"&&(()=>{
               const totalPages = Math.max(1, Math.ceil(certRecords.length / CERT_RECORDS_PAGE_SIZE));
               const safePage = Math.min(certRecordsPage, totalPages);
               const pageStart = (safePage-1)*CERT_RECORDS_PAGE_SIZE;
@@ -4086,8 +4080,28 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users"}) =
         </div>
       )}
 
-      {/* ── 2기 명단 탭 ── */}
-      {adminTab==="roster2"&&(()=>{
+      {/* ── 20HA 2기 현황 하위 탭 바 ── */}
+      {adminTab==="roster2" && (
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+          {[
+            {k:"overview",   l:"📊 전체 현황"},
+            {k:"scoresheet", l:"📋 인증글 점수표"},
+            {k:"grading",    l:"📝 인증글 채점"},
+            {k:"attendance", l:"📋 출석체크"},
+          ].map(({k,l})=>(
+            <button key={k} onClick={()=>setRoster2Tab(k)}
+              style={{...roster2Tab===k?css.btnOrange:css.btnOutline,padding:"7px 16px",fontSize:13,fontWeight:700}}>{l}</button>
+          ))}
+        </div>
+      )}
+
+      {/* ── 출석체크 (CSV 업로드) ── */}
+      {adminTab==="roster2" && roster2Tab==="attendance" && (
+        <AttendanceUploadView onRefresh={onRefresh}/>
+      )}
+
+      {/* ── 전체 현황 (회차×명단 종합 그리드) ── */}
+      {adminTab==="roster2" && roster2Tab==="overview" && (()=>{
         // ROSTER2, 날짜 배열은 컴포넌트 외부 상수 사용 (렌더마다 재생성 방지)
         const naverDates   = ROSTER2_NAVER_DATES;
         const morningDates = ROSTER2_MORNING_DATES;
@@ -6551,8 +6565,6 @@ export default function App() {
     ? [
         { key:"users",       label:"회원 관리",          icon:"users"     },
         { key:"roster2",     label:"20HA 2기 현황",      icon:"trophy"    },
-        { key:"cert",        label:"20HA 2기 인증글 관리", icon:"clipboard" },
-        { key:"attendance",  label:"20HA 2기 출석체크",   icon:"calendar"  },
         { key:"manjeom",     label:"만점 테스트",         icon:"cap"       },
         { key:"history",     label:"전체 기록",           icon:"calendar"  },
       ]
@@ -6663,12 +6675,16 @@ export default function App() {
             </div>
           ) : view === "cert" && !isAdmin && !isParent && isIn2ki ? (
             <StudentCertView profile={profile}/>
-          ) : view === "attendance" && isAdmin ? (
-            <AttendanceUploadView onRefresh={refreshData}/>
           ) : view === "manjeom" && isAdmin ? (
             <ManjeomView onRefresh={refreshData} allProfiles={allProfiles}/>
-          ) : (view === "users" || view === "cert" || view === "roster2") && isAdmin ? (
-            <AdminDashboard allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData} defaultTab={view}/>
+          ) : (view === "users" || view === "cert" || view === "roster2" || view === "attendance") && isAdmin ? (
+            <AdminDashboard
+              allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData}
+              defaultTab={view === "users" ? "users" : "roster2"}
+              defaultRoster2Tab={
+                view === "cert" ? "grading" :
+                view === "attendance" ? "attendance" : "overview"
+              }/>
           ) : isParent && view.startsWith("child-") ? (
             (() => {
               // 만점 테스트는 관리자 검토 중 — child-manjeom-* 라우트는 admin 전환 전까지 비활성
