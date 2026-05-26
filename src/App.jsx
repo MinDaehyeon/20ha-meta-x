@@ -2261,6 +2261,7 @@ const StudentCertView = ({profile}) => {
   const [peerGrades, setPeerGrades] = useState({});
   const [myCafeCerts, setMyCafeCerts] = useState([]);
   const [classCertStats, setClassCertStats] = useState({}); // {name: cert_count}
+  const [classSessionAvgs, setClassSessionAvgs] = useState({}); // {sessionNum: avg_score}
   const [myAttLogs, setMyAttLogs] = useState([]);            // [{session_date, session_type}]
   const [classAttStats, setClassAttStats] = useState({});    // {name: {morning, night}}
   const isMobile = useMobile();
@@ -2283,6 +2284,12 @@ const StudentCertView = ({profile}) => {
       const map = {};
       (data||[]).forEach(r => { map[r.student_name] = r.cert_count; });
       setClassCertStats(map);
+    });
+    // 회차별 클래스 평균 점수 (그래프용)
+    supabase.rpc("get_class_cert_session_avgs").then(({data}) => {
+      const map = {};
+      (data||[]).forEach(r => { map[r.session_num] = Number(r.avg_score); });
+      setClassSessionAvgs(map);
     });
     // 본인 출석 (모닝/나잇)
     supabase.rpc("get_my_attendance_logs").then(({data}) => {
@@ -2653,11 +2660,20 @@ const StudentCertView = ({profile}) => {
       {/* ③ 8주 전체 일정 */}
       {(()=>{
         const myGrade = calcGrade(profile.birth_year, profile.birth_month) || profile.grade || "";
-        const sameGradeRanked = myGrade && Object.keys(peerGrades).length>0
-          ? [...allStats].filter(s=>(peerGrades[s.name]||"")===myGrade).sort((a,b)=>b.total-a.total).slice(0,3)
+        // 학년 → 학교급 그룹 변환 ("초N"→"초등부", "중N"→"중등부", "고N"→"고등부")
+        const gradeGroup = (g) => {
+          if (!g) return "";
+          if (g.startsWith("초")) return "초등부";
+          if (g.startsWith("중")) return "중등부";
+          if (g.startsWith("고")) return "고등부";
+          return "";
+        };
+        const myGroup = gradeGroup(myGrade);
+        const sameGroupRanked = myGroup && Object.keys(peerGrades).length>0
+          ? [...allStats].filter(s=>gradeGroup(peerGrades[s.name]||"")===myGroup).sort((a,b)=>b.total-a.total).slice(0,3)
           : [];
         const meInTop3 = ranked.slice(0,3).some(s => s.name === profile.name);
-        const meInGradeTop3 = sameGradeRanked.some(s => s.name === profile.name);
+        const meInGroupTop3 = sameGroupRanked.some(s => s.name === profile.name);
         const ACTIVITIES = [
           {label:"미라클모닝", dates:ROSTER2_MORNING_DATES, type:"M",   color:"#EA580C"},
           {label:"카페 인증",  dates:ROSTER2_NAVER_DATES,   type:"N",   color:"#03C75A"},
@@ -2903,6 +2919,139 @@ const StudentCertView = ({profile}) => {
             })()}
           </Card>
 
+          {/* ③-3 카페 인증 점수 그래프 */}
+          <Card style={{padding:"16px 18px"}}>
+            {(()=>{
+              const kstStr = ts => {
+                const k = new Date(new Date(ts).getTime() + 9*3600*1000);
+                return `${k.getUTCFullYear()}-${String(k.getUTCMonth()+1).padStart(2,'0')}-${String(k.getUTCDate()).padStart(2,'0')}`;
+              };
+              // 회차별 본인 점수 매핑 (지각 포함, 다중 글은 최고점)
+              const myBySession = {};
+              myCafeCerts.forEach(c => {
+                const postStr = kstStr(c.posted_at);
+                let sn = null;
+                for (let i = ROSTER2_NAVER_DATES.length - 1; i >= 0; i--) {
+                  if (postStr >= fk(ROSTER2_NAVER_DATES[i])) { sn = i+1; break; }
+                }
+                if (!sn) return;
+                const sc = c.completeness_score;
+                if (sc === null || sc === undefined) return;
+                if (myBySession[sn] === undefined || Number(sc) > myBySession[sn]) {
+                  myBySession[sn] = Number(sc);
+                }
+              });
+              const myScores = Object.values(myBySession);
+              const myAvg = myScores.length ? myScores.reduce((a,b)=>a+b,0)/myScores.length : null;
+              const myHigh = myScores.length ? Math.max(...myScores) : null;
+              const myLow  = myScores.length ? Math.min(...myScores) : null;
+              const safeCount = myScores.filter(s => s>=80).length;
+              const classAvgAll = Object.values(classSessionAvgs);
+              const classAvgOverall = classAvgAll.length ? classAvgAll.reduce((a,b)=>a+b,0)/classAvgAll.length : null;
+              const avgDiff = (myAvg!==null && classAvgOverall!==null) ? Math.round((myAvg - classAvgOverall) * 10) / 10 : null;
+              const chartData = ROSTER2_NAVER_DATES.map((dt, idx) => {
+                const sn = idx+1;
+                return {
+                  name: `${sn}회`,
+                  date: `${dt.getMonth()+1}/${dt.getDate()}`,
+                  myScore: myBySession[sn] ?? null,
+                  classAvg: classSessionAvgs[sn] ?? null,
+                };
+              });
+              const ChartTooltip = ({active, payload, label}) => {
+                if (!active || !payload || !payload.length) return null;
+                const me = payload.find(p=>p.dataKey==="myScore")?.value;
+                const cls = payload.find(p=>p.dataKey==="classAvg")?.value;
+                const d = chartData.find(x=>x.name===label);
+                return (
+                  <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 12px",fontSize:11,boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>
+                    <div style={{fontWeight:800,color:T.navy,marginBottom:4}}>{label} {d&&<span style={{color:T.muted,fontWeight:500}}>({d.date})</span>}</div>
+                    <div style={{color:"#16A34A",fontWeight:700}}>내 점수: {me!==null&&me!==undefined?`${me}점`:"미제출"}</div>
+                    <div style={{color:T.muted}}>전체 평균: {cls!==null&&cls!==undefined?`${cls}점`:"-"}</div>
+                  </div>
+                );
+              };
+
+              return (
+              <>
+                <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:12,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                  📊 카페 인증 점수 그래프
+                  <span style={{fontSize:10,fontWeight:400,color:T.muted}}>· 회차별 내 점수 vs 전체 평균</span>
+                </div>
+
+                {/* 요약 미니 카드 4개 */}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4, 1fr)",gap:8,marginBottom:14}}>
+                  <div style={{padding:"8px 10px",borderRadius:8,background:"#F0FDF4",border:"1px solid #BBF7D0",textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#15803D",fontWeight:700}}>📈 내 평균</div>
+                    <div style={{fontSize:16,fontWeight:900,color:"#16A34A",marginTop:2}}>
+                      {myAvg!==null ? `${Math.round(myAvg*10)/10}` : "—"}
+                    </div>
+                  </div>
+                  <div style={{padding:"8px 10px",borderRadius:8,background:"#EFF6FF",border:"1px solid #BFDBFE",textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#1D4ED8",fontWeight:700}}>🎯 80점 이상</div>
+                    <div style={{fontSize:16,fontWeight:900,color:"#2563EB",marginTop:2}}>
+                      {myScores.length>0 ? `${safeCount}/${myScores.length}` : "—"}
+                    </div>
+                  </div>
+                  <div style={{padding:"8px 10px",borderRadius:8,background:"#FEF3C7",border:"1px solid #FDE68A",textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#92400E",fontWeight:700}}>⭐ 최고/최저</div>
+                    <div style={{fontSize:13,fontWeight:900,color:"#B45309",marginTop:2}}>
+                      {myHigh!==null ? `${myHigh}/${myLow}` : "—"}
+                    </div>
+                  </div>
+                  <div style={{padding:"8px 10px",borderRadius:8,
+                    background: avgDiff===null?"#F8FAFC": avgDiff>=0?"#F0FDF4":"#FEE2E2",
+                    border:`1px solid ${avgDiff===null?T.border: avgDiff>=0?"#BBF7D0":"#FECACA"}`,textAlign:"center"}}>
+                    <div style={{fontSize:10,color:avgDiff===null?T.muted: avgDiff>=0?"#15803D":"#991B1B",fontWeight:700}}>📊 전체 대비</div>
+                    <div style={{fontSize:16,fontWeight:900,color:avgDiff===null?T.muted: avgDiff>=0?"#16A34A":"#DC2626",marginTop:2}}>
+                      {avgDiff===null ? "—" : `${avgDiff>=0?"+":""}${avgDiff}`}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 그래프 */}
+                <ResponsiveContainer width="100%" height={isMobile?220:260}>
+                  <ComposedChart data={chartData} margin={{top:8,right:12,left:-8,bottom:0}}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB"/>
+                    <XAxis dataKey="name" tick={{fontSize:10,fill:T.muted}} interval={0}/>
+                    <YAxis domain={[0,100]} tick={{fontSize:10,fill:T.muted}} ticks={[0,20,40,60,80,100]}/>
+                    <Tooltip content={<ChartTooltip/>}/>
+                    <ReferenceLine y={80} stroke="#DC2626" strokeDasharray="4 4" strokeWidth={1.5}
+                      label={{value:"80점 (안전)", position:"right", fontSize:10, fill:"#DC2626"}}/>
+                    {myAvg!==null && (
+                      <ReferenceLine y={myAvg} stroke="#2563EB" strokeDasharray="6 3" strokeWidth={1.5}
+                        label={{value:`내 평균 ${Math.round(myAvg*10)/10}`, position:"insideTopLeft", fontSize:10, fill:"#2563EB"}}/>
+                    )}
+                    <Bar dataKey="myScore" name="내 점수" radius={[6,6,0,0]} barSize={isMobile?10:14}>
+                      {chartData.map((entry, i) => (
+                        <Cell key={i} fill={entry.myScore===null ? "#E5E7EB" : entry.myScore < 80 ? "#DC2626" : "#16A34A"}/>
+                      ))}
+                    </Bar>
+                    <Line type="monotone" dataKey="classAvg" name="전체 평균" stroke="#94A3B8" strokeWidth={2}
+                      dot={{r:3,fill:"#94A3B8",strokeWidth:0}} activeDot={{r:5}} connectNulls={false}/>
+                  </ComposedChart>
+                </ResponsiveContainer>
+                <div style={{display:"flex",justifyContent:"center",gap:14,fontSize:10,color:T.muted,marginTop:6,flexWrap:"wrap"}}>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <span style={{display:"inline-block",width:10,height:10,background:"#16A34A",borderRadius:2}}/>내 점수 (80 이상)
+                  </span>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <span style={{display:"inline-block",width:10,height:10,background:"#DC2626",borderRadius:2}}/>내 점수 (80 미만)
+                  </span>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <span style={{display:"inline-block",width:14,height:2,background:"#94A3B8"}}/>전체 평균 (회차별)
+                  </span>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <span style={{display:"inline-block",width:14,borderTop:"2px dashed #2563EB"}}/>내 평균
+                  </span>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <span style={{display:"inline-block",width:14,borderTop:"2px dashed #DC2626"}}/>80점 안전선
+                  </span>
+                </div>
+              </>);
+            })()}
+          </Card>
+
           {/* ④ 랭킹 2열 */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <Card style={{padding:"14px 16px"}}>
@@ -2915,17 +3064,17 @@ const StudentCertView = ({profile}) => {
             </Card>
             <Card style={{padding:"14px 16px"}}>
               <div style={{fontSize:13,fontWeight:800,color:T.navy,marginBottom:10,display:"flex",alignItems:"center",gap:5}}>
-                {HI.cap(14,T.navy)} 같은 학년 BEST 3
-                {myGrade&&<span style={{fontSize:10,color:T.muted,fontWeight:400,marginLeft:4}}>({myGrade})</span>}
+                {HI.cap(14,T.navy)} 같은 학교급 BEST 3
+                {myGroup&&<span style={{fontSize:10,color:T.muted,fontWeight:400,marginLeft:4}}>({myGroup})</span>}
               </div>
-              {sameGradeRanked.length===0 ? (
+              {sameGroupRanked.length===0 ? (
                 <div style={{fontSize:11,color:T.muted,textAlign:"center",padding:"16px 0"}}>
-                  {Object.keys(peerGrades).length===0?"학년 정보 로딩 중...":"같은 학년 데이터 없음"}
+                  {Object.keys(peerGrades).length===0?"학년 정보 로딩 중...":"같은 학교급 데이터 없음"}
                 </div>
               ) : (
                 <div style={{display:"grid",gap:5}}>
-                  {sameGradeRanked.map((s,rank)=>(
-                    <RankRow key={rank} s={s} rank={rank} isMe={s.name===profile.name} highlightFirst={meInGradeTop3}/>
+                  {sameGroupRanked.map((s,rank)=>(
+                    <RankRow key={rank} s={s} rank={rank} isMe={s.name===profile.name} highlightFirst={meInGroupTop3}/>
                   ))}
                 </div>
               )}
