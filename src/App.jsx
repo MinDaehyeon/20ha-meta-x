@@ -3011,22 +3011,27 @@ const StudentCertView = ({profile}) => {
 
                 {/* 그래프 */}
                 <ResponsiveContainer width="100%" height={isMobile?240:280}>
-                  <ComposedChart data={chartData} margin={{top:20,right:24,left:-8,bottom:0}}>
+                  <ComposedChart data={chartData} margin={{top:20,right:84,left:-8,bottom:0}}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB"/>
                     <XAxis dataKey="name" tick={{fontSize:10,fill:T.muted}} interval={0}/>
                     <YAxis domain={[0,100]} tick={{fontSize:10,fill:T.muted}} ticks={[0,20,40,60,80,100]}/>
                     <Tooltip content={<ChartTooltip/>}/>
-                    <ReferenceLine y={80} stroke="#DC2626" strokeDasharray="4 4" strokeWidth={1.5}
-                      label={{value:"80 안전선", position:"insideTopLeft", fontSize:10, fill:"#DC2626", offset:4}}/>
-                    {myAvg!==null && (()=>{
-                      // 80점과 가까우면(±6) 라벨을 위/아래로 분리해서 겹침 방지
-                      const closeTo80 = Math.abs(myAvg - 80) < 6;
-                      const pos = closeTo80
-                        ? (myAvg >= 80 ? "insideBottomRight" : "insideTopRight")
-                        : "insideTopRight";
+                    {(()=>{
+                      // 두 기준선 라벨이 겹치지 않도록 dy 자동 분리
+                      // myAvg가 80 위면 myAvg 위쪽·80 아래쪽 / myAvg가 80 아래면 반대
+                      const myAvgVal = myAvg;
+                      const aboveOrEq = myAvgVal !== null && myAvgVal >= 80;
+                      const safeDy   = aboveOrEq ? 12 : -4;   // 80 라벨
+                      const myAvgDy  = aboveOrEq ? -4 : 12;   // 내 평균 라벨
                       return (
-                        <ReferenceLine y={myAvg} stroke="#2563EB" strokeDasharray="6 3" strokeWidth={1.5}
-                          label={{value:`내 평균 ${Math.round(myAvg*10)/10}`, position:pos, fontSize:10, fill:"#2563EB", offset:4}}/>
+                        <>
+                          <ReferenceLine y={80} stroke="#DC2626" strokeDasharray="4 4" strokeWidth={1.5}
+                            label={{value:"80 안전선", position:"right", fontSize:10, fill:"#DC2626", dy:safeDy, dx:6}}/>
+                          {myAvgVal!==null && (
+                            <ReferenceLine y={myAvgVal} stroke="#2563EB" strokeDasharray="6 3" strokeWidth={1.5}
+                              label={{value:`내 평균 ${Math.round(myAvgVal*10)/10}`, position:"right", fontSize:10, fill:"#2563EB", dy:myAvgDy, dx:6}}/>
+                          )}
+                        </>
                       );
                     })()}
                     <Bar dataKey="myScore" name="내 점수" radius={[6,6,0,0]} barSize={isMobile?10:14}>
