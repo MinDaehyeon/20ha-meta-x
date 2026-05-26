@@ -3052,15 +3052,15 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
   };
 
   useEffect(()=>{
-    if(adminTab!=="cert" && adminTab!=="roster2") return;
+    if(adminTab!=="roster2") return;
     loadCertStudents();
-    if(adminTab==="cert") loadCertRecords("all");
+    loadCertRecords("all");
     // 카페 인증 현황: ROSTER2_NAVER_DATES 전체 기간 로드
     const certFrom = new Date(ROSTER2_NAVER_DATES[0]); certFrom.setHours(0,0,0,0);
     const certTo = new Date(ROSTER2_NAVER_DATES[ROSTER2_NAVER_DATES.length-1]); certTo.setHours(23,59,59,999);
     loadAttendanceCerts(certFrom, certTo);
     // 모닝/나잇 출석 로그 로드 → 전체 활동 기간(5/17~)
-    if(adminTab==="roster2"){
+    {
       const allDates = [...ROSTER2_MORNING_DATES, ...ROSTER2_NIGHT_DATES];
       const minMs = Math.min(...allDates.map(d=>d.getTime()));
       const maxMs = Math.max(...allDates.map(d=>d.getTime()));
