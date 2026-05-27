@@ -2267,7 +2267,8 @@ const INIT_ATTENDANCE2 = {};
 // ══════════════════════════════════════════════════════
 // 학생: 20HA 인증 현황 탭
 // ══════════════════════════════════════════════════════
-const StudentCertView = ({profile}) => {
+const StudentCertView = ({profile, viewerMode="self"}) => {
+  // viewerMode: "self" = 학생 본인 / "parent" = 학부모가 자녀 보기
   const [peerGrades, setPeerGrades] = useState({});
   const [myCafeCerts, setMyCafeCerts] = useState([]);
   const [classCertStats, setClassCertStats] = useState({}); // {name: cert_count}
@@ -2285,8 +2286,11 @@ const StudentCertView = ({profile}) => {
           setPeerGrades(map);
         }
       });
-    // 본인 카페 인증 글 (회차별 + 점수)
-    supabase.rpc("get_my_cafe_certs").then(({data}) => {
+    // 카페 인증 글 (본인 또는 자녀)
+    const cafeCertReq = viewerMode === "parent"
+      ? supabase.rpc("get_child_cafe_certs", {p_child_id: profile.id})
+      : supabase.rpc("get_my_cafe_certs");
+    cafeCertReq.then(({data}) => {
       setMyCafeCerts(data || []);
     });
     // 클래스 전체 카페 인증 카운트 (랭킹/평균용)
@@ -2301,8 +2305,11 @@ const StudentCertView = ({profile}) => {
       (data||[]).forEach(r => { map[r.session_num] = Number(r.avg_score); });
       setClassSessionAvgs(map);
     });
-    // 본인 출석 (모닝/나잇)
-    supabase.rpc("get_my_attendance_logs").then(({data}) => {
+    // 출석 (본인 또는 자녀)
+    const attReq = viewerMode === "parent"
+      ? supabase.rpc("get_child_attendance_logs", {p_child_id: profile.id})
+      : supabase.rpc("get_my_attendance_logs");
+    attReq.then(({data}) => {
       setMyAttLogs(data || []);
     });
     // 클래스 전체 출석 카운트 (랭킹/평균용)
@@ -7422,7 +7429,7 @@ export default function App() {
               const [, sub, cid] = m;
               const child = children.find(c => c.profile.id === cid);
               if(!child) return <Card style={{padding:24,textAlign:"center",color:T.muted}}>자녀 정보를 찾을 수 없어요.</Card>;
-              if(sub === "cert")      return <StudentCertView profile={child.profile}/>;
+              if(sub === "cert")      return <StudentCertView profile={child.profile} viewerMode="parent"/>;
               if(sub === "history")   return <LogHistory logs={child.logs} onDelete={null} isAdmin={false} allProfiles={[child.profile]}/>;
               return <StudentDashboard logs={child.logs} profile={child.profile} isAdminView={true}/>;
             })()
