@@ -2251,6 +2251,14 @@ const ROSTER2_DAY_KO        = ['일','월','화','수','목','금','토'];
 const roster2FmtKey = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 const roster2Fmt    = (dt) => `${dt.getMonth()+1}/${dt.getDate()}`;
 
+// 카페 인증 지각 판정: 회차일 다음날 12:00 KST 까지는 정시 인정
+// sessionDate: ROSTER2_NAVER_DATES의 Date (KST 자정), posted_at: ISO 또는 Date
+const isLateByDeadline = (posted_at, sessionDate) => {
+  if (!sessionDate) return false;
+  const deadlineMs = sessionDate.getTime() + 36 * 3600 * 1000; // +1일 12시간
+  return new Date(posted_at).getTime() > deadlineMs;
+};
+
 // 2기 출석 데이터 (사용 안 함 — DB attendance_logs로 마이그레이션 완료)
 // 5/17~5/22 기존 데이터는 모두 attendance_logs에 저장되어 있음
 // 새 출석은 /attendance 메뉴에서 CSV 업로드로 추가
@@ -2866,7 +2874,7 @@ const StudentCertView = ({profile}) => {
                   if (postStr >= certStr) {
                     if (!sessionMap[i].cert) {
                       sessionMap[i].cert = c;
-                      sessionMap[i].isLate = postStr > certStr;
+                      sessionMap[i].isLate = isLateByDeadline(c.posted_at, ROSTER2_NAVER_DATES[i]);
                     }
                     break;
                   }
@@ -3726,7 +3734,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           const postStr = kstDateStr(posted_at);
           for (let i = ROSTER2_NAVER_DATES.length - 1; i >= 0; i--) {
             const certStr = roster2FmtKey(ROSTER2_NAVER_DATES[i]);
-            if (postStr >= certStr) return { sessionNum: i+1, isLate: postStr > certStr };
+            if (postStr >= certStr) return { sessionNum: i+1, isLate: isLateByDeadline(posted_at, ROSTER2_NAVER_DATES[i]) };
           }
           return { sessionNum: null, isLate: false };
         };
@@ -3736,11 +3744,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           const auto = getSessionInfo(cert.posted_at).sessionNum;
           return auto ? [auto] : [];
         };
-        // 회차당 지각 여부 (작성일이 회차 일자보다 KST 늦은 날짜면 지각)
+        // 회차당 지각 여부 (회차일 다음날 12:00 KST 까지는 정시)
         const isLateForSession = (cert, sessionNum) => {
-          const sessionDate = ROSTER2_NAVER_DATES[sessionNum-1];
-          if (!sessionDate) return false;
-          return kstDateStr(cert.posted_at) > roster2FmtKey(sessionDate);
+          return isLateByDeadline(cert.posted_at, ROSTER2_NAVER_DATES[sessionNum-1]);
         };
         // 회차 단위 매칭: 해당 회차의 정시·지각 글을 모두 포함, 다중 회차 글 포함
         // 같은 회차에 글이 여러 개면 가장 먼저 올린 글 1건만 채택
@@ -4223,7 +4229,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           const postStr = kstDateStr(posted_at);
           for (let i = ROSTER2_NAVER_DATES.length - 1; i >= 0; i--) {
             const certStr = roster2FmtKey(ROSTER2_NAVER_DATES[i]);
-            if (postStr >= certStr) return { sessionNum: i+1, isLate: postStr > certStr };
+            if (postStr >= certStr) return { sessionNum: i+1, isLate: isLateByDeadline(posted_at, ROSTER2_NAVER_DATES[i]) };
           }
           return { sessionNum: null, isLate: false };
         };
@@ -4590,7 +4596,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           const postStr = kstDateStr(posted_at);
           for (let i = naverDates.length - 1; i >= 0; i--) {
             const certStr = fmtKey(naverDates[i]);
-            if (postStr >= certStr) return { sessionIdx: i, isLate: postStr > certStr };
+            if (postStr >= certStr) return { sessionIdx: i, isLate: isLateByDeadline(posted_at, naverDates[i]) };
           }
           return { sessionIdx: -1, isLate: false };
         };
@@ -4610,7 +4616,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
             const sessions = getCertSessionsLocal(cert);
             if (sessions.includes(targetSession)) {
               const sessionDate = naverDates[sessionIdx];
-              const late = sessionDate ? kstDateStr(cert.posted_at) > fmtKey(sessionDate) : false;
+              const late = isLateByDeadline(cert.posted_at, sessionDate);
               return { cert, isLate: late };
             }
           }
