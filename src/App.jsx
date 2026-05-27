@@ -4922,25 +4922,43 @@ const MakeupView = () => {
     .map((d,i)=>({idx:i, sn:i+1, date:d, key:roster2FmtKey(d)}))
     .filter(s => s.key <= yesterdayKey);
 
-  // 학생별 분석
+  // 학생별 분석 — 회차 순서대로 경고 검사 후 '연속 2회 이상' 발생한 학생만 대상자
   const realStudents = students.filter(s => s.name !== "테스트학생");
   const studentReports = realStudents.map(stu => {
     const warnings = [];
-    elapsedSessions.forEach(sess => {
-      // 해당 회차의 cert (가장 먼저 올린 글)
+    // 회차 순서 보장 (sn 오름차순)
+    const ordered = [...elapsedSessions].sort((a,b)=>a.sn-b.sn);
+    let currentStreak = 0;
+    let maxStreak = 0;
+    let currentChain = [];
+    let bestChain = [];
+    ordered.forEach(sess => {
       const candidate = certs
         .filter(c => c.assigned_student_id === stu.id)
         .filter(c => getCertSessions(c).includes(sess.sn))
         .sort((a,b) => new Date(a.posted_at) - new Date(b.posted_at))[0];
+      let warn = null;
       if (!candidate) {
-        warnings.push({sn: sess.sn, date: sess.date, reason: "미제출"});
+        warn = {sn: sess.sn, date: sess.date, reason: "미제출"};
       } else if (candidate.completeness_score !== null && candidate.completeness_score !== undefined && Number(candidate.completeness_score) < 80) {
-        warnings.push({sn: sess.sn, date: sess.date, reason: `80점 미만 (${candidate.completeness_score}점)`, score: Number(candidate.completeness_score)});
+        warn = {sn: sess.sn, date: sess.date, reason: `80점 미만 (${candidate.completeness_score}점)`, score: Number(candidate.completeness_score)};
+      }
+      if (warn) {
+        warnings.push(warn);
+        currentStreak++;
+        currentChain.push(warn);
+        if (currentStreak > maxStreak) {
+          maxStreak = currentStreak;
+          bestChain = [...currentChain];
+        }
+      } else {
+        currentStreak = 0;
+        currentChain = [];
       }
     });
-    return {student: stu, warnings};
-  }).filter(r => r.warnings.length >= 2)
-    .sort((a,b) => b.warnings.length - a.warnings.length || a.student.name.localeCompare(b.student.name));
+    return {student: stu, warnings, maxStreak, bestChain};
+  }).filter(r => r.maxStreak >= 2)
+    .sort((a,b) => b.maxStreak - a.maxStreak || b.warnings.length - a.warnings.length || a.student.name.localeCompare(b.student.name));
 
   if (loading) {
     return <Card style={{padding:40, textAlign:"center", color:T.muted}}>불러오는 중...</Card>;
@@ -4951,7 +4969,7 @@ const MakeupView = () => {
       <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:14,flexWrap:"wrap"}}>
         <div style={{fontSize:18,fontWeight:800,color:T.navy}}>📚 Make-up 대상자</div>
         <div style={{fontSize:12,color:T.muted}}>
-          ※ 미제출은 어제({yesterday.getMonth()+1}/{yesterday.getDate()})까지의 회차만 검사 · 경고 2회 이상 누적 시 대상자
+          ※ 미제출은 어제({yesterday.getMonth()+1}/{yesterday.getDate()})까지의 회차만 검사 · <strong>2회 연속 경고</strong> 시 대상자
         </div>
       </div>
 
@@ -4973,16 +4991,20 @@ const MakeupView = () => {
         </Card>
       ) : (
         <div style={{display:"grid",gap:10}}>
-          {studentReports.map(({student, warnings}) => (
+          {studentReports.map(({student, warnings, maxStreak}) => {
+            return (
             <Card key={student.id} style={{padding:"14px 16px"}}>
-              <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:10,borderBottom:`1px solid ${T.border}`,paddingBottom:8}}>
+              <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:10,borderBottom:`1px solid ${T.border}`,paddingBottom:8,flexWrap:"wrap"}}>
                 <div style={{fontSize:15,fontWeight:800,color:T.navy}}>{student.name}</div>
                 <div style={{fontSize:11,color:T.muted}}>{student.phone||""}</div>
-                <div style={{marginLeft:"auto",fontSize:12,fontWeight:700,
-                  color:warnings.length>=4?"#DC2626":warnings.length>=3?"#B45309":"#92400E",
-                  background:warnings.length>=4?"#FEE2E2":warnings.length>=3?"#FEF3C7":"#FEF3C7",
-                  padding:"3px 10px",borderRadius:10,border:`1px solid ${warnings.length>=4?"#FECACA":"#FDE68A"}`}}>
-                  경고 {warnings.length}회
+                <div style={{marginLeft:"auto",display:"flex",gap:6,alignItems:"center"}}>
+                  <span style={{fontSize:12,fontWeight:700,
+                    color:maxStreak>=4?"#DC2626":maxStreak>=3?"#B45309":"#92400E",
+                    background:maxStreak>=4?"#FEE2E2":"#FEF3C7",
+                    padding:"3px 10px",borderRadius:10,border:`1px solid ${maxStreak>=4?"#FECACA":"#FDE68A"}`}}>
+                    연속 {maxStreak}회 경고
+                  </span>
+                  <span style={{fontSize:11,color:T.muted}}>(총 {warnings.length}회)</span>
                 </div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(180px,1fr))",gap:6}}>
@@ -5003,7 +5025,8 @@ const MakeupView = () => {
                 })}
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
