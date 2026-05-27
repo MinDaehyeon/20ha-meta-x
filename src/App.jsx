@@ -3199,6 +3199,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
   const [lastCrawledAt, setLastCrawledAt] = useState(null);
   const [certRecordsPage, setCertRecordsPage] = useState(1);
   const CERT_RECORDS_PAGE_SIZE = 30;
+  const [certSearch, setCertSearch] = useState("");
+  const [certSessionFilter, setCertSessionFilter] = useState("all"); // "all" | number
+  const [certScoreFilter, setCertScoreFilter] = useState("all"); // "all" | "scored" | "unscored" | "low"
+  const [certTimeFilter, setCertTimeFilter] = useState("all"); // "all" | "ontime" | "late"
   const [certRecords, setCertRecords] = useState([]);
   const [certRecordsLoading, setCertRecordsLoading] = useState(false);
   const [certStatusFilter, setCertStatusFilter] = useState("all");
@@ -3909,14 +3913,91 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
 
             {/* ── 크롤링된 인증글 탭 ── */}
             {roster2Tab==="grading"&&(()=>{
-              const totalPages = Math.max(1, Math.ceil(certRecords.length / CERT_RECORDS_PAGE_SIZE));
+              // 필터 적용
+              const q = certSearch.trim().toLowerCase();
+              const filteredRecords = certRecords.filter(rec => {
+                // 검색: 학생명·제목·닉네임
+                if (q) {
+                  const hay = `${rec.matched_student_name||""} ${rec.post_title||""} ${rec.naver_nickname||""}`.toLowerCase();
+                  if (!hay.includes(q)) return false;
+                }
+                // 회차 필터
+                if (certSessionFilter !== "all") {
+                  const sessions = getCertSessions(rec);
+                  if (!sessions.includes(Number(certSessionFilter))) return false;
+                }
+                // 점수 상태
+                const hasScore = rec.completeness_score !== null && rec.completeness_score !== undefined;
+                if (certScoreFilter === "scored" && !hasScore) return false;
+                if (certScoreFilter === "unscored" && hasScore) return false;
+                if (certScoreFilter === "low" && (!hasScore || Number(rec.completeness_score) >= 80)) return false;
+                // 정시/지각 (회차 매칭된 경우에만)
+                if (certTimeFilter !== "all") {
+                  const sessions = getCertSessions(rec);
+                  if (sessions.length === 0) return false;
+                  // 회차 중 하나라도 조건 맞으면 통과
+                  const anyMatch = sessions.some(sn => {
+                    const late = isLateForSession(rec, sn);
+                    return certTimeFilter === "late" ? late : !late;
+                  });
+                  if (!anyMatch) return false;
+                }
+                return true;
+              });
+              const totalPages = Math.max(1, Math.ceil(filteredRecords.length / CERT_RECORDS_PAGE_SIZE));
               const safePage = Math.min(certRecordsPage, totalPages);
               const pageStart = (safePage-1)*CERT_RECORDS_PAGE_SIZE;
-              const pageRecords = certRecords.slice(pageStart, pageStart+CERT_RECORDS_PAGE_SIZE);
+              const pageRecords = filteredRecords.slice(pageStart, pageStart+CERT_RECORDS_PAGE_SIZE);
+              const filterActive = q || certSessionFilter!=="all" || certScoreFilter!=="all" || certTimeFilter!=="all";
+              const resetFilters = () => {
+                setCertSearch(""); setCertSessionFilter("all"); setCertScoreFilter("all"); setCertTimeFilter("all"); setCertRecordsPage(1);
+              };
+              const onChangeFilter = (setter) => (v) => { setter(v); setCertRecordsPage(1); };
+
+              const inputStyle = {padding:"6px 10px",borderRadius:6,border:`1px solid ${T.border}`,fontSize:12,background:T.white,color:T.navy};
+
               return (
               <div>
+                {/* 검색 + 필터 바 */}
+                <Card style={{padding:"10px 12px",marginBottom:12}}>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+                    <input type="text" placeholder="🔍 학생명 · 제목 · 닉네임 검색"
+                      value={certSearch}
+                      onChange={e=>{ setCertSearch(e.target.value); setCertRecordsPage(1); }}
+                      style={{...inputStyle,flex:"1 1 220px",minWidth:180}}/>
+                    <select value={certSessionFilter} onChange={e=>onChangeFilter(setCertSessionFilter)(e.target.value)}
+                      style={{...inputStyle,cursor:"pointer"}}>
+                      <option value="all">회차 전체</option>
+                      {ROSTER2_NAVER_DATES.map((dt,idx)=>(
+                        <option key={idx} value={idx+1}>{idx+1}회 ({dt.getMonth()+1}/{dt.getDate()})</option>
+                      ))}
+                    </select>
+                    <select value={certScoreFilter} onChange={e=>onChangeFilter(setCertScoreFilter)(e.target.value)}
+                      style={{...inputStyle,cursor:"pointer"}}>
+                      <option value="all">점수 전체</option>
+                      <option value="scored">채점 완료</option>
+                      <option value="unscored">미채점</option>
+                      <option value="low">80점 미만</option>
+                    </select>
+                    <select value={certTimeFilter} onChange={e=>onChangeFilter(setCertTimeFilter)(e.target.value)}
+                      style={{...inputStyle,cursor:"pointer"}}>
+                      <option value="all">정시·지각 전체</option>
+                      <option value="ontime">정시</option>
+                      <option value="late">지각</option>
+                    </select>
+                    {filterActive && (
+                      <button onClick={resetFilters}
+                        style={{padding:"6px 12px",borderRadius:6,border:`1px solid ${T.border}`,fontSize:12,fontWeight:700,background:T.white,color:T.navy,cursor:"pointer"}}>
+                        ✕ 필터 초기화
+                      </button>
+                    )}
+                  </div>
+                </Card>
                 <div style={{fontSize:12,color:T.muted,marginBottom:10}}>
-                  총 {certRecords.length}건 · {safePage}/{totalPages}페이지 · 제목 클릭 → 원문 / 점수 클릭 → 입력
+                  {filterActive
+                    ? <>필터 결과 <strong style={{color:T.navy}}>{filteredRecords.length}</strong>건 / 전체 {certRecords.length}건 · {safePage}/{totalPages}페이지</>
+                    : <>총 {certRecords.length}건 · {safePage}/{totalPages}페이지 · 제목 클릭 → 원문 / 점수 클릭 → 입력</>
+                  }
                 </div>
                 {certRecordsLoading?(
                   <div style={{textAlign:"center",padding:40,color:T.muted,fontSize:13}}>불러오는 중...</div>
