@@ -7,6 +7,25 @@
 
 ---
 
+## v2026.05.27-2 — 2026-05-27
+**커밋:** [2d823ba](https://github.com/MinDaehyeon/20ha-meta-x/commit/2d823ba)
+
+### 주요 변경
+
+**학부모 자녀 인증현황 조회 버그 수정**
+- `StudentCertView`가 학부모 화면에서도 본인용 RPC를 호출하던 문제 → 학부모 본인 데이터(0건)만 가져옴
+- 신규 RPC `get_child_cafe_certs(p_child_id)`, `get_child_attendance_logs(p_child_id)` 추가 (parent_students 검증)
+- `viewerMode` prop 추가 (`"self"`/`"parent"`)로 자녀 조회 시 child RPC 호출
+
+**`get_my_cafe_certs` RPC 갱신 (부수 효과로 해결)**
+- 기존엔 `completeness_score`만 반환 → 학생 본인 화면 카드의 제출/미션/충실도가 항상 "—"로 표시되던 문제
+- `submit_score / mission_score / fidelity_score / session_override` 컬럼 추가 반환
+
+### DB 마이그레이션
+- `20260527100000_child_cert_attendance_rpc.sql`
+
+---
+
 ## v2026.05.27-1 — 2026-05-27
 **커밋:** [e1ac397](https://github.com/MinDaehyeon/20ha-meta-x/commit/e1ac397)
 
