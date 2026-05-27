@@ -3761,7 +3761,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           return `${k.getUTCMonth()+1}/${k.getUTCDate()} ${String(k.getUTCHours()).padStart(2,'0')}:${String(k.getUTCMinutes()).padStart(2,'0')}`;
         };
 
-        const CELL_W = 56;
+        const CELL_W = 70;
         const stickyBase = {position:"sticky",left:0,zIndex:2,borderRight:`1px solid ${T.border}`};
         const today = new Date();
 
@@ -3880,14 +3880,14 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                                   }}>
                                     {has ? (
                                       ev !== null ? (
-                                        <div style={{lineHeight:1.2}}>
-                                          <div style={{fontSize:8,color:isLow?"#7F1D1D":"#475569"}}>
+                                        <div style={{lineHeight:1.25}}>
+                                          <div style={{fontSize:11,fontWeight:600,color:isLow?"#7F1D1D":"#475569"}}>
                                             {fmtPart(cert.submit_score)}/{fmtPart(cert.mission_score)}/{fmtPart(cert.fidelity_score)}
                                           </div>
-                                          <div style={{fontSize:13,fontWeight:800,color:isLow?"#991B1B":"#065F46",marginTop:1}}>{ev}</div>
+                                          <div style={{fontSize:17,fontWeight:900,color:isLow?"#991B1B":"#065F46",marginTop:2}}>{ev}</div>
                                         </div>
-                                      ) : <span style={{fontSize:10,color:"#94A3B8",fontStyle:"italic"}}>—</span>
-                                    ) : <span style={{fontSize:10,color:"#D1D5DB"}}>·</span>}
+                                      ) : <span style={{fontSize:11,color:"#94A3B8",fontStyle:"italic"}}>—</span>
+                                    ) : <span style={{fontSize:11,color:"#D1D5DB"}}>·</span>}
                                   </td>
                                 );
                               })}
