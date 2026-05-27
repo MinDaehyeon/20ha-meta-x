@@ -2277,15 +2277,14 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
   const [classAttStats, setClassAttStats] = useState({});    // {name: {morning, night}}
   const isMobile = useMobile();
   useEffect(() => {
-    supabase.from("profiles").select("name,grade,birth_year,birth_month")
-      .in("name", ROSTER2.map(s=>s.name))
-      .then(({data}) => {
-        if(data && data.length>0) {
-          const map = {};
-          data.forEach(p => { map[p.name] = calcGrade(p.birth_year, p.birth_month) || p.grade || ""; });
-          setPeerGrades(map);
-        }
-      });
+    // 학년 정보: RLS 우회용 SECURITY DEFINER RPC 사용 (학생/학부모도 다른 학생 학년 조회 가능)
+    supabase.rpc("get_student_grades").then(({data}) => {
+      if(data && data.length>0) {
+        const map = {};
+        data.forEach(p => { map[p.name] = calcGrade(p.birth_year, p.birth_month) || p.grade || ""; });
+        setPeerGrades(map);
+      }
+    });
     // 카페 인증 글 (본인 또는 자녀)
     const cafeCertReq = viewerMode === "parent"
       ? supabase.rpc("get_child_cafe_certs", {p_child_id: profile.id})

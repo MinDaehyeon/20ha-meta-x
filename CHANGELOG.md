@@ -7,6 +7,24 @@
 
 ---
 
+## v2026.05.27-3 — 2026-05-27
+**커밋:** [78a87b0](https://github.com/MinDaehyeon/26-04-12-meta-x/commit/78a87b0)
+
+### 주요 변경
+
+**학년 정보 RLS 차단 우회**
+- 원인: `profiles_select` 정책이 `auth.uid()=id`로 본인 row만 허용 → 학생/학부모가 다른 학생 학년 못 읽음 → BEST 3 카드가 "학년 정보 로딩 중..." 무한
+- 해결: `get_student_grades()` SECURITY DEFINER RPC 추가 (student role + 비테스트만, name/grade/birth만 노출)
+- 클라이언트: `supabase.from("profiles").select(...)` → `supabase.rpc("get_student_grades")` 교체
+
+### DB 마이그레이션
+- `20260527110000_get_student_grades.sql`
+
+### 보안 가이드라인 (memory 반영)
+- RLS self-only 테이블 우회 시 SECURITY DEFINER RPC + 컬럼 최소화 원칙 명문화
+
+---
+
 ## v2026.05.27-2 — 2026-05-27
 **커밋:** [2d823ba](https://github.com/MinDaehyeon/20ha-meta-x/commit/2d823ba)
 
