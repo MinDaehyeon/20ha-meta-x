@@ -2244,7 +2244,9 @@ const ROSTER2_NAVER_DATES   = _genDates([0, 3])
   .filter(d => !(d.getFullYear()===2026 && d.getMonth()===4 && d.getDate()===17))
   .concat([new Date(2026, 6, 12)]); // 7/12 일요일
 const ROSTER2_MORNING_DATES = _genDates([1, 3, 5]);
-const ROSTER2_NIGHT_DATES   = _genDates([0, 1, 2, 4, 5, 6]);
+const ROSTER2_NIGHT_DATES   = _genDates([0, 1, 2, 4, 5, 6])
+  // 마지막 7/11(토)은 일정상 제외
+  .filter(d => !(d.getFullYear()===2026 && d.getMonth()===6 && d.getDate()===11));
 const ROSTER2_DAY_KO        = ['일','월','화','수','목','금','토'];
 const roster2FmtKey = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 const roster2Fmt    = (dt) => `${dt.getMonth()+1}/${dt.getDate()}`;
@@ -2880,13 +2882,15 @@ const StudentCertView = ({profile}) => {
                     const isLate = sm.isLate;
                     const hasScore = cert && cert.completeness_score !== null && cert.completeness_score !== undefined;
                     const submitted = !!cert;
+                    const total = hasScore ? Number(cert.completeness_score) : null;
+                    const isLow = total !== null && total < 80;
                     const dateLabel = `${dt.getMonth()+1}/${dt.getDate()}(${ROSTER2_DAY_KO[dt.getDay()]})`;
                     return (
                       <div key={idx} style={{
                         padding:"10px 8px",
                         borderRadius:10,
-                        border:`1px solid ${hasScore?"#86EFAC":submitted?"#FCD34D":"#E2E6F3"}`,
-                        background:hasScore?"#F0FDF4":submitted?"#FFFBEB":"#F8FAFC",
+                        border:`1px solid ${isLow?"#FECACA":hasScore?"#86EFAC":submitted?"#FCD34D":"#E2E6F3"}`,
+                        background:isLow?"#FEF2F2":hasScore?"#F0FDF4":submitted?"#FFFBEB":"#F8FAFC",
                         textAlign:"center",
                       }}>
                         {/* 1행: 회차 + 날짜 */}
@@ -2894,11 +2898,15 @@ const StudentCertView = ({profile}) => {
                           <span style={{fontSize:11,fontWeight:800,color:T.navy}}>{idx+1}회</span>
                           <span style={{fontSize:10,color:T.muted}}>{dateLabel}</span>
                         </div>
-                        {/* 2행: 상태/점수 */}
+                        {/* 2행: 상태/점수 (3분할 + 종합) */}
                         {hasScore ? (
                           <div>
-                            <div style={{fontSize:20,fontWeight:900,color:"#16A34A",lineHeight:1}}>
-                              {cert.completeness_score}<span style={{fontSize:11,fontWeight:600,color:"#16A34A",marginLeft:2}}>점</span>
+                            <div style={{fontSize:9,color:T.muted,lineHeight:1.5,marginBottom:4}}>
+                              <div>제출 {cert.submit_score ?? "—"} / 미션 {cert.mission_score ?? "—"}</div>
+                              <div>충실도 {cert.fidelity_score ?? "—"}</div>
+                            </div>
+                            <div style={{fontSize:18,fontWeight:900,color:isLow?"#DC2626":"#16A34A",lineHeight:1}}>
+                              {total}<span style={{fontSize:10,fontWeight:600,marginLeft:2}}>점</span>
                             </div>
                             {isLate && <div style={{fontSize:9,color:"#B45309",marginTop:3,fontWeight:600}}>⚠️ 지각</div>}
                           </div>
@@ -2917,6 +2925,24 @@ const StudentCertView = ({profile}) => {
                 </div>
               );
             })()}
+            {/* 점수 가이드라인 */}
+            <div style={{marginTop:14,padding:"12px 14px",borderRadius:8,background:"#F8FAFC",border:`1px solid ${T.border}`}}>
+              <div style={{fontSize:11,fontWeight:800,color:T.navy,marginBottom:8}}>📌 점수 가이드라인 (총 100점)</div>
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3, 1fr)",gap:8,fontSize:10,color:T.muted,lineHeight:1.5}}>
+                <div>
+                  <span style={{fontWeight:700,color:T.navy}}>① 제출 (50점)</span><br/>
+                  인증 주기(수/일) 내 제출 — 제출 50점 / 미제출 0점
+                </div>
+                <div>
+                  <span style={{fontWeight:700,color:T.navy}}>② 필수 미션 (30점)</span><br/>
+                  주차별 필수 미션 — 모두 포함 30 / 일부 포함 15
+                </div>
+                <div>
+                  <span style={{fontWeight:700,color:T.navy}}>③ 내용 충실도 (20점)</span><br/>
+                  학습 과정·결과의 구체성과 성실도 — 매우우수 20 / 우수 15 / 보통 10 / 미흡 5
+                </div>
+              </div>
+            </div>
           </Card>
 
           {/* ③-3 카페 인증 점수 그래프 */}
@@ -2979,32 +3005,38 @@ const StudentCertView = ({profile}) => {
                   <span style={{fontSize:10,fontWeight:400,color:T.muted}}>· 회차별 내 점수 vs 전체 평균</span>
                 </div>
 
-                {/* 요약 미니 카드 4개 */}
-                <div style={{display:"grid",gridTemplateColumns:"repeat(4, 1fr)",gap:8,marginBottom:14}}>
+                {/* 요약 미니 카드 5개 */}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(5, 1fr)",gap:8,marginBottom:14}}>
                   <div style={{padding:"8px 10px",borderRadius:8,background:"#F0FDF4",border:"1px solid #BBF7D0",textAlign:"center"}}>
-                    <div style={{fontSize:10,color:"#15803D",fontWeight:700}}>📈 내 평균</div>
+                    <div style={{fontSize:10,color:"#15803D",fontWeight:700}}>📈 내 누적 평균</div>
                     <div style={{fontSize:16,fontWeight:900,color:"#16A34A",marginTop:2}}>
-                      {myAvg!==null ? `${Math.round(myAvg*10)/10}` : "—"}
+                      {myAvg!==null ? `${Math.round(myAvg*10)/10}점` : "—"}
                     </div>
                   </div>
                   <div style={{padding:"8px 10px",borderRadius:8,background:"#EFF6FF",border:"1px solid #BFDBFE",textAlign:"center"}}>
                     <div style={{fontSize:10,color:"#1D4ED8",fontWeight:700}}>🎯 80점 이상</div>
                     <div style={{fontSize:16,fontWeight:900,color:"#2563EB",marginTop:2}}>
-                      {myScores.length>0 ? `${safeCount}/${myScores.length}` : "—"}
+                      {myScores.length>0 ? `${safeCount}/${myScores.length}회` : "—"}
                     </div>
                   </div>
                   <div style={{padding:"8px 10px",borderRadius:8,background:"#FEF3C7",border:"1px solid #FDE68A",textAlign:"center"}}>
-                    <div style={{fontSize:10,color:"#92400E",fontWeight:700}}>⭐ 최고/최저</div>
+                    <div style={{fontSize:10,color:"#92400E",fontWeight:700}}>⭐ 내 최고/최저 점수</div>
                     <div style={{fontSize:13,fontWeight:900,color:"#B45309",marginTop:2}}>
-                      {myHigh!==null ? `${myHigh}/${myLow}` : "—"}
+                      {myHigh!==null ? `${myHigh}/${myLow}점` : "—"}
+                    </div>
+                  </div>
+                  <div style={{padding:"8px 10px",borderRadius:8,background:"#F8FAFC",border:`1px solid ${T.border}`,textAlign:"center"}}>
+                    <div style={{fontSize:10,color:T.muted,fontWeight:700}}>👥 전체 누적 평균</div>
+                    <div style={{fontSize:16,fontWeight:900,color:T.navy,marginTop:2}}>
+                      {classAvgOverall!==null ? `${Math.round(classAvgOverall*10)/10}점` : "—"}
                     </div>
                   </div>
                   <div style={{padding:"8px 10px",borderRadius:8,
                     background: avgDiff===null?"#F8FAFC": avgDiff>=0?"#F0FDF4":"#FEE2E2",
                     border:`1px solid ${avgDiff===null?T.border: avgDiff>=0?"#BBF7D0":"#FECACA"}`,textAlign:"center"}}>
-                    <div style={{fontSize:10,color:avgDiff===null?T.muted: avgDiff>=0?"#15803D":"#991B1B",fontWeight:700}}>📊 전체 대비</div>
+                    <div style={{fontSize:10,color:avgDiff===null?T.muted: avgDiff>=0?"#15803D":"#991B1B",fontWeight:700}}>📊 전체 평균 대비</div>
                     <div style={{fontSize:16,fontWeight:900,color:avgDiff===null?T.muted: avgDiff>=0?"#16A34A":"#DC2626",marginTop:2}}>
-                      {avgDiff===null ? "—" : `${avgDiff>=0?"+":""}${avgDiff}`}
+                      {avgDiff===null ? "—" : `${avgDiff>=0?"+":""}${avgDiff}점`}
                     </div>
                   </div>
                 </div>
@@ -3029,7 +3061,7 @@ const StudentCertView = ({profile}) => {
                             label={{value:"안전선(80)", position:"right", fontSize:10, fill:"#DC2626", dy:safeDy, dx:6}}/>
                           {myAvgVal!==null && (
                             <ReferenceLine y={myAvgVal} stroke="#2563EB" strokeDasharray="6 3" strokeWidth={1.5}
-                              label={{value:`내 평균(${Math.round(myAvgVal*10)/10})`, position:"right", fontSize:10, fill:"#2563EB", dy:myAvgDy, dx:6}}/>
+                              label={{value:`내 누적 평균(${Math.round(myAvgVal*10)/10})`, position:"right", fontSize:10, fill:"#2563EB", dy:myAvgDy, dx:6}}/>
                           )}
                         </>
                       );
@@ -3054,7 +3086,7 @@ const StudentCertView = ({profile}) => {
                     <span style={{display:"inline-block",width:14,height:2,background:"#94A3B8"}}/>전체 평균 (회차별)
                   </span>
                   <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
-                    <span style={{display:"inline-block",width:14,borderTop:"2px dashed #2563EB"}}/>내 평균
+                    <span style={{display:"inline-block",width:14,borderTop:"2px dashed #2563EB"}}/>내 누적 평균
                   </span>
                   <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
                     <span style={{display:"inline-block",width:14,borderTop:"2px dashed #DC2626"}}/>80점 안전선
@@ -3729,7 +3761,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           return `${k.getUTCMonth()+1}/${k.getUTCDate()} ${String(k.getUTCHours()).padStart(2,'0')}:${String(k.getUTCMinutes()).padStart(2,'0')}`;
         };
 
-        const CELL_W = 28;
+        const CELL_W = 56;
         const stickyBase = {position:"sticky",left:0,zIndex:2,borderRight:`1px solid ${T.border}`};
         const today = new Date();
 
@@ -3771,7 +3803,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                           <th rowSpan={2} style={{width:42,minWidth:42,fontSize:9,fontWeight:700,color:"#4F46E5",background:"#EEF2FF",textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`2px solid #4F46E5`,verticalAlign:"middle"}}>인증<br/>합계</th>
                           <th rowSpan={2} style={{width:44,minWidth:44,fontSize:9,fontWeight:700,color:"#16A34A",background:"#F0FDF4",textAlign:"center",padding:"2px 0",borderBottom:`2px solid ${T.borderStrong}`,borderLeft:`1px solid ${T.border}`,verticalAlign:"middle"}}>점수<br/>평균</th>
                           <th colSpan={ROSTER2_NAVER_DATES.length} style={{background:"#EEF2FF",color:"#4F46E5",fontSize:11,fontWeight:800,textAlign:"center",padding:"4px 0",borderBottom:`1px solid ${T.border}`,borderLeft:`2px solid #4F46E5`}}>
-                            카페 인증 ({ROSTER2_NAVER_DATES.length}일) — 완성도 점수
+                            카페 인증 ({ROSTER2_NAVER_DATES.length}일) — 제출/미션/충실도 · 종합
                           </th>
                         </tr>
                         <tr>
@@ -3831,26 +3863,31 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                                   {avgScore!==null ? avgScore : "—"}
                                 </div>
                               </td>
-                              {/* 날짜별 셀 — 완성도 점수 1개 */}
+                              {/* 날짜별 셀 — 제출/미션/충실도/종합 */}
                               {ROSTER2_NAVER_DATES.map((dt,di)=>{
                                 const cert = getStudentCertOnDate(s,dt);
                                 const has = !!cert;
                                 const ev = has && cert.completeness_score !== null && cert.completeness_score !== undefined ? cert.completeness_score : null;
                                 const isLow = ev !== null && Number(ev) < 80;
+                                const fmtPart = (v) => (v===null || v===undefined ? "—" : v);
                                 return (
                                   <td key={di} style={{
-                                    width:CELL_W,minWidth:CELL_W,height:38,
+                                    width:CELL_W,minWidth:CELL_W,height:60,
                                     textAlign:"center",verticalAlign:"middle",
                                     borderBottom:`1px solid ${T.border}`,
                                     borderLeft:di===0?`2px solid #4F46E5`:`1px solid ${T.border}`,
                                     background:has ? (isLow ? "#FEE2E2" : "#D1FAE5") : rowBg,
                                   }}>
-                                    {has
-                                      ? (ev!==null
-                                          ? <span style={{fontSize:11,fontWeight:800,color:isLow?"#991B1B":"#065F46"}}>{ev}</span>
-                                          : <span style={{fontSize:10,color:"#94A3B8",fontStyle:"italic"}}>—</span>)
-                                      : <span style={{fontSize:10,color:"#D1D5DB"}}>·</span>
-                                    }
+                                    {has ? (
+                                      ev !== null ? (
+                                        <div style={{lineHeight:1.2}}>
+                                          <div style={{fontSize:8,color:isLow?"#7F1D1D":"#475569"}}>
+                                            {fmtPart(cert.submit_score)}/{fmtPart(cert.mission_score)}/{fmtPart(cert.fidelity_score)}
+                                          </div>
+                                          <div style={{fontSize:13,fontWeight:800,color:isLow?"#991B1B":"#065F46",marginTop:1}}>{ev}</div>
+                                        </div>
+                                      ) : <span style={{fontSize:10,color:"#94A3B8",fontStyle:"italic"}}>—</span>
+                                    ) : <span style={{fontSize:10,color:"#D1D5DB"}}>·</span>}
                                   </td>
                                 );
                               })}
