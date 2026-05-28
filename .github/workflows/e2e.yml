@@ -30,12 +30,25 @@ jobs:
         run: sleep 75
 
       - name: Run E2E
+        id: e2e
+        continue-on-error: true
         env:
           PLAYWRIGHT_BASE_URL: ${{ vars.PLAYWRIGHT_BASE_URL || 'https://20ha-meta-x-git-dev-mindaehyeons-projects.vercel.app' }}
-          # Sign-up cleanup용 (없으면 02-signup.spec 의 afterAll만 skip)
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: npx playwright test
+        run: npx playwright test 2>&1 | tee e2e-stdout.log
+
+      - name: Surface stdout in Step Summary (visible without admin)
+        if: always()
+        run: |
+          echo "## E2E stdout (tail 200)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -200 e2e-stdout.log >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Mark job failure if E2E failed
+        if: steps.e2e.outcome == 'failure'
+        run: exit 1
 
       - name: Upload report
         uses: actions/upload-artifact@v4
