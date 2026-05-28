@@ -10,43 +10,10 @@ import {
 import { supabase } from "./supabase";
 import { T, GRAPH, EI_COLOR, css, sliderFill } from "./styles/theme";
 import { injectStyles } from "./styles/inject";
+import { HI, navIcon, KakaoIcon, GoogleIcon, NaverIcon } from "./components/icons";
+import { Card, Pill, NavyNum, SectionTitle, Divider, Spinner, ChartTip } from "./components/ui";
 
 // ══════════════════════════════════════════════════════
-// HEROICONS — outline style (인라인 SVG, 설치 불필요)
-// ══════════════════════════════════════════════════════
-const HI = {
-  _svg: (path, sz=20, c="currentColor", sw=1.6) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-      strokeWidth={sw} stroke={c} width={sz} height={sz} style={{display:"block",flexShrink:0}}>
-      <path strokeLinecap="round" strokeLinejoin="round" d={path}/>
-    </svg>
-  ),
-  sun:   (sz=20,c="currentColor") => HI._svg("M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z",sz,c),
-  moon:  (sz=20,c="currentColor") => HI._svg("M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z",sz,c),
-  trophy:(sz=20,c="currentColor") => HI._svg("M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 0 1-.982-3.172M9.497 14.25a7.454 7.454 0 0 0 .981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 0 0 7.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 0 0 2.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 0 1 2.916.52 6.003 6.003 0 0 1-5.395 4.972m0 0a6.726 6.726 0 0 1-2.749 1.35m0 0a6.772 6.772 0 0 1-3.044 0",sz,c),
-  cap:   (sz=20,c="currentColor") => HI._svg("M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5",sz,c),
-  calendar:(sz=20,c="currentColor") => HI._svg("M6.75 2.994v2.25m10.5-2.25v2.25m-14.252 13.5V7.491a2.25 2.25 0 0 1 2.25-2.25h13.5a2.25 2.25 0 0 1 2.25 2.25v11.251m-18 0a2.25 2.25 0 0 0 2.25 2.25h13.5a2.25 2.25 0 0 0 2.25-2.25m-18 0v-7.5a2.25 2.25 0 0 1 2.25-2.25h13.5a2.25 2.25 0 0 1 2.25 2.25v7.5m-6.75-6h2.25m-9 2.25h4.5m.002-2.25h.005v.005H12v-.005Zm-.001 4.5h.006v.006h-.006v-.006Zm-2.25.001h.005v.005H9.75v-.005Zm-2.25 0h.005v.005H7.5v-.005Zm6.75-2.25h.005v.005h-.005v-.005Zm0 2.25h.005v.005h-.005v-.005Zm2.25-4.5h.005v.005H16.5v-.005Zm0 2.25h.005v.005H16.5v-.005Z",sz,c),
-  search:(sz=20,c="currentColor") => HI._svg("m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z",sz,c),
-  users: (sz=20,c="currentColor") => HI._svg("M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z",sz,c),
-  user:  (sz=20,c="currentColor") => HI._svg("M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z",sz,c),
-  bell:  (sz=20,c="currentColor") => HI._svg("M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0",sz,c),
-  chart: (sz=20,c="currentColor") => HI._svg("M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z",sz,c),
-  clipboard:(sz=20,c="currentColor") => HI._svg("M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z",sz,c),
-  check: (sz=20,c="currentColor") => HI._svg("M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",sz,c),
-  warn:  (sz=20,c="currentColor") => HI._svg("M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z",sz,c),
-  camera:(sz=20,c="currentColor") => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-      strokeWidth={1.6} stroke={c} width={sz} height={sz} style={{display:"block",flexShrink:0}}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z"/>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z"/>
-    </svg>
-  ),
-};
-// 아이콘 키 → JSX 렌더 헬퍼
-const navIcon = (key, sz=18, color="currentColor") => {
-  const map = {trophy:HI.trophy, cap:HI.cap, calendar:HI.calendar, search:HI.search, users:HI.users, user:HI.user, clipboard:HI.clipboard, bell:HI.bell, chart:HI.chart};
-  return (map[key]?.(sz, color)) || <span style={{fontSize:sz}}>{key}</span>;
-};
 
 // ══════════════════════════════════════════════════════
 // FONT INJECT — Sandoll Gothic Neo + Noto Sans KR fallback
@@ -111,71 +78,6 @@ const useMobile = () => {
 // ══════════════════════════════════════════════════════
 // BASE COMPONENTS
 // ══════════════════════════════════════════════════════
-const Card = ({children,style={}}) => (
-  <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:16,padding:"18px 20px",boxShadow:"0 1px 6px rgba(25,29,84,0.06)",animation:"fadeIn 0.3s ease",...style}}>{children}</div>
-);
-const Pill = ({children,color=T.navy}) => (
-  <span style={{background:color+"18",color,border:`1px solid ${color}30`,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700,letterSpacing:"0.04em",whiteSpace:"nowrap"}}>{children}</span>
-);
-const NavyNum = ({value,unit="",size=32,color=T.navy}) => (
-  <div style={{display:"flex",alignItems:"baseline",gap:3}}>
-    <span style={{fontSize:size,fontWeight:900,color,fontFamily:"'DM Mono','Courier New',monospace",lineHeight:1}}>{value}</span>
-    {unit&&<span style={{fontSize:12,color:T.muted,fontWeight:600}}>{unit}</span>}
-  </div>
-);
-// sub = "tag1 · tag2 · tag3" string, tooltip = detailed explanation
-const SectionTitle = ({children,sub,tooltip}) => {
-  const [show,setShow] = useState(false);
-  const [pos,setPos]   = useState({x:0,y:0});
-  const tags = sub ? sub.split(" · ") : [];
-  return (
-    <div style={{marginBottom:14}}>
-      <div style={{display:"flex",alignItems:"center",gap:6}}>
-        <div style={{fontSize:14,fontWeight:800,color:T.navy}}>{children}</div>
-        {tooltip&&(
-          <div onMouseEnter={e=>{const r=e.currentTarget.getBoundingClientRect();setPos({x:r.left,y:r.bottom+6});setShow(true);}}
-               onMouseLeave={()=>setShow(false)}
-               style={{width:16,height:16,borderRadius:"50%",background:T.muted+"30",display:"flex",alignItems:"center",justifyContent:"center",cursor:"help",flexShrink:0}}>
-            <span style={{fontSize:10,color:T.muted,fontWeight:800}}>?</span>
-          </div>
-        )}
-      </div>
-      {tags.length>0&&(
-        <div style={{display:"flex",flexWrap:"wrap",gap:"3px 8px",marginTop:4}}>
-          {tags.map((t,i)=>(
-            <span key={i} style={{fontSize:10,color:T.muted,wordBreak:"keep-all",overflowWrap:"break-word"}}>
-              {i>0&&<span style={{color:T.border,marginRight:4}}>·</span>}{t}
-            </span>
-          ))}
-        </div>
-      )}
-      {show&&tooltip&&(
-        <div style={{position:"fixed",...(pos.x+316>window.innerWidth?{right:8,left:"auto"}:{left:pos.x}),top:pos.y,zIndex:9999,pointerEvents:"none",
-          background:T.navy,color:T.white,borderRadius:10,padding:"12px 16px",fontSize:12,
-          width:300,lineHeight:1.8,boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>
-          {tooltip.split(/\\n|\n/).map((line,i)=>
-            line===""
-              ? <div key={i} style={{height:6}}/>
-              : <div key={i}>{line}</div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-const Divider = () => <div style={{height:1,background:T.border,margin:"16px 0"}} />;
-const Spinner = ({size=24,color=T.navy}) => (
-  <div style={{width:size,height:size,border:`3px solid ${T.border}`,borderTop:`3px solid ${color}`,borderRadius:"50%",animation:"spin 0.8s linear infinite",flexShrink:0}} />
-);
-const ChartTip = ({active,payload,label}) => {
-  if(!active||!payload?.length) return null;
-  return (
-    <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 12px",fontSize:11,boxShadow:"0 2px 8px rgba(25,29,84,0.10)"}}>
-      <div style={{color:T.muted,marginBottom:4,fontWeight:600,fontSize:10}}>{label}</div>
-      {payload.map((p,i)=>{const v=p.value;const displayName=p.name==="value"?label:p.name;const isErrCode=/^[QM][1-3]$/.test(displayName);const isSpeed=displayName==="기본"||displayName==="응용"||displayName==="심화";const isCount=isErrCode||displayName&&(displayName.includes("회")||displayName.includes("건")||displayName.includes("오답")||displayName.includes("횟수"));const disp=typeof v==="number"?(Number.isInteger(v)||isCount||isSpeed?Math.round(v):v.toFixed(1)):v;if(isErrCode)return<div key={i} style={{color:p.color||T.navy,fontWeight:700,fontSize:12,lineHeight:1.8}}>{displayName} {disp}</div>;return<div key={i} style={{color:p.color||T.navy,fontWeight:700,fontSize:11}}>{displayName}: {disp}{isSpeed?"초":isCount?"회":""}</div>;})}
-    </div>
-  );
-};
 // 생년월일 입력 공통 컴포넌트 (년/월/일 세 드롭다운) — T 선언 이후에 위치해야 함
 // showGrade=true 이면 학년 태그 표시 (학생용)
 const BirthInput = ({year, month, day, onYear, onMonth, onDay, showGrade=false}) => {
@@ -246,29 +148,6 @@ const SocialBtn = ({icon,label,color,bg,border,onClick,loading}) => (
 );
 
 // 카카오 로고 SVG
-const KakaoIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="#3C1E1E">
-    <path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.74 1.618 5.148 4.075 6.585L5.1 20.7a.3.3 0 00.435.337l4.182-2.79A11.6 11.6 0 0012 18.6c5.523 0 10-3.477 10-7.8S17.523 3 12 3z"/>
-  </svg>
-);
-
-// 구글 로고 SVG
-const GoogleIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24">
-    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-  </svg>
-);
-
-// 네이버 로고
-const NaverIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff">
-    <path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/>
-  </svg>
-);
-
 // ══════════════════════════════════════════════════════
 // PASSWORD RESET SCREEN
 // ══════════════════════════════════════════════════════
