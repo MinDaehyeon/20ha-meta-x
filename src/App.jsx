@@ -587,10 +587,6 @@ const handleSocial = async (provider) => {
     if(err){ setError(translateSupabaseError(err.message)); setLoad(provider,false); }
   };
 
-  const fillDemo = async (type) => {
-    if(type==="student") await handleLogin("test@20ha.kr","test1234!");
-  };
-
   const brandPanel = (
     <div style={{flex:1,background:T.grad,display:"flex",flexDirection:"column",justifyContent:"center",padding:"60px 64px",position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",top:-80,right:-80,width:400,height:400,background:"rgba(255,255,255,0.04)",borderRadius:"50%",pointerEvents:"none"}}/>
