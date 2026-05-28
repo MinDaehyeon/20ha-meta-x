@@ -8,6 +8,8 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from "recharts";
 import { supabase } from "./supabase";
+import { T, GRAPH, EI_COLOR, css, sliderFill } from "./styles/theme";
+import { injectStyles } from "./styles/inject";
 
 // ══════════════════════════════════════════════════════
 // HEROICONS — outline style (인라인 SVG, 설치 불필요)
@@ -49,38 +51,7 @@ const navIcon = (key, sz=18, color="currentColor") => {
 // ══════════════════════════════════════════════════════
 // FONT INJECT — Sandoll Gothic Neo + Noto Sans KR fallback
 // ══════════════════════════════════════════════════════
-const injectStyles = () => {
-  if (document.getElementById("20ha-styles")) return;
-  const el = document.createElement("style");
-  el.id = "20ha-styles";
-  el.innerHTML = `
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100;300;400;500;700;900&display=swap');
-    @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
-    .logo-20ha { font-family: 'SandollGothicNeo','Sandoll Gothic Neo','산돌고딕 Neo','Noto Sans KR',sans-serif !important; }
-    * { box-sizing: border-box; }
-    input, select, button { font-family: 'Noto Sans KR', sans-serif; }
-    ::-webkit-scrollbar { width: 7px; height: 7px; }
-    select option { background-color: #ffffff !important; color: #1a1a2e !important; }
-    input[type=range] { background: transparent; }
-    input[type=range] { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 4px; outline: none; }
-    input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: transparent; }
-    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--thumb-color, #191D54); cursor: pointer; margin-top: -7px; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
-    input[type=range]::-moz-range-track { height: 4px; border-radius: 4px; background: #E8EAF6; }
-    input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #191D54; cursor: pointer; border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
-    input[type=range]::-moz-range-progress { background: currentColor; height: 4px; border-radius: 4px; }
-    ::-webkit-scrollbar-track { background: #F0F2FA; }
-    ::-webkit-scrollbar-thumb { background: #C8CEED; border-radius: 4px; }
-  `;
-  document.head.appendChild(el);
-};
 injectStyles();
-
-const sliderFill = (value, min, max, color) => {
-  const pct = ((value - min) / (max - min)) * 100;
-  return { width: "100%", color, background: `linear-gradient(to right, ${color} 0%, ${color} ${pct}%, #E8EAF6 ${pct}%, #E8EAF6 100%)` };
-};
 
 // ══════════════════════════════════════════════════════
 // CONSTANTS
@@ -125,23 +96,6 @@ const calcGrade = (birthYear, birthMonth) => {
 // ══════════════════════════════════════════════════════
 // DESIGN TOKENS
 // ══════════════════════════════════════════════════════
-const T = {
-  bg:"#F7F8FC", surface:"#FFFFFF", surfaceAlt:"#F0F2FA",
-  border:"#E2E6F3", borderStrong:"#C8CEED",
-  navy:"#191D54", navyLight:"#252B7A", navyMid:"#3D4499",
-  orange:"#F68B1E", orangeLight:"#FFA94D", orangePale:"#FFF3E0",
-  text:"#191D54", textMid:"#4A5080", muted:"#8B91C0",
-  white:"#FFFFFF", danger:"#E8394A", success:"#16A34A",
-  warn:"#F59E0B",
-  grad:"linear-gradient(135deg,#191D54,#3D4499)",
-  gradOrange:"linear-gradient(135deg,#F68B1E,#FFA94D)",
-};
-const GRAPH = {
-  ccColor:"#16A34A", ciColor:"#E8394A", icColor:"#F68B1E", iiColor:"#7C3AED",
-  errQ:["#E8394A","#F87171","#FECACA"], errM:["#F68B1E","#FFA94D","#FED7AA"],
-  speed:"#0891B2",
-};
-const EI_COLOR  = v => v>=85?GRAPH.ccColor:v>=70?T.navy:v>=55?GRAPH.icColor:GRAPH.ciColor;
 const gradeInfo = s => s>=93?{g:"S",c:"#16A34A"}:s>=81?{g:"A",c:"#2563EB"}:s>=66?{g:"B",c:"#111827"}:s>=51?{g:"C",c:"#F97316"}:{g:"D",c:"#DC2626"};
 const calcEI    = ({strategyScore:s,efficiencyIndex:e,metacognitionAccuracy:m}) => +(s*0.4+e*0.2+m*0.4).toFixed(1);
 
@@ -222,16 +176,6 @@ const ChartTip = ({active,payload,label}) => {
     </div>
   );
 };
-const css = {
-  input:  {width:"100%",background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:10,padding:"11px 14px",color:T.text,fontSize:14,boxSizing:"border-box",outline:"none"},
-  select: {width:"100%",background:"#ffffff",border:`1px solid ${T.border}`,borderRadius:10,padding:"11px 14px",color:"#1a1a2e",fontSize:14,colorScheme:"light"},
-  label:  {fontSize:12,color:T.muted,marginBottom:6,display:"block",letterSpacing:"0.04em",fontWeight:700},
-  btnPrimary:  {background:T.grad,border:"none",borderRadius:10,padding:"12px 28px",color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"},
-  btnOrange:   {background:T.gradOrange,border:"none",borderRadius:10,padding:"12px 28px",color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"},
-  btnGhost:    {background:"transparent",border:`1px solid ${T.border}`,borderRadius:10,padding:"11px 20px",color:T.textMid,fontSize:13,cursor:"pointer"},
-  btnOutline:  {background:"transparent",border:`1px solid ${T.border}`,borderRadius:8,padding:"7px 14px",color:T.textMid,fontSize:12,cursor:"pointer"},
-};
-
 // 생년월일 입력 공통 컴포넌트 (년/월/일 세 드롭다운) — T 선언 이후에 위치해야 함
 // showGrade=true 이면 학년 태그 표시 (학생용)
 const BirthInput = ({year, month, day, onYear, onMonth, onDay, showGrade=false}) => {
