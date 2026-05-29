@@ -330,18 +330,35 @@ const AuthScreen = ({ onLogin }) => {
         target_ei:85, role:suRole, approval_status:"pending"
       });
       if(profErr){
+        // 좀비 계정 방지: auth.users는 비번까지 설정됐는데 profile 없음
+        // cleanup으로 정리 후 사용자에게 재시도 안내 (같은 이메일로 다시 시도 가능)
+        try {
+          await supabase.auth.signOut();
+          await supabase.rpc("cleanup_incomplete_signup", { p_email: suEmail });
+        } catch (_) {}
         setLoad("signup",false);
-        setError("프로필 저장 중 오류가 발생했습니다. 다시 시도해주세요.");
+        setError("프로필 저장 중 오류가 발생했습니다. 잠시 후 같은 이메일로 다시 시도해주세요.");
+        // OTP 다시 받아야 하므로 인증 상태 초기화
+        setOtpVerified(false); setOtpSent(false); setOtpCode("");
         return;
       }
       // 학생 회원가입 시 20HA 2기 명단(cert_students)과 이름 매칭되면 자동 연동
+      // 결과를 받아 사용자에게 상태 안내 (ambiguous=동명이인은 관리자 수동 연동)
+      let linkMsg = "";
       if(suRole === "student"){
         try {
-          await supabase.rpc("try_link_2ki_on_signup", { p_profile_id: data.user.id, p_name: suName.trim() });
-        } catch (e) { /* 실패해도 가입 자체는 성공 처리 */ }
+          const { data: linkRes } = await supabase.rpc("try_link_2ki_on_signup", { p_profile_id: data.user.id, p_name: suName.trim() });
+          if(linkRes && !linkRes.linked && linkRes.reason === "ambiguous"){
+            linkMsg = `\n\n※ '${suName}' 동명이인이 ${linkRes.match_count}명 발견되어 자동 연동되지 않았습니다.\n관리자가 수동으로 연동해드릴게요.`;
+          }
+          // no_match는 안내 안 함 — 2기 아닌 일반 학생일 수 있음
+        } catch (e) { /* RPC 실패는 가입 자체에 영향 없음 (관리자 수동으로 연동 가능) */ }
       }
+      // 향후 setSignupDone 후 화면에서 노출
+      if(linkMsg) window.__signupLinkMsg = linkMsg;
     }
-    await supabase.auth.signOut();
+    // signOut 실패해도 가입은 완료 — approval_status=pending이 진입 차단
+    try { await supabase.auth.signOut(); } catch (_) {}
     setLoad("signup",false);
     clearDraft(SIGNUP_DRAFT_KEY);
     setSignupDone(true);
@@ -409,6 +426,11 @@ const handleSocial = async (provider) => {
         <div style={{textAlign:"center"}}>
           <div style={{marginBottom:16,display:"flex",justifyContent:"center"}}>{HI.check(52,"#16A34A")}</div>
           <div style={{fontSize:20,fontWeight:800,color:T.navy,marginBottom:8}}>가입 완료!</div>
+          {typeof window !== "undefined" && window.__signupLinkMsg && (
+            <div style={{background:"#FEF3C7",border:"1px solid #FDE68A",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#92400E",marginBottom:16,whiteSpace:"pre-line",textAlign:"left"}}>
+              {window.__signupLinkMsg.trim()}
+            </div>
+          )}
           <div style={{fontSize:14,color:T.textMid,lineHeight:1.8,marginBottom:24}}>
             관리자 승인 후 로그인하실 수 있습니다.<br/>담당 선생님께 승인을 요청해 주세요.
           </div>
@@ -1787,9 +1809,15 @@ const ParentHomeView = ({children, parentId, onChildrenUpdate}) => {
   const handleAdd = async () => {
     if(!addEmail){ setMsg({type:"err",text:"이메일을 입력해주세요."}); return; }
     setAddLoading(true); setMsg(null);
-    const { data, error } = await supabase.rpc("find_student_by_email", { student_email: addEmail.trim().toLowerCase() });
+    const lowerEmail = addEmail.trim().toLowerCase();
+    const { data, error } = await supabase.rpc("find_student_by_email", { student_email: lowerEmail });
     if(error || !data || data.length === 0) {
-      setMsg({type:"err",text:"해당 이메일의 학생을 찾을 수 없습니다. 학생이 가입 및 승인 완료된 상태여야 합니다."});
+      // 가입 여부 확인 — 가입은 됐지만 미승인인지, 아예 미가입인지 구분 안내
+      const { data: exists } = await supabase.rpc("auth_email_exists", { p_email: lowerEmail });
+      const refined = exists
+        ? "학생 계정은 있지만 관리자 승인 대기 중입니다. 승인 후 다시 시도해주세요."
+        : "해당 이메일로 가입된 학생을 찾을 수 없습니다. 자녀가 먼저 회원가입을 진행해야 합니다.";
+      setMsg({type:"err",text: refined});
       setAddLoading(false); return;
     }
     const student = data[0];
@@ -1902,9 +1930,15 @@ const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChild
     if(!addEmail){ setAddMsg({type:"err", text:"이메일을 입력해주세요."}); return; }
     setAddLoading(true); setAddMsg(null);
     // 이메일로 학생 검색
-    const { data, error } = await supabase.rpc("find_student_by_email", { student_email: addEmail.trim().toLowerCase() });
+    const lowerEmail = addEmail.trim().toLowerCase();
+    const { data, error } = await supabase.rpc("find_student_by_email", { student_email: lowerEmail });
     if(error || !data || data.length === 0) {
-      setAddMsg({type:"err", text:"해당 이메일의 학생을 찾을 수 없습니다. 학생이 가입 및 승인 완료된 상태여야 합니다."}); setAddLoading(false); return;
+      // 가입 여부 확인 — 가입은 됐지만 미승인인지, 아예 미가입인지 구분
+      const { data: exists } = await supabase.rpc("auth_email_exists", { p_email: lowerEmail });
+      const refined = exists
+        ? "학생 계정은 있지만 관리자 승인 대기 중입니다. 승인 후 다시 시도해주세요."
+        : "해당 이메일로 가입된 학생을 찾을 수 없습니다. 자녀가 먼저 회원가입을 진행해야 합니다.";
+      setAddMsg({type:"err", text: refined}); setAddLoading(false); return;
     }
     const student = data[0];
     // 이미 연결된 경우
