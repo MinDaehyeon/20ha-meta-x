@@ -18,3 +18,15 @@ tools/remigrate*.js
 
 # Vercel env 백업 파일
 .env.vercel
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# 로컬 스크래치 파일
+.scratch/
+
+# Bun lockfile (npm 환경 우선)
+bun.lock

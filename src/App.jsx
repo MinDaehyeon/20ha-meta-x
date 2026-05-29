@@ -8,142 +8,22 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from "recharts";
 import { supabase } from "./supabase";
+import { T, GRAPH, EI_COLOR, css, sliderFill } from "./styles/theme";
+import { injectStyles } from "./styles/inject";
+import { HI, navIcon, KakaoIcon, GoogleIcon, NaverIcon } from "./components/icons";
+import { Card, Pill, NavyNum, SectionTitle, Divider, Spinner, ChartTip } from "./components/ui";
+import { QUANT_ITEMS, QUAL_ITEMS, SUBJECTS, SUBJECT_CONFIG, ERR_CODES, ERR_LABELS, GRADES } from "./utils/constants";
+import { calcGrade, gradeInfo, calcEI } from "./utils/grade";
+import { ROSTER2, ROSTER2_NAVER_DATES, ROSTER2_MORNING_DATES, ROSTER2_NIGHT_DATES, ROSTER2_DAY_KO, roster2FmtKey, roster2Fmt, isLateByDeadline, INIT_ATTENDANCE2 } from "./utils/roster2";
+import { draftKey, restoreDraft, clearDraft, useDraftBackup } from "./utils/draft";
 
 // ══════════════════════════════════════════════════════
-// HEROICONS — outline style (인라인 SVG, 설치 불필요)
-// ══════════════════════════════════════════════════════
-const HI = {
-  _svg: (path, sz=20, c="currentColor", sw=1.6) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-      strokeWidth={sw} stroke={c} width={sz} height={sz} style={{display:"block",flexShrink:0}}>
-      <path strokeLinecap="round" strokeLinejoin="round" d={path}/>
-    </svg>
-  ),
-  sun:   (sz=20,c="currentColor") => HI._svg("M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z",sz,c),
-  moon:  (sz=20,c="currentColor") => HI._svg("M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z",sz,c),
-  trophy:(sz=20,c="currentColor") => HI._svg("M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 0 1-.982-3.172M9.497 14.25a7.454 7.454 0 0 0 .981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 0 0 7.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 0 0 2.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 0 1 2.916.52 6.003 6.003 0 0 1-5.395 4.972m0 0a6.726 6.726 0 0 1-2.749 1.35m0 0a6.772 6.772 0 0 1-3.044 0",sz,c),
-  cap:   (sz=20,c="currentColor") => HI._svg("M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5",sz,c),
-  calendar:(sz=20,c="currentColor") => HI._svg("M6.75 2.994v2.25m10.5-2.25v2.25m-14.252 13.5V7.491a2.25 2.25 0 0 1 2.25-2.25h13.5a2.25 2.25 0 0 1 2.25 2.25v11.251m-18 0a2.25 2.25 0 0 0 2.25 2.25h13.5a2.25 2.25 0 0 0 2.25-2.25m-18 0v-7.5a2.25 2.25 0 0 1 2.25-2.25h13.5a2.25 2.25 0 0 1 2.25 2.25v7.5m-6.75-6h2.25m-9 2.25h4.5m.002-2.25h.005v.005H12v-.005Zm-.001 4.5h.006v.006h-.006v-.006Zm-2.25.001h.005v.005H9.75v-.005Zm-2.25 0h.005v.005H7.5v-.005Zm6.75-2.25h.005v.005h-.005v-.005Zm0 2.25h.005v.005h-.005v-.005Zm2.25-4.5h.005v.005H16.5v-.005Zm0 2.25h.005v.005H16.5v-.005Z",sz,c),
-  search:(sz=20,c="currentColor") => HI._svg("m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z",sz,c),
-  users: (sz=20,c="currentColor") => HI._svg("M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z",sz,c),
-  user:  (sz=20,c="currentColor") => HI._svg("M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z",sz,c),
-  bell:  (sz=20,c="currentColor") => HI._svg("M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0",sz,c),
-  chart: (sz=20,c="currentColor") => HI._svg("M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z",sz,c),
-  clipboard:(sz=20,c="currentColor") => HI._svg("M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z",sz,c),
-  check: (sz=20,c="currentColor") => HI._svg("M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",sz,c),
-  warn:  (sz=20,c="currentColor") => HI._svg("M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z",sz,c),
-  camera:(sz=20,c="currentColor") => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-      strokeWidth={1.6} stroke={c} width={sz} height={sz} style={{display:"block",flexShrink:0}}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z"/>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z"/>
-    </svg>
-  ),
-};
-// 아이콘 키 → JSX 렌더 헬퍼
-const navIcon = (key, sz=18, color="currentColor") => {
-  const map = {trophy:HI.trophy, cap:HI.cap, calendar:HI.calendar, search:HI.search, users:HI.users, user:HI.user, clipboard:HI.clipboard, bell:HI.bell, chart:HI.chart};
-  return (map[key]?.(sz, color)) || <span style={{fontSize:sz}}>{key}</span>;
-};
 
 // ══════════════════════════════════════════════════════
 // FONT INJECT — Sandoll Gothic Neo + Noto Sans KR fallback
 // ══════════════════════════════════════════════════════
-const injectStyles = () => {
-  if (document.getElementById("20ha-styles")) return;
-  const el = document.createElement("style");
-  el.id = "20ha-styles";
-  el.innerHTML = `
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100;300;400;500;700;900&display=swap');
-    @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
-    .logo-20ha { font-family: 'SandollGothicNeo','Sandoll Gothic Neo','산돌고딕 Neo','Noto Sans KR',sans-serif !important; }
-    * { box-sizing: border-box; }
-    input, select, button { font-family: 'Noto Sans KR', sans-serif; }
-    ::-webkit-scrollbar { width: 7px; height: 7px; }
-    select option { background-color: #ffffff !important; color: #1a1a2e !important; }
-    input[type=range] { background: transparent; }
-    input[type=range] { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 4px; outline: none; }
-    input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: transparent; }
-    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--thumb-color, #191D54); cursor: pointer; margin-top: -7px; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
-    input[type=range]::-moz-range-track { height: 4px; border-radius: 4px; background: #E8EAF6; }
-    input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #191D54; cursor: pointer; border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
-    input[type=range]::-moz-range-progress { background: currentColor; height: 4px; border-radius: 4px; }
-    ::-webkit-scrollbar-track { background: #F0F2FA; }
-    ::-webkit-scrollbar-thumb { background: #C8CEED; border-radius: 4px; }
-  `;
-  document.head.appendChild(el);
-};
 injectStyles();
 
-const sliderFill = (value, min, max, color) => {
-  const pct = ((value - min) / (max - min)) * 100;
-  return { width: "100%", color, background: `linear-gradient(to right, ${color} 0%, ${color} ${pct}%, #E8EAF6 ${pct}%, #E8EAF6 100%)` };
-};
-
-// ══════════════════════════════════════════════════════
-// CONSTANTS
-// ══════════════════════════════════════════════════════
-const QUANT_ITEMS = ["white-out RPT","실수제로테스트","코넬 노트","백지목차 테스트","마인드맵","위클리 티칭 미션"];
-const QUAL_ITEMS  = ["10배빠른 복습법","데이터 채점법","웜업슬라이딩","슬립온리콜","유형/비유형 학습","5분 누적복습"];
-const SUBJECTS    = ["수학","영어","국어","과학","사회","한국사"];
-const SUBJECT_CONFIG = {
-  "수학":   { qLevels:true,  showQM:true,
-    quant:["white-out RPT","백지목차 테스트","마인드맵","위클리 티칭 미션"],
-    qual:["10배빠른 복습법","데이터 채점법","웜업슬라이딩"] },
-  "과학":   { qLevels:false, showQM:false,
-    quant:["white-out RPT","코넬 노트","백지목차 테스트","마인드맵","위클리 티칭 미션"],
-    qual:["5분 누적복습","슬립온리콜","데이터 채점법","웜업슬라이딩"] },
-  "사회":   { qLevels:false, showQM:false,
-    quant:["white-out RPT","코넬 노트","백지목차 테스트","마인드맵","위클리 티칭 미션"],
-    qual:["5분 누적복습","슬립온리콜","데이터 채점법","웜업슬라이딩"] },
-  "한국사": { qLevels:false, showQM:false,
-    quant:["white-out RPT","코넬 노트","백지목차 테스트","마인드맵","위클리 티칭 미션"],
-    qual:["5분 누적복습","슬립온리콜","데이터 채점법","웜업슬라이딩"] },
-  "영어":   { qLevels:false, showQM:false,
-    quant:["white-out RPT"], qual:["데이터 채점법"] },
-  "국어":   { qLevels:false, showQM:false,
-    quant:["white-out RPT"], qual:["데이터 채점법"] },
-};
-const ERR_CODES   = ["Q1","Q2","Q3","M1","M2","M3"];
-const ERR_LABELS  = { Q1:"개념 미숙지", Q2:"추론 실패", Q3:"지식 공백", M1:"계산 실수", M2:"문제 오독", M3:"단순 실수" };
-const GRADES      = ["초1","초2","초3","초4","초5","초6","중1","중2","중3","고1","고2","고3"];
-// birth_year + birth_month(optional, null이면 3월 기준) → "초4" 같은 학년 문자열
-const calcGrade = (birthYear, birthMonth) => {
-  if (!birthYear) return "";
-  const now = new Date();
-  const schoolYear = (birthMonth ?? now.getMonth() + 1) >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-  const n = schoolYear - birthYear - 6;
-  if (n < 1) return "미취학";
-  if (n <= 6) return `초${n}`;
-  if (n <= 9) return `중${n - 6}`;
-  if (n <= 12) return `고${n - 9}`;
-  return "졸업";
-};
-
-// ══════════════════════════════════════════════════════
-// DESIGN TOKENS
-// ══════════════════════════════════════════════════════
-const T = {
-  bg:"#F7F8FC", surface:"#FFFFFF", surfaceAlt:"#F0F2FA",
-  border:"#E2E6F3", borderStrong:"#C8CEED",
-  navy:"#191D54", navyLight:"#252B7A", navyMid:"#3D4499",
-  orange:"#F68B1E", orangeLight:"#FFA94D", orangePale:"#FFF3E0",
-  text:"#191D54", textMid:"#4A5080", muted:"#8B91C0",
-  white:"#FFFFFF", danger:"#E8394A", success:"#16A34A",
-  warn:"#F59E0B",
-  grad:"linear-gradient(135deg,#191D54,#3D4499)",
-  gradOrange:"linear-gradient(135deg,#F68B1E,#FFA94D)",
-};
-const GRAPH = {
-  ccColor:"#16A34A", ciColor:"#E8394A", icColor:"#F68B1E", iiColor:"#7C3AED",
-  errQ:["#E8394A","#F87171","#FECACA"], errM:["#F68B1E","#FFA94D","#FED7AA"],
-  speed:"#0891B2",
-};
-const EI_COLOR  = v => v>=85?GRAPH.ccColor:v>=70?T.navy:v>=55?GRAPH.icColor:GRAPH.ciColor;
-const gradeInfo = s => s>=93?{g:"S",c:"#16A34A"}:s>=81?{g:"A",c:"#2563EB"}:s>=66?{g:"B",c:"#111827"}:s>=51?{g:"C",c:"#F97316"}:{g:"D",c:"#DC2626"};
-const calcEI    = ({strategyScore:s,efficiencyIndex:e,metacognitionAccuracy:m}) => +(s*0.4+e*0.2+m*0.4).toFixed(1);
 
 // ══════════════════════════════════════════════════════
 // RESPONSIVE
@@ -157,81 +37,6 @@ const useMobile = () => {
 // ══════════════════════════════════════════════════════
 // BASE COMPONENTS
 // ══════════════════════════════════════════════════════
-const Card = ({children,style={}}) => (
-  <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:16,padding:"18px 20px",boxShadow:"0 1px 6px rgba(25,29,84,0.06)",animation:"fadeIn 0.3s ease",...style}}>{children}</div>
-);
-const Pill = ({children,color=T.navy}) => (
-  <span style={{background:color+"18",color,border:`1px solid ${color}30`,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700,letterSpacing:"0.04em",whiteSpace:"nowrap"}}>{children}</span>
-);
-const NavyNum = ({value,unit="",size=32,color=T.navy}) => (
-  <div style={{display:"flex",alignItems:"baseline",gap:3}}>
-    <span style={{fontSize:size,fontWeight:900,color,fontFamily:"'DM Mono','Courier New',monospace",lineHeight:1}}>{value}</span>
-    {unit&&<span style={{fontSize:12,color:T.muted,fontWeight:600}}>{unit}</span>}
-  </div>
-);
-// sub = "tag1 · tag2 · tag3" string, tooltip = detailed explanation
-const SectionTitle = ({children,sub,tooltip}) => {
-  const [show,setShow] = useState(false);
-  const [pos,setPos]   = useState({x:0,y:0});
-  const tags = sub ? sub.split(" · ") : [];
-  return (
-    <div style={{marginBottom:14}}>
-      <div style={{display:"flex",alignItems:"center",gap:6}}>
-        <div style={{fontSize:14,fontWeight:800,color:T.navy}}>{children}</div>
-        {tooltip&&(
-          <div onMouseEnter={e=>{const r=e.currentTarget.getBoundingClientRect();setPos({x:r.left,y:r.bottom+6});setShow(true);}}
-               onMouseLeave={()=>setShow(false)}
-               style={{width:16,height:16,borderRadius:"50%",background:T.muted+"30",display:"flex",alignItems:"center",justifyContent:"center",cursor:"help",flexShrink:0}}>
-            <span style={{fontSize:10,color:T.muted,fontWeight:800}}>?</span>
-          </div>
-        )}
-      </div>
-      {tags.length>0&&(
-        <div style={{display:"flex",flexWrap:"wrap",gap:"3px 8px",marginTop:4}}>
-          {tags.map((t,i)=>(
-            <span key={i} style={{fontSize:10,color:T.muted,wordBreak:"keep-all",overflowWrap:"break-word"}}>
-              {i>0&&<span style={{color:T.border,marginRight:4}}>·</span>}{t}
-            </span>
-          ))}
-        </div>
-      )}
-      {show&&tooltip&&(
-        <div style={{position:"fixed",...(pos.x+316>window.innerWidth?{right:8,left:"auto"}:{left:pos.x}),top:pos.y,zIndex:9999,pointerEvents:"none",
-          background:T.navy,color:T.white,borderRadius:10,padding:"12px 16px",fontSize:12,
-          width:300,lineHeight:1.8,boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>
-          {tooltip.split(/\\n|\n/).map((line,i)=>
-            line===""
-              ? <div key={i} style={{height:6}}/>
-              : <div key={i}>{line}</div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-const Divider = () => <div style={{height:1,background:T.border,margin:"16px 0"}} />;
-const Spinner = ({size=24,color=T.navy}) => (
-  <div style={{width:size,height:size,border:`3px solid ${T.border}`,borderTop:`3px solid ${color}`,borderRadius:"50%",animation:"spin 0.8s linear infinite",flexShrink:0}} />
-);
-const ChartTip = ({active,payload,label}) => {
-  if(!active||!payload?.length) return null;
-  return (
-    <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 12px",fontSize:11,boxShadow:"0 2px 8px rgba(25,29,84,0.10)"}}>
-      <div style={{color:T.muted,marginBottom:4,fontWeight:600,fontSize:10}}>{label}</div>
-      {payload.map((p,i)=>{const v=p.value;const displayName=p.name==="value"?label:p.name;const isErrCode=/^[QM][1-3]$/.test(displayName);const isSpeed=displayName==="기본"||displayName==="응용"||displayName==="심화";const isCount=isErrCode||displayName&&(displayName.includes("회")||displayName.includes("건")||displayName.includes("오답")||displayName.includes("횟수"));const disp=typeof v==="number"?(Number.isInteger(v)||isCount||isSpeed?Math.round(v):v.toFixed(1)):v;if(isErrCode)return<div key={i} style={{color:p.color||T.navy,fontWeight:700,fontSize:12,lineHeight:1.8}}>{displayName} {disp}</div>;return<div key={i} style={{color:p.color||T.navy,fontWeight:700,fontSize:11}}>{displayName}: {disp}{isSpeed?"초":isCount?"회":""}</div>;})}
-    </div>
-  );
-};
-const css = {
-  input:  {width:"100%",background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:10,padding:"11px 14px",color:T.text,fontSize:14,boxSizing:"border-box",outline:"none"},
-  select: {width:"100%",background:"#ffffff",border:`1px solid ${T.border}`,borderRadius:10,padding:"11px 14px",color:"#1a1a2e",fontSize:14,colorScheme:"light"},
-  label:  {fontSize:12,color:T.muted,marginBottom:6,display:"block",letterSpacing:"0.04em",fontWeight:700},
-  btnPrimary:  {background:T.grad,border:"none",borderRadius:10,padding:"12px 28px",color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"},
-  btnOrange:   {background:T.gradOrange,border:"none",borderRadius:10,padding:"12px 28px",color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"},
-  btnGhost:    {background:"transparent",border:`1px solid ${T.border}`,borderRadius:10,padding:"11px 20px",color:T.textMid,fontSize:13,cursor:"pointer"},
-  btnOutline:  {background:"transparent",border:`1px solid ${T.border}`,borderRadius:8,padding:"7px 14px",color:T.textMid,fontSize:12,cursor:"pointer"},
-};
-
 // 생년월일 입력 공통 컴포넌트 (년/월/일 세 드롭다운) — T 선언 이후에 위치해야 함
 // showGrade=true 이면 학년 태그 표시 (학생용)
 const BirthInput = ({year, month, day, onYear, onMonth, onDay, showGrade=false}) => {
@@ -302,29 +107,6 @@ const SocialBtn = ({icon,label,color,bg,border,onClick,loading}) => (
 );
 
 // 카카오 로고 SVG
-const KakaoIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="#3C1E1E">
-    <path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.74 1.618 5.148 4.075 6.585L5.1 20.7a.3.3 0 00.435.337l4.182-2.79A11.6 11.6 0 0012 18.6c5.523 0 10-3.477 10-7.8S17.523 3 12 3z"/>
-  </svg>
-);
-
-// 구글 로고 SVG
-const GoogleIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24">
-    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-  </svg>
-);
-
-// 네이버 로고
-const NaverIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff">
-    <path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/>
-  </svg>
-);
-
 // ══════════════════════════════════════════════════════
 // PASSWORD RESET SCREEN
 // ══════════════════════════════════════════════════════
@@ -395,15 +177,19 @@ const AuthScreen = ({ onLogin }) => {
   const [pw, setPw]           = useState("");
   const [rememberMe, setRememberMe] = useState(()=>!!localStorage.getItem("20ha_saved_email"));
   const [mode, setMode]       = useState("login"); // "login"|"signup"
-  const [suRole, setSuRole]   = useState("student"); // "student" | "parent"
-  const [suName, setSuName]   = useState("");
-  const [suBirthYear, setSuBirthYear]   = useState("");
-  const [suBirthMonth, setSuBirthMonth] = useState("");
-  const [suBirthDay, setSuBirthDay]     = useState("");
-  const [suEmail, setSuEmail] = useState("");
-  const [suPw, setSuPw]       = useState("");
+  const SIGNUP_DRAFT_KEY = draftKey("signup");
+  const _restoredSignup = useMemo(() => restoreDraft(SIGNUP_DRAFT_KEY) || {}, []);
+  const [suRole, setSuRole]   = useState(_restoredSignup.suRole || "student");
+  const [suName, setSuName]   = useState(_restoredSignup.suName || "");
+  const [suBirthYear, setSuBirthYear]   = useState(_restoredSignup.suBirthYear || "");
+  const [suBirthMonth, setSuBirthMonth] = useState(_restoredSignup.suBirthMonth || "");
+  const [suBirthDay, setSuBirthDay]     = useState(_restoredSignup.suBirthDay || "");
+  const [suEmail, setSuEmail] = useState(_restoredSignup.suEmail || "");
+  const [suPw, setSuPw]       = useState(""); // 보안: 비번 백업 안 함
   const [suPwC, setSuPwC]     = useState("");
   const [suTarget, setSuTarget] = useState(85);
+  // 비번 제외 회원가입 입력 백업 (debounce 500ms)
+  useDraftBackup(SIGNUP_DRAFT_KEY, { suRole, suName, suBirthYear, suBirthMonth, suBirthDay, suEmail });
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [ageAgreed, setAgeAgreed] = useState(false);
@@ -544,19 +330,37 @@ const AuthScreen = ({ onLogin }) => {
         target_ei:85, role:suRole, approval_status:"pending"
       });
       if(profErr){
+        // 좀비 계정 방지: auth.users는 비번까지 설정됐는데 profile 없음
+        // cleanup으로 정리 후 사용자에게 재시도 안내 (같은 이메일로 다시 시도 가능)
+        try {
+          await supabase.auth.signOut();
+          await supabase.rpc("cleanup_incomplete_signup", { p_email: suEmail });
+        } catch (_) {}
         setLoad("signup",false);
-        setError("프로필 저장 중 오류가 발생했습니다. 다시 시도해주세요.");
+        setError("프로필 저장 중 오류가 발생했습니다. 잠시 후 같은 이메일로 다시 시도해주세요.");
+        // OTP 다시 받아야 하므로 인증 상태 초기화
+        setOtpVerified(false); setOtpSent(false); setOtpCode("");
         return;
       }
       // 학생 회원가입 시 20HA 2기 명단(cert_students)과 이름 매칭되면 자동 연동
+      // 결과를 받아 사용자에게 상태 안내 (ambiguous=동명이인은 관리자 수동 연동)
+      let linkMsg = "";
       if(suRole === "student"){
         try {
-          await supabase.rpc("try_link_2ki_on_signup", { p_profile_id: data.user.id, p_name: suName.trim() });
-        } catch (e) { /* 실패해도 가입 자체는 성공 처리 */ }
+          const { data: linkRes } = await supabase.rpc("try_link_2ki_on_signup", { p_profile_id: data.user.id, p_name: suName.trim() });
+          if(linkRes && !linkRes.linked && linkRes.reason === "ambiguous"){
+            linkMsg = `\n\n※ '${suName}' 동명이인이 ${linkRes.match_count}명 발견되어 자동 연동되지 않았습니다.\n관리자가 수동으로 연동해드릴게요.`;
+          }
+          // no_match는 안내 안 함 — 2기 아닌 일반 학생일 수 있음
+        } catch (e) { /* RPC 실패는 가입 자체에 영향 없음 (관리자 수동으로 연동 가능) */ }
       }
+      // 향후 setSignupDone 후 화면에서 노출
+      if(linkMsg) window.__signupLinkMsg = linkMsg;
     }
-    await supabase.auth.signOut();
+    // signOut 실패해도 가입은 완료 — approval_status=pending이 진입 차단
+    try { await supabase.auth.signOut(); } catch (_) {}
     setLoad("signup",false);
+    clearDraft(SIGNUP_DRAFT_KEY);
     setSignupDone(true);
   };
 
@@ -585,10 +389,6 @@ const handleSocial = async (provider) => {
       provider, options:{ redirectTo: window.location.origin }
     });
     if(err){ setError(translateSupabaseError(err.message)); setLoad(provider,false); }
-  };
-
-  const fillDemo = async (type) => {
-    if(type==="student") await handleLogin("test@20ha.kr","test1234!");
   };
 
   const brandPanel = (
@@ -626,6 +426,11 @@ const handleSocial = async (provider) => {
         <div style={{textAlign:"center"}}>
           <div style={{marginBottom:16,display:"flex",justifyContent:"center"}}>{HI.check(52,"#16A34A")}</div>
           <div style={{fontSize:20,fontWeight:800,color:T.navy,marginBottom:8}}>가입 완료!</div>
+          {typeof window !== "undefined" && window.__signupLinkMsg && (
+            <div style={{background:"#FEF3C7",border:"1px solid #FDE68A",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#92400E",marginBottom:16,whiteSpace:"pre-line",textAlign:"left"}}>
+              {window.__signupLinkMsg.trim()}
+            </div>
+          )}
           <div style={{fontSize:14,color:T.textMid,lineHeight:1.8,marginBottom:24}}>
             관리자 승인 후 로그인하실 수 있습니다.<br/>담당 선생님께 승인을 요청해 주세요.
           </div>
@@ -753,7 +558,10 @@ const handleSocial = async (provider) => {
                 </button>
               </div>
               <button onClick={async()=>{setOtpCode("");setError("");await handleSendOtp();}}
-                style={{background:"none",border:"none",color:"#6B7280",fontSize:11,cursor:"pointer",marginTop:6,padding:0}}>코드 재전송</button>
+                disabled={loading.sendOtp||loading.otp}
+                style={{background:"none",border:"none",color:"#6B7280",fontSize:11,cursor:(loading.sendOtp||loading.otp)?"default":"pointer",marginTop:6,padding:0,opacity:(loading.sendOtp||loading.otp)?0.5:1}}>
+                {loading.sendOtp ? "전송 중..." : "코드 재전송"}
+              </button>
             </div>
           )}
           <div><label style={css.label}>비밀번호 <span style={{fontWeight:400,color:T.muted}}>(대소문자+특수문자 포함 8자↑)</span></label><input type="password" value={suPw} onChange={e=>setSuPw(e.target.value)} placeholder="••••••••" style={css.input}/></div>
@@ -907,7 +715,7 @@ const ProfileSetupScreen = ({user, onComplete}) => {
         <button onClick={save} disabled={saving} style={{...css.btnPrimary,width:"100%",padding:"13px 0",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
           {saving?<><Spinner size={18} color="#fff"/>저장 중...</>:"저장하고 승인 대기 →"}
         </button>
-        <button onClick={async()=>{ await supabase.auth.signOut(); window.location.reload(); }}
+        <button onClick={async()=>{ try { window.__intentionalLogout = true; } catch(_){}; await supabase.auth.signOut(); window.location.reload(); }}
           style={{...css.btnGhost,width:"100%",marginTop:10,padding:"10px 0",textAlign:"center"}}>
           ← 로그인 화면으로 돌아가기
         </button>
@@ -1008,17 +816,23 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
   const [saving, setSaving] = useState(false);
   const [saveWarnings, setSaveWarnings] = useState([]);
   const isMobile = useMobile();
-  const [form, setForm]   = useState({
-    date:new Date().toISOString().slice(0,10), subject:"수학", bookLevel:1,
-    startTime:"", endTime:"", breakTime:0, questionCount:20,
-    qBasic:0, qMid:0, qAdv:0,
-    tBasic:0, tMid:0, tAdv:0,
-    quant:Object.fromEntries(QUANT_ITEMS.map(k=>[k,80])),
-    qual:Object.fromEntries(QUAL_ITEMS.map(k=>[k,3])),
-    quantEnabled:{}, qualEnabled:{},
-    coinFilter:{cc:0,ci:0,ic:0,ii:0},
-    errorAnalysis:{Q1:0,Q2:0,Q3:0,M1:0,M2:0,M3:0},
+  const DRAFT_KEY = draftKey("datainput", uid);
+  const [form, setForm]   = useState(() => {
+    const restored = restoreDraft(DRAFT_KEY);
+    if (restored) return restored;
+    return {
+      date:new Date().toISOString().slice(0,10), subject:"수학", bookLevel:1,
+      startTime:"", endTime:"", breakTime:0, questionCount:20,
+      qBasic:0, qMid:0, qAdv:0,
+      tBasic:0, tMid:0, tAdv:0,
+      quant:Object.fromEntries(QUANT_ITEMS.map(k=>[k,80])),
+      qual:Object.fromEntries(QUAL_ITEMS.map(k=>[k,3])),
+      quantEnabled:{}, qualEnabled:{},
+      coinFilter:{cc:0,ci:0,ic:0,ii:0},
+      errorAnalysis:{Q1:0,Q2:0,Q3:0,M1:0,M2:0,M3:0},
+    };
   });
+  useDraftBackup(DRAFT_KEY, form);
   const subjectCfg = SUBJECT_CONFIG[form.subject] || SUBJECT_CONFIG["수학"];
   const handleSubjectChange = s => setForm(f=>({...f, subject:s, qBasic:0, qMid:0, qAdv:0, quantEnabled:{}, qualEnabled:{}}));
   const toMin = t=>{if(!t)return 0;const[h,m]=t.split(":").map(Number);return h*60+m;};
@@ -1103,6 +917,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
     });
     setSaving(false);
     if(error){setErr("저장 오류: "+error.message);return;}
+    clearDraft(DRAFT_KEY);
     onSave();
   };
 
@@ -1994,9 +1809,15 @@ const ParentHomeView = ({children, parentId, onChildrenUpdate}) => {
   const handleAdd = async () => {
     if(!addEmail){ setMsg({type:"err",text:"이메일을 입력해주세요."}); return; }
     setAddLoading(true); setMsg(null);
-    const { data, error } = await supabase.rpc("find_student_by_email", { student_email: addEmail.trim().toLowerCase() });
+    const lowerEmail = addEmail.trim().toLowerCase();
+    const { data, error } = await supabase.rpc("find_student_by_email", { student_email: lowerEmail });
     if(error || !data || data.length === 0) {
-      setMsg({type:"err",text:"해당 이메일의 학생을 찾을 수 없습니다. 학생이 가입 및 승인 완료된 상태여야 합니다."});
+      // 가입 여부 확인 — 가입은 됐지만 미승인인지, 아예 미가입인지 구분 안내
+      const { data: exists } = await supabase.rpc("auth_email_exists", { p_email: lowerEmail });
+      const refined = exists
+        ? "학생 계정은 있지만 관리자 승인 대기 중입니다. 승인 후 다시 시도해주세요."
+        : "해당 이메일로 가입된 학생을 찾을 수 없습니다. 자녀가 먼저 회원가입을 진행해야 합니다.";
+      setMsg({type:"err",text: refined});
       setAddLoading(false); return;
     }
     const student = data[0];
@@ -2109,9 +1930,15 @@ const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChild
     if(!addEmail){ setAddMsg({type:"err", text:"이메일을 입력해주세요."}); return; }
     setAddLoading(true); setAddMsg(null);
     // 이메일로 학생 검색
-    const { data, error } = await supabase.rpc("find_student_by_email", { student_email: addEmail.trim().toLowerCase() });
+    const lowerEmail = addEmail.trim().toLowerCase();
+    const { data, error } = await supabase.rpc("find_student_by_email", { student_email: lowerEmail });
     if(error || !data || data.length === 0) {
-      setAddMsg({type:"err", text:"해당 이메일의 학생을 찾을 수 없습니다. 학생이 가입 및 승인 완료된 상태여야 합니다."}); setAddLoading(false); return;
+      // 가입 여부 확인 — 가입은 됐지만 미승인인지, 아예 미가입인지 구분
+      const { data: exists } = await supabase.rpc("auth_email_exists", { p_email: lowerEmail });
+      const refined = exists
+        ? "학생 계정은 있지만 관리자 승인 대기 중입니다. 승인 후 다시 시도해주세요."
+        : "해당 이메일로 가입된 학생을 찾을 수 없습니다. 자녀가 먼저 회원가입을 진행해야 합니다.";
+      setAddMsg({type:"err", text: refined}); setAddLoading(false); return;
     }
     const student = data[0];
     // 이미 연결된 경우
@@ -2192,32 +2019,6 @@ const ParentDashboard = ({children, selChildId, setSelChildId, parentId, onChild
 // ══════════════════════════════════════════════════════
 // ADMIN DASHBOARD (진단 + 회원 관리)
 // ── 2기 명단 상수 (렌더마다 재생성 방지) ──────────────
-const ROSTER2 = [
-  {name:"강예나",  phone:"010-5463-7565"}, {name:"김가흔",  phone:"010-7277-4530"},
-  {name:"김은채",  phone:"010-2565-9756"}, {name:"김태준",  phone:"010-7282-5241"},
-  {name:"박재현",  phone:"010-3889-4881"}, {name:"손연재",  phone:"010-2658-1189"},
-  {name:"윤준원",  phone:"010-3560-4433"}, {name:"최지유",  phone:"010-5913-3385"},
-  {name:"배정윤",  phone:"010-6686-6462"}, {name:"심수윤",  phone:"010-2079-0009"},
-  {name:"한설아",  phone:"010-3288-1931"}, {name:"강가인",  phone:"010-3952-3253"},
-  {name:"권민유",  phone:"010-4355-2933"}, {name:"권순혁",  phone:"010-6220-0745"},
-  {name:"최유주",  phone:"010-7928-0050"}, {name:"김도현",  phone:"010-2265-9013"},
-  {name:"김시원",  phone:"010-9289-4397"}, {name:"김시윤",  phone:"010-3788-2478"},
-  {name:"김아란",  phone:"010-5410-8405"}, {name:"김준범",  phone:"010-2797-3039"},
-  {name:"김지우",  phone:"010-9458-2447"}, {name:"김호진",  phone:"010-4528-8226"},
-  {name:"나지성",  phone:"010-9625-1379"}, {name:"문지유",  phone:"010-6496-1389"},
-  {name:"박지우",  phone:"010-8330-6779"}, {name:"서소윤",  phone:"010-9996-9761"},
-  {name:"서지우",  phone:"010-9269-1336"}, {name:"송민건",  phone:"010-9004-2926"},
-  {name:"양소윤",  phone:"010-9111-3700"}, {name:"오수연",  phone:"010-3286-6880"},
-  {name:"우정훈",  phone:"010-3833-8315"}, {name:"윤서준",  phone:"010-9283-9400"},
-  {name:"이유빈",  phone:"010-6451-9510"}, {name:"이홍윤",  phone:"010-8504-9798"},
-  {name:"임다은",  phone:"010-8183-9283"}, {name:"정유진",  phone:"010-8880-7759"},
-  {name:"박선율",  phone:"010-2776-9111"}, {name:"한채린",  phone:"010-5298-7970"},
-  {name:"오수빈",  phone:"010-3286-6880"}, {name:"남희수",  phone:"010-8965-5948"},
-  {name:"김가인",  phone:"010-4549-0142"}, {name:"양은정",  phone:"010-7232-0795"},
-  {name:"테스트학생", phone:"010-0000-0000"},
-  {name:"한유찬",  phone:"010-3288-1931"}, // 신규 (2026-05-22, idx=43)
-  {name:"문성민",  phone:"010-6496-1389"}, // 신규 (2026-05-22, idx=44)
-];
 // 한글 조사 헬퍼: 받침 유무 자동 판별
 const _hasJong = (s) => {
   const c = s.charCodeAt(s.length-1);
@@ -2229,40 +2030,6 @@ const J_i   = (s) => `${s}${_hasJong(s) ? "이" : "가"}`;   // 이/가
 const J_eun = (s) => `${s}${_hasJong(s) ? "은" : "는"}`;   // 은/는
 const J_eu_ro = (s) => `${s}${_hasJong(s) ? "으로" : "로"}`; // 으로/로
 
-const _genDates = (days) => {
-  const result = [];
-  for (let w = 0; w < 8; w++)
-    for (let d = 0; d < 7; d++) {
-      const dt = new Date(2026, 4, 17 + w*7 + d);
-      if (days.includes(dt.getDay())) result.push(dt);
-    }
-  return result;
-};
-// 카페 인증: 5/20부터 시작, 매주 수/일 + 마지막 7/12 추가 (총 16일)
-// 모닝/나잇과 동일한 5/17 기준 주 구분으로 표시됨
-const ROSTER2_NAVER_DATES   = _genDates([0, 3])
-  .filter(d => !(d.getFullYear()===2026 && d.getMonth()===4 && d.getDate()===17))
-  .concat([new Date(2026, 6, 12)]); // 7/12 일요일
-const ROSTER2_MORNING_DATES = _genDates([1, 3, 5]);
-const ROSTER2_NIGHT_DATES   = _genDates([0, 1, 2, 4, 5, 6])
-  // 마지막 7/11(토)은 일정상 제외
-  .filter(d => !(d.getFullYear()===2026 && d.getMonth()===6 && d.getDate()===11));
-const ROSTER2_DAY_KO        = ['일','월','화','수','목','금','토'];
-const roster2FmtKey = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-const roster2Fmt    = (dt) => `${dt.getMonth()+1}/${dt.getDate()}`;
-
-// 카페 인증 지각 판정: 회차일 다음날 12:00 KST 까지는 정시 인정
-// sessionDate: ROSTER2_NAVER_DATES의 Date (KST 자정), posted_at: ISO 또는 Date
-const isLateByDeadline = (posted_at, sessionDate) => {
-  if (!sessionDate) return false;
-  const deadlineMs = sessionDate.getTime() + 36 * 3600 * 1000; // +1일 12시간
-  return new Date(posted_at).getTime() > deadlineMs;
-};
-
-// 2기 출석 데이터 (사용 안 함 — DB attendance_logs로 마이그레이션 완료)
-// 5/17~5/22 기존 데이터는 모두 attendance_logs에 저장되어 있음
-// 새 출석은 /attendance 메뉴에서 CSV 업로드로 추가
-const INIT_ATTENDANCE2 = {};
 
 // ══════════════════════════════════════════════════════
 // 학생: 20HA 인증 현황 탭
@@ -3202,6 +2969,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
   const [certSessionModal, setCertSessionModal] = useState(null); // {id, postTitle, posted_at, sessions: number[]}
   const [certScoreModal, setCertScoreModal] = useState(null); // {id, postTitle, submit, mission, fidelity}
   const [certScoreSaving, setCertScoreSaving] = useState(false);
+  const [certSessionSaving, setCertSessionSaving] = useState(false);
   const [lastCrawledAt, setLastCrawledAt] = useState(null);
   const [certRecordsPage, setCertRecordsPage] = useState(1);
   const CERT_RECORDS_PAGE_SIZE = 30;
@@ -3318,16 +3086,22 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
   };
 
   const updateCertSessions = async (certId, sessions) => {
-    const arr = (sessions||[]).map(Number).filter(n=>n>=1 && n<=ROSTER2_NAVER_DATES.length);
-    arr.sort((a,b)=>a-b);
-    const dedup = [...new Set(arr)];
-    await supabase.rpc("update_cert_sessions", {
-      p_cert_id: certId,
-      p_sessions: dedup.length ? dedup : null,
-    });
-    const patch = { session_override: dedup.length ? dedup : null };
-    setCertRecords(prev => prev.map(r => r.id===certId ? {...r, ...patch} : r));
-    setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, ...patch} : c));
+    if (certSessionSaving) return;
+    setCertSessionSaving(true);
+    try {
+      const arr = (sessions||[]).map(Number).filter(n=>n>=1 && n<=ROSTER2_NAVER_DATES.length);
+      arr.sort((a,b)=>a-b);
+      const dedup = [...new Set(arr)];
+      await supabase.rpc("update_cert_sessions", {
+        p_cert_id: certId,
+        p_sessions: dedup.length ? dedup : null,
+      });
+      const patch = { session_override: dedup.length ? dedup : null };
+      setCertRecords(prev => prev.map(r => r.id===certId ? {...r, ...patch} : r));
+      setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, ...patch} : c));
+    } finally {
+      setCertSessionSaving(false);
+    }
   };
 
   const updateCertScore = async (certId, parts) => {
@@ -4221,10 +3995,12 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                     <button onClick={resetAuto}
                       style={{...css.btnOutline,padding:"6px 12px",fontSize:12}}>자동 복귀</button>
                     <div style={{display:"flex",gap:8}}>
-                      <button onClick={()=>setCertSessionModal(null)}
-                        style={{...css.btnOutline,padding:"7px 18px",fontSize:13}}>취소</button>
-                      <button onClick={save}
-                        style={{...css.btnOrange,padding:"7px 18px",fontSize:13}}>확인</button>
+                      <button onClick={()=>setCertSessionModal(null)} disabled={certSessionSaving}
+                        style={{...css.btnOutline,padding:"7px 18px",fontSize:13,opacity:certSessionSaving?0.5:1}}>취소</button>
+                      <button onClick={save} disabled={certSessionSaving}
+                        style={{...css.btnOrange,padding:"7px 18px",fontSize:13,opacity:certSessionSaving?0.6:1,display:"flex",alignItems:"center",gap:6}}>
+                        {certSessionSaving ? <><Spinner size={12} color="#fff"/>저장 중</> : "확인"}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -5011,9 +4787,11 @@ const MakeupView = () => {
   const yesterdayKey = roster2FmtKey(yesterday);
 
   // 회차 중 어제까지 끝난 회차만 검사 (회차 일자 <= 어제)
+  // 1주차(1회·2회 = 5/20·5/24)는 적응 기간으로 Make-up 검사에서 제외
   const elapsedSessions = ROSTER2_NAVER_DATES
     .map((d,i)=>({idx:i, sn:i+1, date:d, key:roster2FmtKey(d)}))
-    .filter(s => s.key <= yesterdayKey);
+    .filter(s => s.key <= yesterdayKey)
+    .filter(s => s.sn > 2);
 
   // 학생별 분석 — 회차 순서대로 경고 검사 후 '연속 2회 이상' 발생한 학생만 대상자
   const realStudents = students.filter(s => s.name !== "테스트학생");
@@ -5062,7 +4840,7 @@ const MakeupView = () => {
       <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:14,flexWrap:"wrap"}}>
         <div style={{fontSize:18,fontWeight:800,color:T.navy}}>📚 Make-up 대상자</div>
         <div style={{fontSize:12,color:T.muted}}>
-          ※ 미제출은 어제({yesterday.getMonth()+1}/{yesterday.getDate()})까지의 회차만 검사 · <strong>2회 연속 경고</strong> 시 대상자
+          ※ 1주차(1·2회) 제외 · 3회차부터 어제({yesterday.getMonth()+1}/{yesterday.getDate()})까지 검사 · <strong>2회 연속 경고</strong> 시 대상자
         </div>
       </div>
 
@@ -6701,11 +6479,14 @@ const EISetupModal = ({profile, logs=[], onSave}) => {
 // PROFILE MODAL
 // ══════════════════════════════════════════════════════
 const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
-  const [name, setName]             = useState(profile.name||"");
-  const [birthYear, setBirthYear]   = useState(profile.birth_year ? String(profile.birth_year) : "");
-  const [birthMonth, setBirthMonth] = useState(profile.birth_month ? String(profile.birth_month) : "");
-  const [birthDay, setBirthDay]     = useState(profile.birth_day ? String(profile.birth_day) : "");
-  const [target, setTarget]       = useState(gradeInfo(profile.target_ei||85).g);
+  const PROFILE_DRAFT_KEY = draftKey("profile", profile.id);
+  const _restoredProfile = useMemo(() => restoreDraft(PROFILE_DRAFT_KEY) || {}, []);
+  const [name, setName]             = useState(_restoredProfile.name ?? (profile.name||""));
+  const [birthYear, setBirthYear]   = useState(_restoredProfile.birthYear ?? (profile.birth_year ? String(profile.birth_year) : ""));
+  const [birthMonth, setBirthMonth] = useState(_restoredProfile.birthMonth ?? (profile.birth_month ? String(profile.birth_month) : ""));
+  const [birthDay, setBirthDay]     = useState(_restoredProfile.birthDay ?? (profile.birth_day ? String(profile.birth_day) : ""));
+  const [target, setTarget]       = useState(_restoredProfile.target ?? gradeInfo(profile.target_ei||85).g);
+  useDraftBackup(PROFILE_DRAFT_KEY, { name, birthYear, birthMonth, birthDay, target });
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url||"");
   const [uploading, setUploading] = useState(false);
   const [newPw, setNewPw]         = useState("");
@@ -6784,6 +6565,7 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
     }
     setSaving(false);
     setDone(true);
+    clearDraft(PROFILE_DRAFT_KEY);
     setTimeout(()=>onSave({...profile,name,grade:newGrade,birth_year:by,birth_month:bm,birth_day:bd,target_ei:GRADE_MIN[target]||85,avatar_url:avatarUrl}), 800);
   };
 
@@ -6907,6 +6689,54 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
             )}
           </div>
         )}
+      </Card>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════
+// SESSION EXPIRED MODAL
+// 토큰 자동 refresh 실패 시 표시. session/profile은 그대로 두고
+// 화면 위에 overlay → 재로그인 성공 시 onAuthStateChange가 처리
+// ══════════════════════════════════════════════════════
+const SessionExpiredModal = ({prefillEmail = ""}) => {
+  const [email, setEmail] = useState(prefillEmail);
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const tryLogin = async () => {
+    if (loading) return;
+    setLoading(true); setErr("");
+    const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
+    setLoading(false);
+    if (error) {
+      const msg = (error.message||"").toLowerCase();
+      if (msg.includes("invalid")) setErr("이메일 또는 비밀번호가 올바르지 않습니다.");
+      else setErr("로그인 실패: " + error.message);
+    }
+    // 성공 시 onAuthStateChange가 잡아서 모달은 자동 사라짐
+  };
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(25,29,84,0.55)",backdropFilter:"blur(2px)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Noto Sans KR',sans-serif"}}>
+      <Card style={{width:"100%",maxWidth:380}}>
+        <div style={{fontSize:36,marginBottom:14,textAlign:"center"}}>🔒</div>
+        <div style={{fontSize:17,fontWeight:800,color:T.navy,textAlign:"center",marginBottom:6}}>세션이 만료됐어요</div>
+        <div style={{fontSize:12,color:T.muted,textAlign:"center",lineHeight:1.7,marginBottom:18}}>
+          작업 중이던 내용은 그대로 보존돼요.<br/>
+          다시 로그인하면 계속 진행할 수 있어요.
+        </div>
+        <div style={{display:"grid",gap:10,marginBottom:12}}>
+          <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="이메일" autoFocus={!prefillEmail}
+            disabled={loading} style={css.input}/>
+          <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="비밀번호"
+            autoFocus={!!prefillEmail} disabled={loading}
+            onKeyDown={e=>{if(e.key==="Enter") tryLogin();}} style={css.input}/>
+        </div>
+        {err && <div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"8px 12px",fontSize:12,color:T.danger,marginBottom:12}}>{err}</div>}
+        <button onClick={tryLogin} disabled={loading||!email||!pw}
+          style={{...css.btnPrimary,width:"100%",padding:"12px 0",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:(loading||!email||!pw)?0.5:1}}>
+          {loading ? <><Spinner size={16} color="#fff"/>로그인 중...</> : "다시 로그인"}
+        </button>
       </Card>
     </div>
   );
@@ -7069,7 +6899,8 @@ const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, 
 // ROOT APP
 // ══════════════════════════════════════════════════════
 export default function App() {
-  const [authState, setAuthState] = useState("loading");
+  const [authState, setAuthState] = useState("loading"); // loading | unauthenticated | ready | pending | passwordRecovery | sessionExpired
+  const intentionalLogoutRef = useRef(false);
   const [showEISetup, setShowEISetup] = useState(false);
   // "loading" | "unauthenticated" | "needsProfile" | "pending" | "ready" | "passwordRecovery"
   const [session, setSession]     = useState(null);
@@ -7201,10 +7032,31 @@ export default function App() {
         setSession(sess);
         return;
       }
-      if(event === "SIGNED_OUT" || !sess) {
-        setAuthState("unauthenticated");
-        setSession(null); setProfile(null);
-        setLogs([]); setAllProfiles([]);
+      // 첫 로드 시 발화 — getSession()이 이미 처리하므로 여기선 무시
+      if(event === "INITIAL_SESSION") return;
+      // 로그인 성공 → 정상 복귀 (sessionExpired에서 재로그인 포함)
+      if(event === "SIGNED_IN" && sess) {
+        intentionalLogoutRef.current = false;
+        loadUserData(sess);
+        return;
+      }
+      if(event === "TOKEN_REFRESHED" && sess) {
+        // 자동 refresh 성공 — 조용히 세션만 갱신
+        setSession(sess);
+        return;
+      }
+      // 명시 SIGNED_OUT 또는 토큰 만료
+      if(event === "SIGNED_OUT") {
+        if (intentionalLogoutRef.current) {
+          intentionalLogoutRef.current = false;
+          setAuthState("unauthenticated");
+          setSession(null); setProfile(null);
+          setLogs([]); setAllProfiles([]);
+        } else {
+          // 자동 refresh 실패 또는 토큰 만료 — 단, 이전에 인증된 적 있을 때만
+          // (첫 방문에서는 이미 unauthenticated로 가 있음)
+          setAuthState(prev => prev === "ready" || prev === "pending" ? "sessionExpired" : prev);
+        }
       }
     });
     return () => subscription.unsubscribe();
@@ -7231,6 +7083,7 @@ export default function App() {
   }, [authState, profile?.id]);
 
   const handleLogout = async () => {
+    intentionalLogoutRef.current = true;
     await supabase.auth.signOut();
     setAuthState("unauthenticated");
     setSession(null); setProfile(null);
@@ -7458,6 +7311,9 @@ export default function App() {
       {isMobile && <BottomNav nav={NAV} view={view} showInput={showInput} onNavigate={navigate} isAdmin={isAdmin||isParent}/>}
       {showEISetup && <EISetupModal profile={profile} logs={logs} onSave={(t)=>{setProfile(p=>({...p,target_ei:t}));setShowEISetup(false);}}/> }
       {showProfileModal && <ProfileModal profile={profile} onClose={()=>setShowProfileModal(false)} onSave={(updated)=>{setProfile(updated);setShowProfileModal(false);}} onDelete={()=>{setShowProfileModal(false);handleLogout();}}/>}
+      {authState === "sessionExpired" && (
+        <SessionExpiredModal prefillEmail={session?.user?.email || ""}/>
+      )}
     </div>
   );
 }
