@@ -7,6 +7,53 @@
 
 ---
 
+## v2026.05.29-1 — 2026-05-29
+**커밋:** [0b15966](https://github.com/MinDaehyeon/20ha-meta-x/commit/0b15966)
+
+### 주요 변경
+
+**Critical 버그 수정**
+- **무한 로딩 픽스** (40bacd7): `onAuthStateChange`의 `INITIAL_SESSION` 이벤트(sess=null)가 `SIGNED_OUT` 분기에 잘못 걸려 비로그인 첫 방문이 `sessionExpired` 상태로 떨어지던 문제. 라우터에 매칭 분기 없어 메인 화면으로 떨어지면서 `profile=null` crash → 화면 깨짐(스피너 잔존). INITIAL_SESSION은 즉시 return, SIGNED_OUT은 이전 state가 `ready`/`pending`일 때만 sessionExpired로 전이하도록 수정.
+
+**보안 점검 후속 (사용자 요청 [A][B])**
+- supabase.js anon key·URL 하드코딩 fallback 제거. 환경변수 미설정 시 명시 throw → Vercel 빌드 실패로 즉시 발견 가능.
+- App.jsx의 데드코드 `fillDemo` 함수(테스트 자격증명 하드코딩 `test@20ha.kr / test1234!`) 제거.
+
+**App.jsx 리팩토링 Phase A (7459 → 7180줄, −279)**
+- `src/styles/` — theme/inject (T, GRAPH, EI_COLOR, css, sliderFill, injectStyles)
+- `src/components/` — icons/ui (HI, navIcon, Kakao/Google/Naver, Card, Pill, NavyNum, SectionTitle, Divider, Spinner, ChartTip)
+- `src/utils/` — constants/grade/roster2/draft (QUANT/QUAL/SUBJECTS/ERR/GRADES, calcGrade/gradeInfo/calcEI, ROSTER2/isLateByDeadline 등)
+- 동작 변경 0, 분리만
+
+**E2E 자동 테스트 도입**
+- `@playwright/test` + GitHub Actions workflow (push/PR/manual 트리거)
+- 3개 시나리오: 로그인 (학생·관리자·실패) / 회원가입 UI 검증 / 학생 카페 인증 그래프
+- CI 통과 사이클 확립, PR마다 자동 회귀 차단
+- `GITHUB_STEP_SUMMARY` 노출로 admin 권한 없이도 stdout 확인 가능
+
+**엣지케이스 보강**
+- **중복 클릭 방지**: 인증글 회차 편집 모달의 save에 `certSessionSaving` 가드, OTP 재전송 버튼에 `loading.sendOtp` 가드
+- **세션 만료 처리**: 자동 refresh 실패 시 `sessionExpired` state + `SessionExpiredModal` (fixed overlay) — 입력값·화면 유지한 채 재로그인, 성공 시 onAuthStateChange가 자동 닫음
+- **입력값 백업/복원**: `src/utils/draft.js` (debounce 500ms localStorage), DataInputForm·회원가입(비번 제외)·ProfileModal 3개 폼 적용, 제출 성공 시 자동 clear
+
+**회원가입 플로우 안정화 4건**
+- 2기 자동 연동 결과(`try_link_2ki_on_signup` jsonb) 활용 — `ambiguous`(동명이인) 발생 시 가입 완료 화면에 안내 (관리자 수동 연동 요청)
+- `profiles` upsert 실패 시 좀비 계정 자동 정리 (`signOut` + `cleanup_incomplete_signup`) + OTP 인증 상태 초기화
+- 가입 마지막 `signOut` 실패 catch (approval_status=pending 안전망 의존)
+- 학부모 자녀 검색 0건 시 `auth_email_exists`로 추가 확인 → "승인 대기" vs "미가입" 구분 안내 (ParentHomeView + ParentDashboard)
+
+**Make-up 알고리즘 조정**
+- 1주차(1·2회 = 5/20·5/24) 적응 기간으로 검사 제외, 3회차부터 카운트
+
+### 배경
+운영 차단 무한 로딩 버그 즉시 해소 + 보안·테스트·UX 안정성 종합 개선. 학습 입력·채점 중 네트워크 끊김·세션 만료·새로고침에 자동 복원, 가입 부분 실패 시 좀비 계정 자동 정리, PR마다 자동 회귀 검증으로 운영 신뢰성 향상.
+
+### 작업 일정
+- 2026-05-28: 코드 분리(A) / E2E(B) / 엣지케이스(C) / 가입(D)
+- 2026-05-29: 수동 전체 검증 중 무한 로딩 버그 발견 → 즉시 픽스, Make-up 1주차 제외
+
+---
+
 ## v2026.05.27-3 — 2026-05-27
 **커밋:** [78a87b0](https://github.com/MinDaehyeon/26-04-12-meta-x/commit/78a87b0)
 
