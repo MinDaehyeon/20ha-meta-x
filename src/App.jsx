@@ -687,7 +687,7 @@ const ProfileSetupScreen = ({user, onComplete}) => {
         <button onClick={save} disabled={saving} style={{...css.btnPrimary,width:"100%",padding:"13px 0",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
           {saving?<><Spinner size={18} color="#fff"/>저장 중...</>:"저장하고 승인 대기 →"}
         </button>
-        <button onClick={async()=>{ await supabase.auth.signOut(); window.location.reload(); }}
+        <button onClick={async()=>{ try { window.__intentionalLogout = true; } catch(_){}; await supabase.auth.signOut(); window.location.reload(); }}
           style={{...css.btnGhost,width:"100%",marginTop:10,padding:"10px 0",textAlign:"center"}}>
           ← 로그인 화면으로 돌아가기
         </button>
@@ -6642,6 +6642,54 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
 };
 
 // ══════════════════════════════════════════════════════
+// SESSION EXPIRED MODAL
+// 토큰 자동 refresh 실패 시 표시. session/profile은 그대로 두고
+// 화면 위에 overlay → 재로그인 성공 시 onAuthStateChange가 처리
+// ══════════════════════════════════════════════════════
+const SessionExpiredModal = ({prefillEmail = ""}) => {
+  const [email, setEmail] = useState(prefillEmail);
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const tryLogin = async () => {
+    if (loading) return;
+    setLoading(true); setErr("");
+    const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
+    setLoading(false);
+    if (error) {
+      const msg = (error.message||"").toLowerCase();
+      if (msg.includes("invalid")) setErr("이메일 또는 비밀번호가 올바르지 않습니다.");
+      else setErr("로그인 실패: " + error.message);
+    }
+    // 성공 시 onAuthStateChange가 잡아서 모달은 자동 사라짐
+  };
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(25,29,84,0.55)",backdropFilter:"blur(2px)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Noto Sans KR',sans-serif"}}>
+      <Card style={{width:"100%",maxWidth:380}}>
+        <div style={{fontSize:36,marginBottom:14,textAlign:"center"}}>🔒</div>
+        <div style={{fontSize:17,fontWeight:800,color:T.navy,textAlign:"center",marginBottom:6}}>세션이 만료됐어요</div>
+        <div style={{fontSize:12,color:T.muted,textAlign:"center",lineHeight:1.7,marginBottom:18}}>
+          작업 중이던 내용은 그대로 보존돼요.<br/>
+          다시 로그인하면 계속 진행할 수 있어요.
+        </div>
+        <div style={{display:"grid",gap:10,marginBottom:12}}>
+          <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="이메일" autoFocus={!prefillEmail}
+            disabled={loading} style={css.input}/>
+          <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="비밀번호"
+            autoFocus={!!prefillEmail} disabled={loading}
+            onKeyDown={e=>{if(e.key==="Enter") tryLogin();}} style={css.input}/>
+        </div>
+        {err && <div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"8px 12px",fontSize:12,color:T.danger,marginBottom:12}}>{err}</div>}
+        <button onClick={tryLogin} disabled={loading||!email||!pw}
+          style={{...css.btnPrimary,width:"100%",padding:"12px 0",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:(loading||!email||!pw)?0.5:1}}>
+          {loading ? <><Spinner size={16} color="#fff"/>로그인 중...</> : "다시 로그인"}
+        </button>
+      </Card>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════
 // MOBILE BOTTOM NAV
 // ══════════════════════════════════════════════════════
 const BottomNav = ({nav,view,showInput,onNavigate,isAdmin}) => (
@@ -6798,7 +6846,8 @@ const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, 
 // ROOT APP
 // ══════════════════════════════════════════════════════
 export default function App() {
-  const [authState, setAuthState] = useState("loading");
+  const [authState, setAuthState] = useState("loading"); // loading | unauthenticated | ready | pending | passwordRecovery | sessionExpired
+  const intentionalLogoutRef = useRef(false);
   const [showEISetup, setShowEISetup] = useState(false);
   // "loading" | "unauthenticated" | "needsProfile" | "pending" | "ready" | "passwordRecovery"
   const [session, setSession]     = useState(null);
@@ -6930,10 +6979,27 @@ export default function App() {
         setSession(sess);
         return;
       }
+      // sessionExpired 상태에서 로그인 성공 → 정상 복귀
+      if(event === "SIGNED_IN" && sess) {
+        intentionalLogoutRef.current = false;
+        loadUserData(sess);
+        return;
+      }
+      if(event === "TOKEN_REFRESHED" && sess) {
+        // 자동 refresh 성공 — 조용히 세션만 갱신
+        setSession(sess);
+        return;
+      }
       if(event === "SIGNED_OUT" || !sess) {
-        setAuthState("unauthenticated");
-        setSession(null); setProfile(null);
-        setLogs([]); setAllProfiles([]);
+        if (intentionalLogoutRef.current) {
+          intentionalLogoutRef.current = false;
+          setAuthState("unauthenticated");
+          setSession(null); setProfile(null);
+          setLogs([]); setAllProfiles([]);
+        } else {
+          // 자동 refresh 실패 또는 토큰 만료 — 입력값 보존을 위해 session/profile 유지
+          setAuthState("sessionExpired");
+        }
       }
     });
     return () => subscription.unsubscribe();
@@ -6960,6 +7026,7 @@ export default function App() {
   }, [authState, profile?.id]);
 
   const handleLogout = async () => {
+    intentionalLogoutRef.current = true;
     await supabase.auth.signOut();
     setAuthState("unauthenticated");
     setSession(null); setProfile(null);
@@ -7187,6 +7254,9 @@ export default function App() {
       {isMobile && <BottomNav nav={NAV} view={view} showInput={showInput} onNavigate={navigate} isAdmin={isAdmin||isParent}/>}
       {showEISetup && <EISetupModal profile={profile} logs={logs} onSave={(t)=>{setProfile(p=>({...p,target_ei:t}));setShowEISetup(false);}}/> }
       {showProfileModal && <ProfileModal profile={profile} onClose={()=>setShowProfileModal(false)} onSave={(updated)=>{setProfile(updated);setShowProfileModal(false);}} onDelete={()=>{setShowProfileModal(false);handleLogout();}}/>}
+      {authState === "sessionExpired" && (
+        <SessionExpiredModal prefillEmail={session?.user?.email || ""}/>
+      )}
     </div>
   );
 }
