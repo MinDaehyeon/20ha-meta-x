@@ -7030,7 +7030,9 @@ export default function App() {
         setSession(sess);
         return;
       }
-      // sessionExpired 상태에서 로그인 성공 → 정상 복귀
+      // 첫 로드 시 발화 — getSession()이 이미 처리하므로 여기선 무시
+      if(event === "INITIAL_SESSION") return;
+      // 로그인 성공 → 정상 복귀 (sessionExpired에서 재로그인 포함)
       if(event === "SIGNED_IN" && sess) {
         intentionalLogoutRef.current = false;
         loadUserData(sess);
@@ -7041,15 +7043,17 @@ export default function App() {
         setSession(sess);
         return;
       }
-      if(event === "SIGNED_OUT" || !sess) {
+      // 명시 SIGNED_OUT 또는 토큰 만료
+      if(event === "SIGNED_OUT") {
         if (intentionalLogoutRef.current) {
           intentionalLogoutRef.current = false;
           setAuthState("unauthenticated");
           setSession(null); setProfile(null);
           setLogs([]); setAllProfiles([]);
         } else {
-          // 자동 refresh 실패 또는 토큰 만료 — 입력값 보존을 위해 session/profile 유지
-          setAuthState("sessionExpired");
+          // 자동 refresh 실패 또는 토큰 만료 — 단, 이전에 인증된 적 있을 때만
+          // (첫 방문에서는 이미 unauthenticated로 가 있음)
+          setAuthState(prev => prev === "ready" || prev === "pending" ? "sessionExpired" : prev);
         }
       }
     });
