@@ -530,7 +530,10 @@ const handleSocial = async (provider) => {
                 </button>
               </div>
               <button onClick={async()=>{setOtpCode("");setError("");await handleSendOtp();}}
-                style={{background:"none",border:"none",color:"#6B7280",fontSize:11,cursor:"pointer",marginTop:6,padding:0}}>코드 재전송</button>
+                disabled={loading.sendOtp||loading.otp}
+                style={{background:"none",border:"none",color:"#6B7280",fontSize:11,cursor:(loading.sendOtp||loading.otp)?"default":"pointer",marginTop:6,padding:0,opacity:(loading.sendOtp||loading.otp)?0.5:1}}>
+                {loading.sendOtp ? "전송 중..." : "코드 재전송"}
+              </button>
             </div>
           )}
           <div><label style={css.label}>비밀번호 <span style={{fontWeight:400,color:T.muted}}>(대소문자+특수문자 포함 8자↑)</span></label><input type="password" value={suPw} onChange={e=>setSuPw(e.target.value)} placeholder="••••••••" style={css.input}/></div>
@@ -2919,6 +2922,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
   const [certSessionModal, setCertSessionModal] = useState(null); // {id, postTitle, posted_at, sessions: number[]}
   const [certScoreModal, setCertScoreModal] = useState(null); // {id, postTitle, submit, mission, fidelity}
   const [certScoreSaving, setCertScoreSaving] = useState(false);
+  const [certSessionSaving, setCertSessionSaving] = useState(false);
   const [lastCrawledAt, setLastCrawledAt] = useState(null);
   const [certRecordsPage, setCertRecordsPage] = useState(1);
   const CERT_RECORDS_PAGE_SIZE = 30;
@@ -3035,16 +3039,22 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
   };
 
   const updateCertSessions = async (certId, sessions) => {
-    const arr = (sessions||[]).map(Number).filter(n=>n>=1 && n<=ROSTER2_NAVER_DATES.length);
-    arr.sort((a,b)=>a-b);
-    const dedup = [...new Set(arr)];
-    await supabase.rpc("update_cert_sessions", {
-      p_cert_id: certId,
-      p_sessions: dedup.length ? dedup : null,
-    });
-    const patch = { session_override: dedup.length ? dedup : null };
-    setCertRecords(prev => prev.map(r => r.id===certId ? {...r, ...patch} : r));
-    setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, ...patch} : c));
+    if (certSessionSaving) return;
+    setCertSessionSaving(true);
+    try {
+      const arr = (sessions||[]).map(Number).filter(n=>n>=1 && n<=ROSTER2_NAVER_DATES.length);
+      arr.sort((a,b)=>a-b);
+      const dedup = [...new Set(arr)];
+      await supabase.rpc("update_cert_sessions", {
+        p_cert_id: certId,
+        p_sessions: dedup.length ? dedup : null,
+      });
+      const patch = { session_override: dedup.length ? dedup : null };
+      setCertRecords(prev => prev.map(r => r.id===certId ? {...r, ...patch} : r));
+      setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, ...patch} : c));
+    } finally {
+      setCertSessionSaving(false);
+    }
   };
 
   const updateCertScore = async (certId, parts) => {
@@ -3938,10 +3948,12 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                     <button onClick={resetAuto}
                       style={{...css.btnOutline,padding:"6px 12px",fontSize:12}}>자동 복귀</button>
                     <div style={{display:"flex",gap:8}}>
-                      <button onClick={()=>setCertSessionModal(null)}
-                        style={{...css.btnOutline,padding:"7px 18px",fontSize:13}}>취소</button>
-                      <button onClick={save}
-                        style={{...css.btnOrange,padding:"7px 18px",fontSize:13}}>확인</button>
+                      <button onClick={()=>setCertSessionModal(null)} disabled={certSessionSaving}
+                        style={{...css.btnOutline,padding:"7px 18px",fontSize:13,opacity:certSessionSaving?0.5:1}}>취소</button>
+                      <button onClick={save} disabled={certSessionSaving}
+                        style={{...css.btnOrange,padding:"7px 18px",fontSize:13,opacity:certSessionSaving?0.6:1,display:"flex",alignItems:"center",gap:6}}>
+                        {certSessionSaving ? <><Spinner size={12} color="#fff"/>저장 중</> : "확인"}
+                      </button>
                     </div>
                   </div>
                 </div>
