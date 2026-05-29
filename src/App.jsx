@@ -4787,9 +4787,11 @@ const MakeupView = () => {
   const yesterdayKey = roster2FmtKey(yesterday);
 
   // 회차 중 어제까지 끝난 회차만 검사 (회차 일자 <= 어제)
+  // 1주차(1회·2회 = 5/20·5/24)는 적응 기간으로 Make-up 검사에서 제외
   const elapsedSessions = ROSTER2_NAVER_DATES
     .map((d,i)=>({idx:i, sn:i+1, date:d, key:roster2FmtKey(d)}))
-    .filter(s => s.key <= yesterdayKey);
+    .filter(s => s.key <= yesterdayKey)
+    .filter(s => s.sn > 2);
 
   // 학생별 분석 — 회차 순서대로 경고 검사 후 '연속 2회 이상' 발생한 학생만 대상자
   const realStudents = students.filter(s => s.name !== "테스트학생");
@@ -4838,7 +4840,7 @@ const MakeupView = () => {
       <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:14,flexWrap:"wrap"}}>
         <div style={{fontSize:18,fontWeight:800,color:T.navy}}>📚 Make-up 대상자</div>
         <div style={{fontSize:12,color:T.muted}}>
-          ※ 미제출은 어제({yesterday.getMonth()+1}/{yesterday.getDate()})까지의 회차만 검사 · <strong>2회 연속 경고</strong> 시 대상자
+          ※ 1주차(1·2회) 제외 · 3회차부터 어제({yesterday.getMonth()+1}/{yesterday.getDate()})까지 검사 · <strong>2회 연속 경고</strong> 시 대상자
         </div>
       </div>
 
