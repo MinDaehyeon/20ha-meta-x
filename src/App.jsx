@@ -15,6 +15,7 @@ import { Card, Pill, NavyNum, SectionTitle, Divider, Spinner, ChartTip } from ".
 import { QUANT_ITEMS, QUAL_ITEMS, SUBJECTS, SUBJECT_CONFIG, ERR_CODES, ERR_LABELS, GRADES } from "./utils/constants";
 import { calcGrade, gradeInfo, calcEI } from "./utils/grade";
 import { ROSTER2, ROSTER2_NAVER_DATES, ROSTER2_MORNING_DATES, ROSTER2_NIGHT_DATES, ROSTER2_DAY_KO, roster2FmtKey, roster2Fmt, isLateByDeadline, INIT_ATTENDANCE2 } from "./utils/roster2";
+import { draftKey, restoreDraft, clearDraft, useDraftBackup } from "./utils/draft";
 
 // ══════════════════════════════════════════════════════
 
@@ -176,15 +177,19 @@ const AuthScreen = ({ onLogin }) => {
   const [pw, setPw]           = useState("");
   const [rememberMe, setRememberMe] = useState(()=>!!localStorage.getItem("20ha_saved_email"));
   const [mode, setMode]       = useState("login"); // "login"|"signup"
-  const [suRole, setSuRole]   = useState("student"); // "student" | "parent"
-  const [suName, setSuName]   = useState("");
-  const [suBirthYear, setSuBirthYear]   = useState("");
-  const [suBirthMonth, setSuBirthMonth] = useState("");
-  const [suBirthDay, setSuBirthDay]     = useState("");
-  const [suEmail, setSuEmail] = useState("");
-  const [suPw, setSuPw]       = useState("");
+  const SIGNUP_DRAFT_KEY = draftKey("signup");
+  const _restoredSignup = useMemo(() => restoreDraft(SIGNUP_DRAFT_KEY) || {}, []);
+  const [suRole, setSuRole]   = useState(_restoredSignup.suRole || "student");
+  const [suName, setSuName]   = useState(_restoredSignup.suName || "");
+  const [suBirthYear, setSuBirthYear]   = useState(_restoredSignup.suBirthYear || "");
+  const [suBirthMonth, setSuBirthMonth] = useState(_restoredSignup.suBirthMonth || "");
+  const [suBirthDay, setSuBirthDay]     = useState(_restoredSignup.suBirthDay || "");
+  const [suEmail, setSuEmail] = useState(_restoredSignup.suEmail || "");
+  const [suPw, setSuPw]       = useState(""); // 보안: 비번 백업 안 함
   const [suPwC, setSuPwC]     = useState("");
   const [suTarget, setSuTarget] = useState(85);
+  // 비번 제외 회원가입 입력 백업 (debounce 500ms)
+  useDraftBackup(SIGNUP_DRAFT_KEY, { suRole, suName, suBirthYear, suBirthMonth, suBirthDay, suEmail });
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [ageAgreed, setAgeAgreed] = useState(false);
@@ -338,6 +343,7 @@ const AuthScreen = ({ onLogin }) => {
     }
     await supabase.auth.signOut();
     setLoad("signup",false);
+    clearDraft(SIGNUP_DRAFT_KEY);
     setSignupDone(true);
   };
 
@@ -788,17 +794,23 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
   const [saving, setSaving] = useState(false);
   const [saveWarnings, setSaveWarnings] = useState([]);
   const isMobile = useMobile();
-  const [form, setForm]   = useState({
-    date:new Date().toISOString().slice(0,10), subject:"수학", bookLevel:1,
-    startTime:"", endTime:"", breakTime:0, questionCount:20,
-    qBasic:0, qMid:0, qAdv:0,
-    tBasic:0, tMid:0, tAdv:0,
-    quant:Object.fromEntries(QUANT_ITEMS.map(k=>[k,80])),
-    qual:Object.fromEntries(QUAL_ITEMS.map(k=>[k,3])),
-    quantEnabled:{}, qualEnabled:{},
-    coinFilter:{cc:0,ci:0,ic:0,ii:0},
-    errorAnalysis:{Q1:0,Q2:0,Q3:0,M1:0,M2:0,M3:0},
+  const DRAFT_KEY = draftKey("datainput", uid);
+  const [form, setForm]   = useState(() => {
+    const restored = restoreDraft(DRAFT_KEY);
+    if (restored) return restored;
+    return {
+      date:new Date().toISOString().slice(0,10), subject:"수학", bookLevel:1,
+      startTime:"", endTime:"", breakTime:0, questionCount:20,
+      qBasic:0, qMid:0, qAdv:0,
+      tBasic:0, tMid:0, tAdv:0,
+      quant:Object.fromEntries(QUANT_ITEMS.map(k=>[k,80])),
+      qual:Object.fromEntries(QUAL_ITEMS.map(k=>[k,3])),
+      quantEnabled:{}, qualEnabled:{},
+      coinFilter:{cc:0,ci:0,ic:0,ii:0},
+      errorAnalysis:{Q1:0,Q2:0,Q3:0,M1:0,M2:0,M3:0},
+    };
   });
+  useDraftBackup(DRAFT_KEY, form);
   const subjectCfg = SUBJECT_CONFIG[form.subject] || SUBJECT_CONFIG["수학"];
   const handleSubjectChange = s => setForm(f=>({...f, subject:s, qBasic:0, qMid:0, qAdv:0, quantEnabled:{}, qualEnabled:{}}));
   const toMin = t=>{if(!t)return 0;const[h,m]=t.split(":").map(Number);return h*60+m;};
@@ -883,6 +895,7 @@ const DataInputForm = ({uid, onSave, onCancel}) => {
     });
     setSaving(false);
     if(error){setErr("저장 오류: "+error.message);return;}
+    clearDraft(DRAFT_KEY);
     onSave();
   };
 
@@ -6430,11 +6443,14 @@ const EISetupModal = ({profile, logs=[], onSave}) => {
 // PROFILE MODAL
 // ══════════════════════════════════════════════════════
 const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
-  const [name, setName]             = useState(profile.name||"");
-  const [birthYear, setBirthYear]   = useState(profile.birth_year ? String(profile.birth_year) : "");
-  const [birthMonth, setBirthMonth] = useState(profile.birth_month ? String(profile.birth_month) : "");
-  const [birthDay, setBirthDay]     = useState(profile.birth_day ? String(profile.birth_day) : "");
-  const [target, setTarget]       = useState(gradeInfo(profile.target_ei||85).g);
+  const PROFILE_DRAFT_KEY = draftKey("profile", profile.id);
+  const _restoredProfile = useMemo(() => restoreDraft(PROFILE_DRAFT_KEY) || {}, []);
+  const [name, setName]             = useState(_restoredProfile.name ?? (profile.name||""));
+  const [birthYear, setBirthYear]   = useState(_restoredProfile.birthYear ?? (profile.birth_year ? String(profile.birth_year) : ""));
+  const [birthMonth, setBirthMonth] = useState(_restoredProfile.birthMonth ?? (profile.birth_month ? String(profile.birth_month) : ""));
+  const [birthDay, setBirthDay]     = useState(_restoredProfile.birthDay ?? (profile.birth_day ? String(profile.birth_day) : ""));
+  const [target, setTarget]       = useState(_restoredProfile.target ?? gradeInfo(profile.target_ei||85).g);
+  useDraftBackup(PROFILE_DRAFT_KEY, { name, birthYear, birthMonth, birthDay, target });
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url||"");
   const [uploading, setUploading] = useState(false);
   const [newPw, setNewPw]         = useState("");
@@ -6513,6 +6529,7 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
     }
     setSaving(false);
     setDone(true);
+    clearDraft(PROFILE_DRAFT_KEY);
     setTimeout(()=>onSave({...profile,name,grade:newGrade,birth_year:by,birth_month:bm,birth_day:bd,target_ei:GRADE_MIN[target]||85,avatar_url:avatarUrl}), 800);
   };
 
