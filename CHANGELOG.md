@@ -7,6 +7,16 @@
 
 ---
 
+## v2026.06.01-6 — 2026-06-01
+**커밋:** [34b21c7](https://github.com/MinDaehyeon/20ha-meta-x/commit/34b21c7)
+
+### Critical 버그 수정
+
+- v2026.06.01-5에서 `supabase.rpc(...).catch(()=>{})` 사용 → `PostgrestFilterBuilder`는 thenable이지만 Promise가 아니라 `.catch`가 없어 `TypeError: rpc(...).catch is not a function`로 모든 사용자 화면 깨짐
+- 수정: `.then(()=>{}, ()=>{})` (두 번째 인자가 onRejected 역할) 사용
+
+---
+
 ## v2026.06.01-5 — 2026-06-01
 **커밋:** [cb2be82](https://github.com/MinDaehyeon/20ha-meta-x/commit/cb2be82)
 
