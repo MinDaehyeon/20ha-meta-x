@@ -7,6 +7,42 @@
 
 ---
 
+## v2026.06.01-9 — 2026-06-01
+**커밋:** [1bcd917](https://github.com/MinDaehyeon/20ha-meta-x/commit/1bcd917)
+
+### 주요 변경
+
+**기능 추가 — 관리자 "학생 화면 보기" 모드**
+- 회원 관리 표의 학생(approved) 행에 "👁 학생화면" 버튼
+- 클릭 시 풀스크린 오버레이 + 상단 노란 배너 "👁 관리자 view 모드 — {학생명} 학생이 보는 화면 그대로"
+- 학생 본인이 보는 카페 인증 화면(StudentCertView) 그대로 표시
+- DB (`20260601400000_admin_view_as_student.sql`): `get_child_cafe_certs` / `get_child_attendance_logs`에 admin role 분기 추가
+  → 학부모 `viewerMode="parent"` 컴포넌트를 admin이 임의 학생 대상으로 그대로 재사용
+
+**버그 수정 — 학생 진행률 과장 표시 (100% / 100% 초과)**
+- 증상: 박재현 학생이 5/25 모닝 빠졌는데 멘토 인사이트가 "미라클모닝 100% 완벽! 흠잡을 데가 없어요"로 표시
+- 추가 증상: 6/3 일정 변경 사전 출석으로 일부 학생 "105% 달성" 표시
+- 원인 1: 본인 출석 카운트(`myStat.morning`)가 ROSTER2 전체 일자 기준이라 미래 회차 사전 출석도 포함 → `done > past` → `done/past*100 > 100`
+- 원인 2: `Math.round` 사용으로 99.5%가 100%로 표시
+- 원인 3: 오늘 출석 row가 어제까지 회차 분자에 포함되어 빠진 회차가 가려짐
+- 수정:
+  - 본인 카운트(morning/night/naver)에 `isTodayOrPast(dt <= todayMidnight)` cap — 미래 출석 사전 표시 차단, 6/3 당일 도달 시 자연 반영
+  - 멘토/마스터리 진행률에 `Math.min(100, Math.floor(...))` cap
+  - "100% 완벽" 메시지 조건: `floor + done === past` 정확 비교 (round 함정 차단)
+  - 모든 진행률 메시지에 X/Y 정확 횟수 포함 (예: "진행된 6회 중 5회 (83%)")
+  - "100% 완벽 / 흠잡을 데가 없어요 / 탁월한 성과" 등 강한 표현 → 객관적 사실 기반 톤다운
+  - 1위 메시지 공동 1위 동률 케이스 분리
+
+**런타임 오류 수정 — TDZ**
+- `today/todayMidnight` 정의 위치가 `isTodayOrPast` 보다 아래라 학생화면 진입 시 `Cannot access $ before initialization` 발생
+- 정의를 `myAttSet` 직후로 이동
+
+### dev 검증
+- 박재현 학생화면: 콘솔 에러 0, 미라클모닝 6/24 (옛 7/6 표시 사라짐), 미라클나이트 10/47 (6/3 미래 출석 제외), 멘토/마스터리 메시지 모두 보수적 X/Y 표기
+- 심수윤 학생화면: 정상 표시, 클래스 5위/45명, 카페 4/16, 모닝 7/24, 나잇 12/47
+
+---
+
 ## v2026.06.01-8 — 2026-06-01
 **커밋:** [d8ab2af](https://github.com/MinDaehyeon/20ha-meta-x/commit/d8ab2af)
 
