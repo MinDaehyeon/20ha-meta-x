@@ -7,6 +7,19 @@
 
 ---
 
+## v2026.06.01-7 — 2026-06-01
+**커밋:** [3e8cf86](https://github.com/MinDaehyeon/20ha-meta-x/commit/3e8cf86)
+
+### 주요 변경
+
+**AI 학습코치 안정화 — Gemini 모델 교체**
+- 증상: AI 학습코치가 자주 `503 / "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later."` 반환
+- 원인: 기존 `gemini-2.5-flash`는 preview tier로 무료 quota capacity 변동이 큼
+- 수정: `gemini-2.0-flash` (GA stable)로 교체. 무료 quota 충분
+- 추가: 503/high-demand/overloaded 응답은 영문 그대로 노출하지 않고 한국어 안내 "AI 서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요." 로 표시
+
+---
+
 ## v2026.06.01-6 — 2026-06-01
 **커밋:** [34b21c7](https://github.com/MinDaehyeon/20ha-meta-x/commit/34b21c7)
 
