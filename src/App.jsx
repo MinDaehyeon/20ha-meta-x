@@ -2957,6 +2957,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
   const [filterStatus, setFilterStatus] = useState("all"); // "all"|"pending"|"approved"|"rejected"
   const [filterRole, setFilterRole]   = useState("all"); // "all"|"student"|"parent"
   const [detailStudent, setDetailStudent] = useState(null);
+  // 관리자가 학생 화면을 read-only로 보기 위한 state. profile 객체가 들어있으면 풀스크린 오버레이로 학생 인증 화면을 표시
+  const [viewAsStudent, setViewAsStudent] = useState(null);
 
   // 기수 데이터 (회원 관리·2기 명단 공용)
   const ROSTER2_NAMES = new Set(["강예나","김가흔","김은채","김태준","박재현","손연재","윤준원","최지유","배정윤","심수윤","한설아","강가인","권민유","권순혁","최유주","김도현","김시원","김시윤","김아란","김준범","김지우","김호진","나지성","문지유","박지우","서소윤","서지우","송민건","양소윤","오수연","우정훈","윤서준","이유빈","이홍윤","임다은","정유진","박선율","한채린","오수빈","남희수","김가인","양은정","테스트학생","한유찬","문성민"]);
@@ -3468,6 +3470,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                       </>}
                       {s.approval_status==="approved"&&<button onClick={()=>setApproval(s.id,"rejected")} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:`1px solid ${T.border}`,background:T.white,color:T.muted,cursor:"pointer"}}>비활성</button>}
                       {s.approval_status==="rejected"&&<button onClick={()=>setApproval(s.id,"approved")} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:`1px solid ${T.border}`,background:T.white,color:T.success,cursor:"pointer",fontWeight:700}}>재승인</button>}
+                      {s.role==="student"&&s.approval_status==="approved"&&<button onClick={()=>setViewAsStudent(s)} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:`1px solid #4F46E5`,background:T.white,color:"#4F46E5",cursor:"pointer",fontWeight:700}}>👁 학생화면</button>}
                       <button onClick={()=>setEditStudent(s)} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:`1px solid ${T.border}`,background:T.white,color:T.navy,cursor:"pointer"}}>수정</button>
                     </div>,
                   ])}
@@ -4755,6 +4758,21 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           </div>
         );
       })()}
+
+      {/* 관리자 "학생 화면 보기" 풀스크린 오버레이 — viewerMode="parent"로 학생 본인 화면 그대로 렌더 */}
+      {viewAsStudent && (
+        <div style={{position:"fixed",inset:0,background:T.bg,zIndex:9999,overflow:"auto"}}>
+          <div style={{position:"sticky",top:0,zIndex:1,background:"#FEF3C7",borderBottom:"1px solid #FDE68A",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#92400E"}}>
+              👁 관리자 view 모드 — <strong>{viewAsStudent.name}</strong> 학생이 보는 화면 그대로 (읽기 전용)
+            </div>
+            <button onClick={()=>setViewAsStudent(null)} style={{fontSize:12,fontWeight:700,padding:"6px 14px",borderRadius:8,border:"none",background:T.navy,color:T.white,cursor:"pointer"}}>← 돌아가기</button>
+          </div>
+          <div style={{padding:"16px",maxWidth:1280,margin:"0 auto"}}>
+            <StudentCertView profile={viewAsStudent} viewerMode="parent" />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
