@@ -2129,18 +2129,22 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
   myAttLogs.forEach(l => myAttSet.add(`${l.session_type}-${l.session_date}`));
 
   // 전체 통계: 모두 DB 기반
+  // 본인 카운트는 "오늘까지" 일자만 (미래 회차에 미리 들어간 출석 row — 예: 6/3 일정 변경 사전 처리 —
+  // 화면에 미리 ✓로 표시되지 않도록. 6/3 당일이 되면 자연스레 카운트됨)
+  const isTodayOrPast = (dt) => dt <= todayMidnight;
   const allStats = ROSTER2.map((s) => {
-    // 본인은 myAttSet, 타 학생은 classAttStats
     let morning, night;
     if (s.name === profile.name) {
-      morning = ROSTER2_MORNING_DATES.filter(dt => myAttSet.has(`M-${fk(dt)}`)).length;
-      night   = ROSTER2_NIGHT_DATES.filter(dt => myAttSet.has(`N-${fk(dt)}`)).length;
+      morning = ROSTER2_MORNING_DATES.filter(dt => isTodayOrPast(dt) && myAttSet.has(`M-${fk(dt)}`)).length;
+      night   = ROSTER2_NIGHT_DATES.filter(dt => isTodayOrPast(dt) && myAttSet.has(`N-${fk(dt)}`)).length;
     } else {
       morning = classAttStats[s.name]?.morning || 0;
       night   = classAttStats[s.name]?.night   || 0;
     }
-    // N(카페): 본인은 myCertSessions, 그 외 학생은 classCertStats
-    const n = s.name === profile.name ? myCertSessions.size : (classCertStats[s.name] || 0);
+    // N(카페): 본인은 오늘까지 회차만, 그 외 학생은 classCertStats
+    const n = s.name === profile.name
+      ? [...myCertSessions].filter(i => isTodayOrPast(ROSTER2_NAVER_DATES[i])).length
+      : (classCertStats[s.name] || 0);
     return {name: s.name, naver: n, morning, night, total: n + morning + night};
   });
   const myStat = myIdx >= 0 ? allStats[myIdx] : {naver:0, morning:0, night:0, total:0};
@@ -2221,7 +2225,8 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
   ];
 
   // ── 멘토 인사이트 메시지 풀 (진행 회차 기반)
-  const totalPct   = pct(myStat.total, grandTotal);
+  // floor + cap 100 보수화 — pct()가 round 사용이면 99.5→100 함정 발생, 여기선 자체 계산
+  const totalPct   = grandTotal > 0 ? Math.min(100, Math.floor(myStat.total / grandTotal * 100)) : 0;
   const weeksLeft  = Math.max(0, 7 - currentWeekIdx);
   const thisWeekPct = weeklyData[currentWeekIdx]?.pct ?? 0;
 
@@ -2232,37 +2237,51 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
   const nightPast   = pastCount(ROSTER2_NIGHT_DATES);
   const grandPast   = morningPast + naverPast + nightPast;
 
-  // 진행 회차 대비 달성률
-  const totalPctPast = grandPast > 0 ? Math.round(myStat.total / grandPast * 100) : 0;
+  // 진행 회차 한정 출석 수 — 미래 회차 자동 출석(예: 6/3 일정 변경 사전 처리)으로 done > past 되는 케이스 방지
+  // 멘토/마스터리 메시지는 "어제까지 회차에 대한 출석"만 분모/분자로 사용해야 정확
+  const morningDoneInPast = ROSTER2_MORNING_DATES.filter(dt => dt < todayMidnight && myAttSet.has(`M-${fk(dt)}`)).length;
+  const naverDoneInPast   = [...myCertSessions].filter(i => i < naverPast).length;
+  const nightDoneInPast   = ROSTER2_NIGHT_DATES.filter(dt => dt < todayMidnight && myAttSet.has(`N-${fk(dt)}`)).length;
+  const totalDoneInPast   = morningDoneInPast + naverDoneInPast + nightDoneInPast;
 
-  // 활동별 진행 회차 기반 달성률 (past>0인 활동만 비교 대상)
+  // 진행 회차 대비 달성률 (cap 100, floor로 보수화 — 99.5%가 100%로 반올림되는 함정 회피)
+  const safePct = (done, past) => past > 0 ? Math.min(100, Math.floor(done / past * 100)) : 0;
+  const totalPctPast = safePct(totalDoneInPast, grandPast);
+
+  // 활동별 진행 회차 기반 달성률 — done은 doneInPast만 (미래 출석 미반영)
   const actPctsPast = [
-    {label:"미라클모닝",   p: morningPast>0 ? Math.round(myStat.morning/morningPast*100) : 0, past: morningPast, done: myStat.morning, remaining: Math.max(0, morningTotal - myStat.morning), total: morningTotal},
-    {label:"카페 인증",    p: naverPast>0   ? Math.round(myStat.naver/naverPast*100)     : 0, past: naverPast,   done: myStat.naver,   remaining: Math.max(0, naverTotal   - myStat.naver),   total: naverTotal},
-    {label:"미라클나이트", p: nightPast>0   ? Math.round(myStat.night/nightPast*100)     : 0, past: nightPast,   done: myStat.night,   remaining: Math.max(0, nightTotal   - myStat.night),   total: nightTotal},
+    {label:"미라클모닝",   p: safePct(morningDoneInPast, morningPast), past: morningPast, done: morningDoneInPast, remaining: Math.max(0, morningTotal - myStat.morning), total: morningTotal},
+    {label:"카페 인증",    p: safePct(naverDoneInPast,   naverPast),   past: naverPast,   done: naverDoneInPast,   remaining: Math.max(0, naverTotal   - myStat.naver),   total: naverTotal},
+    {label:"미라클나이트", p: safePct(nightDoneInPast,   nightPast),   past: nightPast,   done: nightDoneInPast,   remaining: Math.max(0, nightTotal   - myStat.night),   total: nightTotal},
   ];
   const validActs = actPctsPast.filter(a => a.past > 0);
   const weakest   = validActs.length ? [...validActs].sort((a,b)=>a.p-b.p)[0] : null;
   const strongest = validActs.length ? [...validActs].sort((a,b)=>b.p-a.p)[0] : null;
 
   const mentorPool = [
-    // 순위
-    ...(myRank===1                                    ? ["현재 클래스 1위! 이 기세를 끝까지 유지해보세요. 🏆"] : []),
-    ...(myRank===2                                    ? [`1위와 ${ranked[0].total-myStat.total}회 차이예요. 따라잡을 수 있어요!`] : []),
-    ...(myRank===3                                    ? ["TOP 3! 지금 이 자리를 지키는 것도 실력이에요."] : []),
-    ...(myRank>3 && myRank<=Math.ceil(ROSTER2.length*.2) ? [`상위 20% 안에 있어요. 조금만 더 하면 TOP 3도 보여요.`] : []),
-    // 약점 활동 (진행 회차 기반, past>0인 것만)
-    ...(weakest && weakest.p < 50                     ? [`지금까지 ${weakest.label} ${weakest.p}% — 균형을 위해 조금만 신경 써보세요.`] : []),
-    ...(weakest && weakest.p >= 50 && weakest.p < 80  ? [`${J_eul(weakest.label)} 한 번만 더 챙기면 균형이 잡혀요. (현재 ${weakest.p}%)`] : []),
-    // 강점 활동
-    ...(strongest && strongest.p === 100              ? [`${strongest.label} 지금까지 100% 완벽! 흠잡을 데가 없어요. ✅`] : []),
-    ...(strongest && strongest.p >= 80 && strongest.p < 100 ? [`${J_i(strongest.label)} ${strongest.p}% — 이 활동의 루틴이 잘 잡혀있어요.`] : []),
+    // 순위 — 동률 케이스 보수화 (1위 두 명일 때 "유일 1위" 표현 회피)
+    ...(myRank===1 && ranked.length > 1 && ranked[1].total < myStat.total ? ["현재 클래스 1위예요. 이 페이스를 유지해보세요."] : []),
+    ...(myRank===1 && ranked.length > 1 && ranked[1].total === myStat.total ? ["현재 공동 1위예요. 페이스를 잘 유지하고 있어요."] : []),
+    ...(myRank===2                                    ? [`1위와 ${Math.max(0, ranked[0].total-myStat.total)}회 차이예요. 천천히 따라잡아 봐요.`] : []),
+    ...(myRank===3                                    ? ["TOP 3 자리예요. 페이스 유지가 가장 중요해요."] : []),
+    ...(myRank>3 && myRank<=Math.ceil(ROSTER2.length*.2) ? [`상위 20% 안에 있어요. 한 단계씩 천천히 올라가 봐요.`] : []),
+    // 약점 활동 (진행 회차 기반, past>0인 것만) — 실제 미수행 회차가 있을 때만
+    ...(weakest && weakest.p < 50 && (weakest.past - weakest.done) > 0 ? [`${weakest.label} 진행 ${weakest.past}회 중 ${weakest.done}회 (${weakest.p}%) — 다음 일정부터 조금씩 챙겨봐요.`] : []),
+    ...(weakest && weakest.p >= 50 && weakest.p < 80 && (weakest.past - weakest.done) > 0 ? [`${J_eul(weakest.label)} ${weakest.past - weakest.done}회 더 챙기면 80%까지 갑니다. (현재 ${weakest.p}%)`] : []),
+    // 강점 활동 — "100% 완벽" 조건: floor 후 정확히 100 + 정확 비교(done === past, past > 0)
+    ...(strongest && strongest.past > 0 && strongest.done === strongest.past
+        ? [`${strongest.label}은(는) 진행된 ${strongest.past}회를 모두 채웠어요. 이 페이스를 유지해보세요.`]
+        : []),
+    ...(strongest && strongest.p >= 80 && strongest.p < 100 && strongest.done < strongest.past
+        ? [`${J_i(strongest.label)} ${strongest.past}회 중 ${strongest.done}회 (${strongest.p}%) — 루틴이 잘 잡혀있어요.`]
+        : []),
     // 진행 대비 전체 달성률
     ...(grandPast===0                                 ? ["프로젝트가 막 시작했어요. 첫 일정부터 차근차근 채워봐요."] : []),
-    ...(grandPast>0 && totalPctPast>=90               ? [`지금까지 ${totalPctPast}% 달성! 거의 모든 일정을 완수하고 있어요. 🌟`] : []),
-    ...(grandPast>0 && totalPctPast>=70 && totalPctPast<90 ? [`진행된 일정의 ${totalPctPast}%를 채우고 있어요. 잘 따라가는 중이에요.`] : []),
-    ...(grandPast>0 && totalPctPast>=40 && totalPctPast<70 ? [`현재 ${totalPctPast}%, 안정적으로 따라가고 있어요. 한 발씩만 더 챙겨보세요.`] : []),
-    ...(grandPast>0 && totalPctPast>0 && totalPctPast<40    ? [`시작했어요. ${myStat.total}회가 쌓였어요. 다음 한 번이 루틴을 만들어요.`] : []),
+    ...(grandPast>0 && totalPctPast>=90 && totalDoneInPast < grandPast ? [`진행된 ${grandPast}회 중 ${totalDoneInPast}회 (${totalPctPast}%)를 채우고 있어요. 잘 따라가는 중이에요.`] : []),
+    ...(grandPast>0 && totalDoneInPast === grandPast  ? [`진행된 ${grandPast}회를 모두 채웠어요. 이 페이스를 유지해보세요.`] : []),
+    ...(grandPast>0 && totalPctPast>=70 && totalPctPast<90 ? [`진행된 일정의 ${totalPctPast}%를 채우고 있어요. 페이스가 안정적이에요.`] : []),
+    ...(grandPast>0 && totalPctPast>=40 && totalPctPast<70 ? [`현재 ${totalPctPast}%예요. 한 회차씩 조금씩 채워가 봐요.`] : []),
+    ...(grandPast>0 && totalPctPast>0 && totalPctPast<40    ? [`지금까지 ${totalDoneInPast}회를 채웠어요. 다음 한 회차가 루틴을 만들어요.`] : []),
     ...(grandPast>0 && totalPctPast===0               ? ["아직 첫 인증을 기다리고 있어요. 오늘 딱 하나만 해볼까요?"] : []),
     // 주차
     ...(currentWeekIdx<=1                             ? ["프로젝트 초반이에요. 지금 만드는 루틴이 8주를 결정해요."] : []),
