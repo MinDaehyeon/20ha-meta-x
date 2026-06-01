@@ -7,6 +7,19 @@
 
 ---
 
+## v2026.06.01-5 — 2026-06-01
+**커밋:** [cb2be82](https://github.com/MinDaehyeon/20ha-meta-x/commit/cb2be82)
+
+### 주요 변경
+
+**기능 추가 — 김도현 학생 매주 월요일 미라클 나이트 자동 출석**
+- 운영 사유: 매주 월요일 아이인사이드 영작 수업으로 미라클 나이트 불참 → 출석 인정
+- 요구사항: 미래 월요일은 미리 체크하지 않음. "화요일이 되면" 어제(월) 자동 추가
+- DB (`20260601300000_kimdohyun_monday_attendance.sql`): SECURITY DEFINER 함수 `apply_kimdohyun_monday_attendance()` — 5/17부터 어제(KST)까지의 월요일 일자를 김도현 (cert_students.id=124) `attendance_logs` 'N'에 멱등 INSERT
+- 코드 (App.jsx): `session` 로드 직후 RPC 1회 fire-and-forget 호출. 학생/학부모/관리자 누가 앱을 열어도 백필 트리거 (pg_cron 없이 일반 사용으로 자동화)
+
+---
+
 ## v2026.06.01-4 — 2026-06-01
 **커밋:** [d98f402](https://github.com/MinDaehyeon/20ha-meta-x/commit/d98f402)
 
