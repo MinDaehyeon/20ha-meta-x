@@ -6901,6 +6901,9 @@ const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, 
 export default function App() {
   const [authState, setAuthState] = useState("loading"); // loading | unauthenticated | ready | pending | passwordRecovery | sessionExpired
   const intentionalLogoutRef = useRef(false);
+  // 가입 진행 중에는 OTP verify로 생긴 임시 세션의 SIGNED_IN을 무시해야 한다.
+  // 그렇지 않으면 loadUserData가 "프로필 없음"으로 보고 강제 signOut → 가입 버튼 실패.
+  const signupInProgressRef = useRef(false);
   const [showEISetup, setShowEISetup] = useState(false);
   // "loading" | "unauthenticated" | "needsProfile" | "pending" | "ready" | "passwordRecovery"
   const [session, setSession]     = useState(null);
@@ -7037,6 +7040,8 @@ export default function App() {
       // 로그인 성공 → 정상 복귀 (sessionExpired에서 재로그인 포함)
       if(event === "SIGNED_IN" && sess) {
         intentionalLogoutRef.current = false;
+        // 가입 중(OTP verify 직후) SIGNED_IN: 임시 세션. handleSignup이 끝까지 책임지므로 loadUserData 건너뜀
+        if (signupInProgressRef.current) { setSession(sess); return; }
         loadUserData(sess);
         return;
       }
@@ -7063,6 +7068,11 @@ export default function App() {
   }, []);
 
   const refreshData = () => { if(session) loadUserData(session); };
+
+  // 가입 모드 진입 시 ref 세팅. signupDone되거나 mode가 바뀌면 해제.
+  useEffect(() => {
+    signupInProgressRef.current = (mode === "signup" && !signupDone);
+  }, [mode, signupDone]);
 
   // 역할별 초기 화면 보정
   useEffect(() => {
