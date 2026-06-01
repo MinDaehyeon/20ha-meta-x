@@ -44,9 +44,15 @@ export const ROSTER2_NAVER_DATES   = _genDates([0, 3])
   .filter(d => !(d.getFullYear()===2026 && d.getMonth()===4 && d.getDate()===17))
   .concat([new Date(2026, 6, 12)]); // 7/12 일요일
 export const ROSTER2_MORNING_DATES = _genDates([1, 3, 5]);
+// 미라클 나이트 일정 — 5/17 시작, 수요일 제외 (일·월·화·목·금·토)
+// 예외:
+//   - 7/11(토) 일정상 제외
+//   - 5/29(금) → 6/3(수)로 일정 이동 (전체 출석 처리는 DB attendance_logs로 일괄 INSERT됨)
 export const ROSTER2_NIGHT_DATES   = _genDates([0, 1, 2, 4, 5, 6])
-  // 마지막 7/11(토)은 일정상 제외
-  .filter(d => !(d.getFullYear()===2026 && d.getMonth()===6 && d.getDate()===11));
+  .filter(d => !(d.getFullYear()===2026 && d.getMonth()===6 && d.getDate()===11))
+  .filter(d => !(d.getFullYear()===2026 && d.getMonth()===4 && d.getDate()===29))
+  .concat([new Date(2026, 5, 3)])
+  .sort((a, b) => a - b);
 
 export const ROSTER2_DAY_KO  = ['일','월','화','수','목','금','토'];
 export const roster2FmtKey   = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
