@@ -7077,9 +7077,10 @@ export default function App() {
   // 김도현 학생: 매주 월요일 미라클 나이트(아이인사이드 영작 수업) 자동 출석
   // 어제까지의 월요일들만 INSERT (미래는 안 함). 화요일에 자동 적용 효과.
   // 모든 인증 사용자가 트리거 가능 (멱등 SECURITY DEFINER RPC라 부담 없음)
+  // supabase-js의 rpc()는 thenable이지만 Promise가 아니어서 .catch 없음 → .then(onOK, onErr)
   useEffect(() => {
     if (!session) return;
-    supabase.rpc("apply_kimdohyun_monday_attendance").catch(()=>{});
+    supabase.rpc("apply_kimdohyun_monday_attendance").then(()=>{}, ()=>{});
   }, [session]);
 
   const loadUserData = async (sess) => {
