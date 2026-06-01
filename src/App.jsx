@@ -1458,9 +1458,11 @@ ${subjectCoIn}`;
     try {
       const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
       if(!apiKey){ setError("REACT_APP_GEMINI_API_KEY 환경변수를 Vercel에 추가해 주세요."); setLoading(false); return; }
-      // gemini-2.0-flash: GA stable, 무료 quota 충분 (2.5-flash는 preview라 high demand 잦음)
+      // gemini-2.5-flash-lite: 2026-06-01 현재 이 API key의 무료 등급이 유일하게 호출 가능한 모델
+      //   (2.0-flash, 2.0-flash-lite는 free_tier_requests limit=0; 2.5-flash는 high demand 잦음;
+      //    1.5-flash는 deprecated 404). 변경 시 반드시 무료 등급 호출 가능 여부 사전 확인.
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
         { method:"POST", headers:{"Content-Type":"application/json"},
           body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.7}}) }
       );
