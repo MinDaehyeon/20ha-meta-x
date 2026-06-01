@@ -7,6 +7,23 @@
 
 ---
 
+## v2026.06.01-8 — 2026-06-01
+**커밋:** [d8ab2af](https://github.com/MinDaehyeon/20ha-meta-x/commit/d8ab2af)
+
+### 주요 변경
+
+**AI 학습코치 모델 재교체 — 무료 등급 quota=0 회피**
+- 직전 v-7의 `gemini-2.0-flash`도 동일 429 응답 (`limit: 0` for `generate_content_free_tier_requests`)
+- 진단: 현재 API key의 free tier가 일부 모델에서 quota 0으로 제한된 상태. Bun으로 7개 모델 직접 호출 결과
+  - `gemini-2.5-flash-lite` → **200 OK** (유일하게 무료 호출 가능)
+  - `gemini-2.0-flash`, `2.0-flash-lite` → 429 limit=0
+  - `gemini-2.5-flash` → 503 high demand
+  - `gemini-1.5-flash`, `-8b`, `-latest` → 404 deprecated
+- 수정: `gemini-2.5-flash-lite`로 교체
+- dev 검증: 200 응답 + `ai_advice_logs` 201 INSERT + 화면 정상 표시
+
+---
+
 ## v2026.06.01-7 — 2026-06-01
 **커밋:** [3e8cf86](https://github.com/MinDaehyeon/20ha-meta-x/commit/3e8cf86)
 
