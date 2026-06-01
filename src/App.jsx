@@ -4748,23 +4748,57 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
 const MakeupView = () => {
   const [students, setStudents] = useState([]);
   const [certs, setCerts] = useState([]);
+  const [exemptions, setExemptions] = useState([]);
   const [loading, setLoading] = useState(true);
+  // 사유 입력 모달 — {studentId, studentName, sn} | null
+  const [exemptTarget, setExemptTarget] = useState(null);
+  const [exemptReason, setExemptReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(()=>{
-    (async()=>{
-      setLoading(true);
-      const [{data:s}, {data:c}] = await Promise.all([
-        supabase.rpc("get_cert_students"),
-        supabase.rpc("get_attendance_certs", {
-          p_from: new Date(ROSTER2_NAVER_DATES[0]).toISOString(),
-          p_to:   new Date(ROSTER2_NAVER_DATES[ROSTER2_NAVER_DATES.length-1].getTime()+86400000).toISOString(),
-        }),
-      ]);
-      setStudents(s||[]);
-      setCerts(c||[]);
-      setLoading(false);
-    })();
-  },[]);
+  const loadAll = async () => {
+    setLoading(true);
+    const [{data:s}, {data:c}, {data:e}] = await Promise.all([
+      supabase.rpc("get_cert_students"),
+      supabase.rpc("get_attendance_certs", {
+        p_from: new Date(ROSTER2_NAVER_DATES[0]).toISOString(),
+        p_to:   new Date(ROSTER2_NAVER_DATES[ROSTER2_NAVER_DATES.length-1].getTime()+86400000).toISOString(),
+      }),
+      supabase.rpc("get_makeup_exemptions"),
+    ]);
+    setStudents(s||[]);
+    setCerts(c||[]);
+    setExemptions(e||[]);
+    setLoading(false);
+  };
+  useEffect(()=>{ loadAll(); },[]);
+
+  // (학생id, 회차) → 면제 row
+  const exemptionMap = useMemo(() => {
+    const m = new Map();
+    exemptions.forEach(ex => m.set(`${ex.student_id}:${ex.session_idx}`, ex));
+    return m;
+  }, [exemptions]);
+  const isExempt = (studentId, sn) => exemptionMap.has(`${studentId}:${sn}`);
+
+  const submitExemption = async () => {
+    if (!exemptTarget) return;
+    const reason = exemptReason.trim();
+    if (!reason) { alert("사유를 입력해주세요."); return; }
+    setSubmitting(true);
+    const { error } = await supabase.rpc("set_makeup_exemption", {
+      p_student_id: exemptTarget.studentId, p_session_idx: exemptTarget.sn, p_reason: reason
+    });
+    setSubmitting(false);
+    if (error) { alert("저장 실패: " + error.message); return; }
+    setExemptTarget(null); setExemptReason("");
+    loadAll();
+  };
+  const revokeExemption = async (ex) => {
+    if (!window.confirm(`${ex.student_name} · ${ex.session_idx}회차 면제를 해제할까요?`)) return;
+    const { error } = await supabase.rpc("revoke_makeup_exemption", { p_id: ex.id, p_revoke_reason: null });
+    if (error) { alert("해제 실패: " + error.message); return; }
+    loadAll();
+  };
 
   const kstDateStr = ts => {
     const k = new Date(new Date(ts).getTime() + 9*3600*1000);
@@ -4806,6 +4840,8 @@ const MakeupView = () => {
     let currentChain = [];
     let bestChain = [];
     ordered.forEach(sess => {
+      // 면제된 회차는 정상 처리(streak 끊김). 별도 카운트 안 함.
+      if (isExempt(stu.id, sess.sn)) { currentStreak = 0; currentChain = []; return; }
       const candidate = certs
         .filter(c => c.assigned_student_id === stu.id)
         .filter(c => getCertSessions(c).includes(sess.sn))
@@ -4880,19 +4916,25 @@ const MakeupView = () => {
                   <span style={{fontSize:11,color:T.muted}}>(총 {warnings.length}회)</span>
                 </div>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(180px,1fr))",gap:6}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(220px,1fr))",gap:6}}>
                 {warnings.map(w => {
                   const isLow = w.reason.startsWith("80점");
                   return (
                     <div key={w.sn} style={{
-                      padding:"6px 10px",borderRadius:8,fontSize:12,
+                      padding:"6px 10px",borderRadius:8,fontSize:12,display:"flex",alignItems:"center",gap:6,
                       background:isLow?"#FEF3C7":"#FEE2E2",
                       border:`1px solid ${isLow?"#FDE68A":"#FECACA"}`,
                       color:isLow?"#92400E":"#991B1B",
                     }}>
                       <span style={{fontWeight:800}}>{w.sn}회</span>
-                      <span style={{fontSize:10,marginLeft:3,opacity:0.8}}>({w.date.getMonth()+1}/{w.date.getDate()})</span>
-                      <span style={{marginLeft:6,fontWeight:600}}>· {w.reason}</span>
+                      <span style={{fontSize:10,opacity:0.8}}>({w.date.getMonth()+1}/{w.date.getDate()})</span>
+                      <span style={{fontWeight:600,flex:1}}>· {w.reason}</span>
+                      <button
+                        onClick={()=>{ setExemptTarget({studentId: student.id, studentName: student.name, sn: w.sn, date: w.date}); setExemptReason(""); }}
+                        style={{padding:"2px 8px",fontSize:11,fontWeight:700,borderRadius:6,
+                          border:"1px solid #6366F1",background:"#fff",color:"#4F46E5",cursor:"pointer"}}>
+                        제외
+                      </button>
                     </div>
                   );
                 })}
@@ -4900,6 +4942,66 @@ const MakeupView = () => {
             </Card>
             );
           })}
+        </div>
+      )}
+
+      {/* 활성 면제 목록 (감사 추적) */}
+      {exemptions.length > 0 && (
+        <Card style={{padding:"14px 16px",marginTop:16}}>
+          <div style={{fontSize:14,fontWeight:800,color:T.navy,marginBottom:10,display:"flex",alignItems:"baseline",gap:8}}>
+            🛡️ 면제 적용 목록
+            <span style={{fontSize:11,color:T.muted,fontWeight:500}}>총 {exemptions.length}건 — 자동 계산은 그대로 두되 이 학생·회차는 경고 대상에서 빠집니다</span>
+          </div>
+          <div style={{display:"grid",gap:6}}>
+            {exemptions.map(ex => (
+              <div key={ex.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",
+                background:"#F0F9FF",border:"1px solid #BAE6FD",borderRadius:8,fontSize:12}}>
+                <span style={{fontWeight:800,color:T.navy,minWidth:80}}>{ex.student_name}</span>
+                <span style={{fontWeight:700,color:"#0369A1"}}>{ex.session_idx}회차</span>
+                <span style={{flex:1,color:"#0C4A6E"}}>· {ex.reason}</span>
+                <span style={{fontSize:10,color:T.muted}}>{new Date(ex.created_at).toLocaleDateString("ko-KR")}</span>
+                <button onClick={()=>revokeExemption(ex)}
+                  style={{padding:"2px 8px",fontSize:11,fontWeight:700,borderRadius:6,
+                    border:"1px solid #DC2626",background:"#fff",color:"#DC2626",cursor:"pointer"}}>
+                  해제
+                </button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* 사유 입력 모달 */}
+      {exemptTarget && (
+        <div onClick={()=>!submitting && setExemptTarget(null)}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div onClick={e=>e.stopPropagation()}
+            style={{background:"#fff",borderRadius:12,padding:20,maxWidth:480,width:"100%",boxShadow:"0 10px 40px rgba(0,0,0,0.2)"}}>
+            <div style={{fontSize:16,fontWeight:800,color:T.navy,marginBottom:6}}>Make-up 면제 처리</div>
+            <div style={{fontSize:13,color:T.muted,marginBottom:14}}>
+              <strong style={{color:T.navy}}>{exemptTarget.studentName}</strong> · <strong style={{color:T.navy}}>{exemptTarget.sn}회차</strong>
+              {exemptTarget.date && <span> ({exemptTarget.date.getMonth()+1}/{exemptTarget.date.getDate()})</span>}
+              를 경고 대상에서 제외합니다.
+            </div>
+            <textarea
+              value={exemptReason}
+              onChange={e=>setExemptReason(e.target.value)}
+              placeholder="예: 가족 경조사로 결석 / 학교 행사 / 질병 (입원) 등"
+              rows={3}
+              style={{width:"100%",padding:10,fontSize:13,border:`1px solid ${T.border}`,borderRadius:8,resize:"vertical",boxSizing:"border-box",fontFamily:"inherit"}}
+            />
+            <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:14}}>
+              <button onClick={()=>setExemptTarget(null)} disabled={submitting}
+                style={{padding:"8px 16px",fontSize:13,fontWeight:600,borderRadius:8,border:`1px solid ${T.border}`,background:"#fff",color:T.muted,cursor:"pointer"}}>
+                취소
+              </button>
+              <button onClick={submitExemption} disabled={submitting||!exemptReason.trim()}
+                style={{padding:"8px 16px",fontSize:13,fontWeight:700,borderRadius:8,border:"none",
+                  background:exemptReason.trim()?"#4F46E5":"#C7D2FE",color:"#fff",cursor:exemptReason.trim()?"pointer":"not-allowed"}}>
+                {submitting?"저장 중…":"제외 적용"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
