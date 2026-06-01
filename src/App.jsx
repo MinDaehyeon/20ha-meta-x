@@ -1458,13 +1458,23 @@ ${subjectCoIn}`;
     try {
       const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
       if(!apiKey){ setError("REACT_APP_GEMINI_API_KEY 환경변수를 Vercel에 추가해 주세요."); setLoading(false); return; }
+      // gemini-2.0-flash: GA stable, 무료 quota 충분 (2.5-flash는 preview라 high demand 잦음)
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
         { method:"POST", headers:{"Content-Type":"application/json"},
           body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.7}}) }
       );
       const data = await res.json();
-      if(data.error){ setError("AI 오류: " + data.error.message); setLoading(false); return; }
+      if(data.error){
+        const msg = data.error.message || "";
+        // 일시 capacity 초과 메시지는 한국어 안내로 친절화
+        if(/high demand|overloaded|UNAVAILABLE|try again/i.test(msg) || res.status === 503){
+          setError("AI 서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요.");
+        } else {
+          setError("AI 오류: " + msg);
+        }
+        setLoading(false); return;
+      }
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "조언을 가져올 수 없었어요.";
       const now  = new Date();
       const time = now.toLocaleString("ko-KR",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
