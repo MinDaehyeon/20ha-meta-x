@@ -7,6 +7,35 @@
 
 ---
 
+## v2026.06.01-2 — 2026-06-01
+**커밋:** [d3498df](https://github.com/MinDaehyeon/20ha-meta-x/commit/d3498df)
+
+### 주요 변경
+
+**기능 추가 — Make-up 대상자 수동 면제**
+- 운영 사유(질병/가정 일정/학교 행사 등)로 자동 Make-up 대상에서 제외 가능
+- 자동 streak 계산은 그대로 유지하되 면제된 (학생, 회차)는 정상 처리로 취급 → 카운트에서 빠지고 대상자 목록 자동 재정렬
+- 면제 단위: **학생 × 회차** (회차 단위 면제). 동일 학생의 다른 회차 경고는 그대로
+- **사유 필수 입력** (감사 추적용 영구 보존, 해제 후에도 row 남음)
+- **해제 가능** (소프트 삭제 — `revoked_at`/`revoked_by`/`revoke_reason` 기록)
+
+**DB (`20260601100000_cert_makeup_exemptions.sql`)**
+- `cert_makeup_exemptions` 테이블 — `student_id × session_idx` partial unique (활성 면제 중복 방지)
+- RLS 전체 차단, admin SECURITY DEFINER RPC 3개로만 접근
+  - `set_makeup_exemption(p_student_id, p_session_idx, p_reason)` — upsert (사유 갱신 포함)
+  - `revoke_makeup_exemption(p_id, p_revoke_reason)` — 소프트 삭제
+  - `get_makeup_exemptions()` — 활성 면제 목록 + 학생명
+
+**UI ([20HA 2기 현황] → Make-up 대상자)**
+- 각 경고 셀에 "제외" 버튼 → 사유 입력 모달 (비어있으면 적용 비활성)
+- 하단 "🛡️ 면제 적용 목록" 섹션 — 학생/회차/사유/등록일 + 행별 "해제" 버튼
+
+### Playwright 검증
+- 권순혁 4회차 제외 → 대상자 5명→4명, 면제 목록 정상 노출
+- 해제 → 대상자 4명→5명 복원, 면제 목록 사라짐 확인
+
+---
+
 ## v2026.06.01-1 — 2026-06-01
 **커밋:** [171a40d](https://github.com/MinDaehyeon/20ha-meta-x/commit/171a40d)
 
