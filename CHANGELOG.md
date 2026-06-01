@@ -7,6 +7,25 @@
 
 ---
 
+## v2026.06.01-4 — 2026-06-01
+**커밋:** [d98f402](https://github.com/MinDaehyeon/20ha-meta-x/commit/d98f402)
+
+### 주요 변경
+
+**일정 변경 — 미라클 나이트 5/29 → 6/3**
+- 5/29(금) 미라클 나이트를 6/3(수)으로 이동
+- 6/3은 변경된 일정이라 **2기 전원 자동 출석** 처리
+- 단일 import 소스(`src/utils/roster2.js`) 수정으로 학생/관리자 모든 화면(전체 현황·출석체크·학생 대시보드·통계 등) 일관 반영
+
+**DB (`20260601200000_full_attendance_2026_06_03.sql`)**
+- 기존 cert_students 45명 전원 → 6/3 'N' 출석 INSERT (멱등, `ON CONFLICT DO NOTHING`)
+- 신규 학생 자동화: `cert_students_full_attendance_2026_06_03` 트리거 — AFTER INSERT 시 6/3 'N' 자동 부여
+
+**코드 변경**
+- `ROSTER2_NIGHT_DATES`에 `.filter` 추가로 5/29 제외 + `.concat([new Date(2026, 5, 3)])` + `.sort` (정렬 순서 보장)
+
+---
+
 ## v2026.06.01-3 — 2026-06-01
 **커밋:** [8575c7d](https://github.com/MinDaehyeon/20ha-meta-x/commit/8575c7d)
 
