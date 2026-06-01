@@ -7,6 +7,22 @@
 
 ---
 
+## v2026.06.01-1 — 2026-06-01
+**커밋:** [171a40d](https://github.com/MinDaehyeon/20ha-meta-x/commit/171a40d)
+
+### 주요 변경
+
+**Critical 버그 수정 — 회원가입 실패**
+- 증상: 이메일 OTP 인증 완료(`✓ 인증완료`) 후 "가입하기" 버튼 클릭 시 "오류가 발생했습니다. 잠시 후 다시 시도해주세요." 표시. updateUser 네트워크 호출 자체가 일어나지 않음.
+- 원인: `verifyOtp` 성공이 임시 세션을 만들면서 `onAuthStateChange`의 `SIGNED_IN`을 발화 → 핸들러가 `loadUserData(sess)` 호출 → 가입 진행 중이라 `profiles` row가 아직 없음 → "프로필 없음 → 강제 `signOut`" 정책이 동작 → 사용자가 가입 버튼을 누르는 시점엔 이미 세션이 죽어 있음 → `updateUser`가 client-side "Auth session missing" throw → 영문 fallback이 잡혀 사용자에게는 일반 오류 메시지로 표시됨.
+- 수정 (1f45c61, 171a40d): `signupInProgressRef` 추가. `AuthScreen`이 가입 모드 진입/이탈을 콜백 prop(`onSignupModeChange`)으로 `App`에 알리고, `App`의 SIGNED_IN 핸들러는 ref가 true일 때 `setSession(sess)`만 하고 `loadUserData`를 건너뜀. 가입 완료(또는 모드 해제) 시 ref가 자동 false로 돌아가 다른 SIGNED_IN 흐름엔 영향 없음.
+
+### Playwright 검증
+- dev 프리뷰에서 학생 회원가입 → OTP 인증 → 가입하기 → "가입 완료!" 화면 정상 표시 확인
+- 관리자 로그인 → 회원 관리에서 승인 처리 정상 확인
+
+---
+
 ## v2026.05.29-1 — 2026-05-29
 **커밋:** [0b15966](https://github.com/MinDaehyeon/20ha-meta-x/commit/0b15966)
 

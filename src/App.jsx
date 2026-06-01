@@ -170,7 +170,7 @@ const PasswordResetScreen = ({ onDone }) => {
 // ══════════════════════════════════════════════════════
 // AUTH SCREEN — 로그인 + 소셜 + 데모 버튼
 // ══════════════════════════════════════════════════════
-const AuthScreen = ({ onLogin }) => {
+const AuthScreen = ({ onLogin, onSignupModeChange }) => {
   const [loading, setLoading] = useState({});
   const [error, setError]     = useState("");
   const [email, setEmail]     = useState(()=>localStorage.getItem("20ha_saved_email")||"");
@@ -190,6 +190,8 @@ const AuthScreen = ({ onLogin }) => {
   const [suTarget, setSuTarget] = useState(85);
   // 비번 제외 회원가입 입력 백업 (debounce 500ms)
   useDraftBackup(SIGNUP_DRAFT_KEY, { suRole, suName, suBirthYear, suBirthMonth, suBirthDay, suEmail });
+  // 가입 모드 변화를 App에 전달 → OTP verify로 생긴 임시 SIGNED_IN을 무시하기 위함
+  useEffect(() => { onSignupModeChange?.(mode === "signup"); }, [mode, onSignupModeChange]);
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [ageAgreed, setAgeAgreed] = useState(false);
@@ -6901,6 +6903,9 @@ const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, 
 export default function App() {
   const [authState, setAuthState] = useState("loading"); // loading | unauthenticated | ready | pending | passwordRecovery | sessionExpired
   const intentionalLogoutRef = useRef(false);
+  // 가입 진행 중에는 OTP verify로 생긴 임시 세션의 SIGNED_IN을 무시해야 한다.
+  // 그렇지 않으면 loadUserData가 "프로필 없음"으로 보고 강제 signOut → 가입 버튼 실패.
+  const signupInProgressRef = useRef(false);
   const [showEISetup, setShowEISetup] = useState(false);
   // "loading" | "unauthenticated" | "needsProfile" | "pending" | "ready" | "passwordRecovery"
   const [session, setSession]     = useState(null);
@@ -7037,6 +7042,8 @@ export default function App() {
       // 로그인 성공 → 정상 복귀 (sessionExpired에서 재로그인 포함)
       if(event === "SIGNED_IN" && sess) {
         intentionalLogoutRef.current = false;
+        // 가입 중(OTP verify 직후) SIGNED_IN: 임시 세션. handleSignup이 끝까지 책임지므로 loadUserData 건너뜀
+        if (signupInProgressRef.current) { setSession(sess); return; }
         loadUserData(sess);
         return;
       }
@@ -7063,6 +7070,11 @@ export default function App() {
   }, []);
 
   const refreshData = () => { if(session) loadUserData(session); };
+
+  // AuthScreen이 가입/로그인 모드 토글 시 호출 — SIGNED_IN 핸들러가 이 ref를 보고 loadUserData 우회
+  const handleSignupModeChange = useCallback((isSignup) => {
+    signupInProgressRef.current = !!isSignup;
+  }, []);
 
   // 역할별 초기 화면 보정
   useEffect(() => {
@@ -7107,7 +7119,10 @@ export default function App() {
 
   // ── 비로그인
   if(authState === "unauthenticated") return (
-    <AuthScreen onLogin={(sess) => { setAuthState("loading"); loadUserData(sess); }}/>
+    <AuthScreen
+      onLogin={(sess) => { setAuthState("loading"); loadUserData(sess); }}
+      onSignupModeChange={handleSignupModeChange}
+    />
   );
 
   // ── 가입 미완료 (이름 미입력) → 이름/역할/비밀번호 입력 완료 화면
