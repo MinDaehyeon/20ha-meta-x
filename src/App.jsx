@@ -2128,6 +2128,10 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
   const myAttSet = new Set();
   myAttLogs.forEach(l => myAttSet.add(`${l.session_type}-${l.session_date}`));
 
+  // 시간 기준 — allStats / mentor / mastery 모두 공통 사용 (TDZ 회피 위해 위로 이동)
+  const today = new Date();
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
   // 전체 통계: 모두 DB 기반
   // 본인 카운트는 "오늘까지" 일자만 (미래 회차에 미리 들어간 출석 row — 예: 6/3 일정 변경 사전 처리 —
   // 화면에 미리 ✓로 표시되지 않도록. 6/3 당일이 되면 자연스레 카운트됨)
@@ -2158,8 +2162,7 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
   const avgNight   = Math.round(allStats.reduce((s,x)=>s+x.night,0)   / allStats.length);
   const avgTotal   = avgNaver + avgMorning + avgNight;
 
-  const today = new Date();
-  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  // today / todayMidnight은 위에서 정의됨 (TDZ 회피)
   const weekStart = new Date(today); weekStart.setDate(today.getDate() - today.getDay());
   const thisWeek = Array.from({length:7}, (_, i) => { const d = new Date(weekStart); d.setDate(weekStart.getDate()+i); return d; });
 
