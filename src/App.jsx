@@ -2948,10 +2948,16 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
 
   // 기수 데이터 (회원 관리·2기 명단 공용)
   const ROSTER2_NAMES = new Set(["강예나","김가흔","김은채","김태준","박재현","손연재","윤준원","최지유","배정윤","심수윤","한설아","강가인","권민유","권순혁","최유주","김도현","김시원","김시윤","김아란","김준범","김지우","김호진","나지성","문지유","박지우","서소윤","서지우","송민건","양소윤","오수연","우정훈","윤서준","이유빈","이홍윤","임다은","정유진","박선율","한채린","오수빈","남희수","김가인","양은정","테스트학생","한유찬","문성민"]);
-  // 다중 기수 지원: DB 학생은 1기 기본, 2기 명단 포함 시 둘 다
+  // 다중 기수 지원
+  // - 2기 첫 회차일(2026-05-20 KST) 이전 가입자만 "20HA 1기" 자동 부여 (기존 운영 호환)
+  // - 그 이후 가입자는 자동 1기 미부여 (신규 가입자가 1기로 잘못 표시되는 문제 방지)
+  // - ROSTER2(2기) 이름 매칭 시 "20HA 2기" 추가 (가입일 무관)
+  const COHORT1_CUTOFF = new Date(2026, 4, 20).getTime(); // 2026-05-20 00:00 로컬
   const getCohorts = (profile) => {
     if (profile.role !== "student") return [];
-    const tags = ["20HA 1기"];
+    const tags = [];
+    const created = profile.created_at ? new Date(profile.created_at).getTime() : null;
+    if (created !== null && created < COHORT1_CUTOFF) tags.push("20HA 1기");
     if (ROSTER2_NAMES.has(profile.name)) tags.push("20HA 2기");
     return tags;
   };
