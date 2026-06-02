@@ -14,7 +14,7 @@ import { HI, navIcon, KakaoIcon, GoogleIcon, NaverIcon } from "./components/icon
 import { Card, Pill, NavyNum, SectionTitle, Divider, Spinner, ChartTip } from "./components/ui";
 import { QUANT_ITEMS, QUAL_ITEMS, SUBJECTS, SUBJECT_CONFIG, ERR_CODES, ERR_LABELS, GRADES } from "./utils/constants";
 import { calcGrade, gradeInfo, calcEI } from "./utils/grade";
-import { ROSTER2, ROSTER2_NAVER_DATES, ROSTER2_MORNING_DATES, ROSTER2_NIGHT_DATES, ROSTER2_DAY_KO, roster2FmtKey, roster2Fmt, isLateByDeadline, INIT_ATTENDANCE2, MIN_ATTENDANCE_MINUTES, isValidAttendance } from "./utils/roster2";
+import { ROSTER2, ROSTER2_NAVER_DATES, ROSTER2_MORNING_DATES, ROSTER2_NIGHT_DATES, ROSTER2_DAY_KO, roster2FmtKey, roster2Fmt, isLateByDeadline, INIT_ATTENDANCE2, MIN_ATTENDANCE_MINUTES, isValidAttendance, attendanceThreshold } from "./utils/roster2";
 import { draftKey, restoreDraft, clearDraft, useDraftBackup } from "./utils/draft";
 
 // ══════════════════════════════════════════════════════
@@ -2134,7 +2134,7 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
   myAttLogs.forEach(l => {
     const key = `${l.session_type}-${l.session_date}`;
     myAttMinutes.set(key, l.participation_minutes ?? null);
-    if (isValidAttendance(l.session_type, l.participation_minutes)) myAttSet.add(key);
+    if (isValidAttendance(l.session_type, l.participation_minutes, l.session_date)) myAttSet.add(key);
     else myAttUnderSet.add(key);
   });
 
@@ -2612,7 +2612,7 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
                                           }
                                           const isPast=dt<todayMidnight;
                                           const missed = isPast && !done && !underMin;
-                                          const minThr = type === "나" ? 60 : type === "M" ? 15 : null;
+                                          const minThr = type === "나" ? MIN_ATTENDANCE_MINUTES.N : type === "M" ? MIN_ATTENDANCE_MINUTES.M : null;
                                           const status = done ? "완료" : underMin ? "참여시간미달" : missed ? "미완료" : "예정";
                                           const tipTypeLabel = type === "M" ? "미라클모닝" : type === "나" ? "미라클나이트" : "카페 인증";
                                           const tipLines = [
@@ -3167,7 +3167,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           if(idx >= 0){
             // session_type: "M" 또는 "N"(나잇) → roster2 키는 "M" 또는 "나"
             const rosterType = r.session_type === "N" ? "나" : "M";
-            const valid = isValidAttendance(r.session_type, r.participation_minutes);
+            const valid = isValidAttendance(r.session_type, r.participation_minutes, r.session_date);
             map[`${idx}-${rosterType}-${r.session_date}`] = {
               valid,
               minutes: r.participation_minutes,
@@ -4825,7 +4825,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                               const att = sec.type !== "N" ? getAtt(s.idx, sec.type, key) : null;
                               const checked = sec.type === "N" ? hasNaverCert : !!(att && att.valid);
                               const underMin = sec.type !== "N" && att && !att.valid;
-                              const minThr = sec.type === "나" ? 60 : sec.type === "M" ? 15 : null;
+                              const minThr = sec.type === "나" ? MIN_ATTENDANCE_MINUTES.N : sec.type === "M" ? MIN_ATTENDANCE_MINUTES.M : null;
                               const status = sec.type === "N"
                                 ? (hasNaverCert ? (isLate ? "지각 인정" : "정시 인증") : "미인증")
                                 : (checked ? "완료" : underMin ? "참여시간미달" : "미참여");
@@ -5266,8 +5266,6 @@ const AttendanceUploadView = ({onRefresh}) => {
     return {name, code};
   };
 
-  // 출석 인정 임계값 (분): 모닝 15분 이상, 나잇 60분 이상 참여 시 인정
-  const MIN_MINUTES = { M: 15, N: 60 };
 
   // CSV 처리
   // Zoom 참가자 보고서: 같은 학생이 입퇴장 반복 시 여러 row로 분리됨 (예: 20분, 10분).
@@ -5299,7 +5297,8 @@ const AttendanceUploadView = ({onRefresh}) => {
       }
     }
     if(!sessionDate){ alert("CSV에서 날짜를 인식하지 못했어요"); return; }
-    const minMin = MIN_MINUTES[sessionType] || 0;
+    // 회차일 기준 실효 임계값 (6/2까지 유예 → 0, 이후 모닝15·나잇50)
+    const minMin = attendanceThreshold(sessionType, sessionDate);
 
     // 회차 매칭 (모닝/나잇)
     const dates = sessionType==="M" ? ROSTER2_MORNING_DATES : ROSTER2_NIGHT_DATES;
@@ -5446,7 +5445,7 @@ const AttendanceUploadView = ({onRefresh}) => {
             <div style={{fontSize:12,color:T.muted,marginBottom:6}}>파일: {parsed.fileName}</div>
             <div style={{fontSize:20,fontWeight:900,color:T.navy}}>{parsed.sessionLabel}</div>
             <div style={{fontSize:12,color:T.navy,marginTop:6,fontWeight:600}}>
-              출석 인정 기준: <strong>{parsed.minMin}분 이상</strong> 참여
+              출석 인정 기준: {parsed.minMin > 0 ? <><strong>{parsed.minMin}분 이상</strong> 참여</> : <strong>참여 시 인정 (유예 기간)</strong>}
             </div>
             {parsed.sessionIdx < 0 && (
               <div style={{fontSize:11,color:"#B45309",marginTop:6}}>⚠️ ROSTER2 회차 일정에 없는 날짜입니다. 저장은 가능하지만 회차 표시는 안 됩니다.</div>
