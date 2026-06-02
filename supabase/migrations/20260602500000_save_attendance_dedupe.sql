@@ -1,6 +1,7 @@
 -- save_attendance_batch: entries에 같은 student_id가 중복 들어가도 안전하게 처리
 -- ("ON CONFLICT DO UPDATE command cannot affect row a second time" 에러 방지)
--- 정책: 같은 학생이 중복되면 최대 분 값을 사용 (보수적 — 가장 길게 참여한 기록 유지)
+-- 정책: 같은 호출 내 같은 학생이 여러 entry로 들어오면 분을 **합산** (입퇴장 반복 케이스)
+--       기존 DB row와 충돌하면 더 큰 값으로 (재업로드 시 분이 줄어들지 않음)
 
 CREATE OR REPLACE FUNCTION public.save_attendance_batch(
   p_session_date date,
@@ -17,7 +18,7 @@ BEGIN
   WITH agg AS (
     SELECT
       (e->>'student_id')::int                AS sid,
-      MAX(NULLIF(e->>'minutes','')::int)     AS mins
+      SUM(NULLIF(e->>'minutes','')::int)     AS mins
     FROM jsonb_array_elements(p_entries) AS e
     GROUP BY (e->>'student_id')::int
   )
