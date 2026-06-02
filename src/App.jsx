@@ -2056,6 +2056,8 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
   const [classSessionAvgs, setClassSessionAvgs] = useState({}); // {sessionNum: avg_score}
   const [myAttLogs, setMyAttLogs] = useState([]);            // [{session_date, session_type}]
   const [classAttStats, setClassAttStats] = useState({});    // {name: {morning, night}}
+  // 출석 셀 hover tooltip — { x, y, lines: [{label, color}, ...], status }
+  const [attTip, setAttTip] = useState(null);
   const isMobile = useMobile();
   useEffect(() => {
     // 학년 정보: RLS 우회용 SECURITY DEFINER RPC 사용 (학생/학부모도 다른 학생 학년 조회 가능)
@@ -2610,22 +2612,33 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
                                           }
                                           const isPast=dt<todayMidnight;
                                           const missed = isPast && !done && !underMin;
-                                          const tip = mins != null
-                                            ? `${dt.getMonth()+1}/${dt.getDate()} · 참여 ${mins}분${underMin?` (미달, ${type==="나"?60:15}분 미만)`:""}`
-                                            : `${dt.getMonth()+1}/${dt.getDate()}`;
+                                          const minThr = type === "나" ? 60 : type === "M" ? 15 : null;
+                                          const status = done ? "완료" : underMin ? "참여시간미달" : missed ? "미완료" : "예정";
+                                          const tipTypeLabel = type === "M" ? "미라클모닝" : type === "나" ? "미라클나이트" : "카페 인증";
+                                          const tipLines = [
+                                            { label: `${dt.getMonth()+1}/${dt.getDate()} · ${tipTypeLabel}`, color: color },
+                                            ...(type !== "N" ? [{ label: `상태: ${status}`, color: done ? "#16A34A" : underMin ? "#9A3412" : missed ? "#B91C1C" : T.muted }] : []),
+                                            ...(mins != null ? [{ label: `참여 시간: ${mins}분`, color: T.navy }] : []),
+                                            ...(underMin && minThr ? [{ label: `(인정 기준 ${minThr}분 미만)`, color: "#9A3412" }] : []),
+                                          ];
+                                          const showTip = (e) => setAttTip({ x: e.clientX, y: e.clientY, lines: tipLines });
+                                          const moveTip = (e) => setAttTip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                                          const hideTip = () => setAttTip(null);
                                           return(
-                                            <div key={i} title={tip} style={{
-                                              width:cell,height:cell,borderRadius:4,
-                                              background:done?color:underMin?"#FED7AA":missed?"transparent":"#F0F2FA",
-                                              border:`1px solid ${done?color:underMin?"#FB923C":missed?`${color}35`:"#E2E6F3"}`,
-                                              display:"flex",alignItems:"center",justifyContent:"center",
-                                              flexShrink:0, position:"relative", overflow:"hidden"
-                                            }}>
+                                            <div key={i}
+                                              onMouseEnter={showTip} onMouseMove={moveTip} onMouseLeave={hideTip}
+                                              style={{
+                                                width:cell,height:cell,borderRadius:4,
+                                                background:done?color:underMin?"#FED7AA":missed?"transparent":"#F0F2FA",
+                                                border:`1px solid ${done?color:underMin?"#FB923C":missed?`${color}35`:"#E2E6F3"}`,
+                                                display:"flex",alignItems:"center",justifyContent:"center",
+                                                flexShrink:0, position:"relative", overflow:"hidden", cursor:"pointer"
+                                              }}>
                                               {done && (
                                                 <span style={{fontSize:isMobile?7:8,fontWeight:700,color:"#fff"}}>{dt.getDate()}</span>
                                               )}
                                               {underMin && (
-                                                <span style={{fontSize:isMobile?7:8,fontWeight:700,color:"#9A3412"}} title={tip}>{dt.getDate()}</span>
+                                                <span style={{fontSize:isMobile?7:8,fontWeight:700,color:"#9A3412"}}>{dt.getDate()}</span>
                                               )}
                                               {missed && (<>
                                                 {/* 사선 */}
@@ -2979,6 +2992,29 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
         </div>
       </div>
 
+      {/* 출석 셀 hover tooltip — 즉시 표시 + ChartTip 스타일 */}
+      {attTip && (
+        <div style={{
+          position:"fixed",
+          left: Math.min(window.innerWidth - 240, attTip.x + 14),
+          top:  Math.max(8, attTip.y - 12),
+          background: T.surface,
+          border: `1px solid ${T.border}`,
+          borderRadius: 8,
+          padding: "8px 12px",
+          fontSize: 11,
+          boxShadow: "0 4px 14px rgba(25,29,84,0.18)",
+          zIndex: 10000,
+          pointerEvents: "none",
+          whiteSpace: "nowrap",
+        }}>
+          {attTip.lines.map((l,i) => (
+            <div key={i} style={{color: l.color, fontWeight: i===0?700:600, fontSize: i===0?11:10.5, marginBottom: i===attTip.lines.length-1?0:3}}>
+              {l.label}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -3001,6 +3037,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
   // 관리자가 학생 화면을 read-only로 보기 위한 state. profile 객체가 들어있으면 풀스크린 오버레이 표시
   // 학생 사이드바와 동일하게 cert / dashboard / history 3개 탭 지원 (학부모 viewerMode="parent" 컴포넌트 재사용)
   const [viewAsStudent, setViewAsStudent] = useState(null);
+  // 출석 셀 hover tooltip (관리자 그리드용) — { x, y, lines: [...] }
+  const [gridTip, setGridTip] = useState(null);
   const [viewAsTab, setViewAsTab] = useState("cert"); // "cert" | "dashboard" | "history"
   const [viewAsLogs, setViewAsLogs] = useState([]);
   const [viewAsLoading, setViewAsLoading] = useState(false);
@@ -4787,11 +4825,22 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                               const att = sec.type !== "N" ? getAtt(s.idx, sec.type, key) : null;
                               const checked = sec.type === "N" ? hasNaverCert : !!(att && att.valid);
                               const underMin = sec.type !== "N" && att && !att.valid;
-                              const cellTip = att != null && att.minutes != null
-                                ? `${s.name} · ${dt.getMonth()+1}/${dt.getDate()} ${sec.label} · 참여 ${att.minutes}분${underMin?` (미달)`:""}`
-                                : "";
+                              const minThr = sec.type === "나" ? 60 : sec.type === "M" ? 15 : null;
+                              const status = sec.type === "N"
+                                ? (hasNaverCert ? (isLate ? "지각 인정" : "정시 인증") : "미인증")
+                                : (checked ? "완료" : underMin ? "참여시간미달" : "미참여");
+                              const tipLines = [
+                                { label: `${s.name} · ${dt.getMonth()+1}/${dt.getDate()} · ${sec.label}`, color: sec.color },
+                                { label: `상태: ${status}`, color: checked ? "#16A34A" : underMin ? "#9A3412" : (sec.type==="N" && isLate) ? "#B45309" : T.muted },
+                                ...(att && att.minutes != null ? [{ label: `참여 시간: ${att.minutes}분`, color: T.navy }] : []),
+                                ...(underMin && minThr ? [{ label: `(인정 기준 ${minThr}분 미만)`, color: "#9A3412" }] : []),
+                              ];
+                              const showTip = (e) => setGridTip({ x: e.clientX, y: e.clientY, lines: tipLines });
+                              const moveTip = (e) => setGridTip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                              const hideTip = () => setGridTip(null);
                               return (
-                                <td key={`${si}-${di}`} title={cellTip}
+                                <td key={`${si}-${di}`}
+                                  onMouseEnter={showTip} onMouseMove={moveTip} onMouseLeave={hideTip}
                                   style={{
                                     width: CELL_W, minWidth: CELL_W,
                                     height: CELL_H,
@@ -4866,6 +4915,30 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
         </div>
         );
       })()}
+
+      {/* 관리자 전체현황 그리드 출석 셀 hover tooltip */}
+      {gridTip && (
+        <div style={{
+          position:"fixed",
+          left: Math.min(window.innerWidth - 280, gridTip.x + 14),
+          top:  Math.max(8, gridTip.y - 12),
+          background: T.surface,
+          border: `1px solid ${T.border}`,
+          borderRadius: 8,
+          padding: "8px 12px",
+          fontSize: 11,
+          boxShadow: "0 4px 14px rgba(25,29,84,0.18)",
+          zIndex: 10000,
+          pointerEvents: "none",
+          whiteSpace: "nowrap",
+        }}>
+          {gridTip.lines.map((l,i) => (
+            <div key={i} style={{color: l.color, fontWeight: i===0?700:600, fontSize: i===0?11:10.5, marginBottom: i===gridTip.lines.length-1?0:3}}>
+              {l.label}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
