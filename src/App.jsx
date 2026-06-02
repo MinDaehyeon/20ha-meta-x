@@ -14,7 +14,7 @@ import { HI, navIcon, KakaoIcon, GoogleIcon, NaverIcon } from "./components/icon
 import { Card, Pill, NavyNum, SectionTitle, Divider, Spinner, ChartTip } from "./components/ui";
 import { QUANT_ITEMS, QUAL_ITEMS, SUBJECTS, SUBJECT_CONFIG, ERR_CODES, ERR_LABELS, GRADES } from "./utils/constants";
 import { calcGrade, gradeInfo, calcEI } from "./utils/grade";
-import { ROSTER2, ROSTER2_NAVER_DATES, ROSTER2_MORNING_DATES, ROSTER2_NIGHT_DATES, ROSTER2_DAY_KO, roster2FmtKey, roster2Fmt, isLateByDeadline, INIT_ATTENDANCE2 } from "./utils/roster2";
+import { ROSTER2, ROSTER2_NAVER_DATES, ROSTER2_MORNING_DATES, ROSTER2_NIGHT_DATES, ROSTER2_DAY_KO, roster2FmtKey, roster2Fmt, isLateByDeadline, INIT_ATTENDANCE2, MIN_ATTENDANCE_MINUTES, isValidAttendance, attendanceThreshold } from "./utils/roster2";
 import { draftKey, restoreDraft, clearDraft, useDraftBackup } from "./utils/draft";
 
 // ══════════════════════════════════════════════════════
@@ -2056,6 +2056,8 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
   const [classSessionAvgs, setClassSessionAvgs] = useState({}); // {sessionNum: avg_score}
   const [myAttLogs, setMyAttLogs] = useState([]);            // [{session_date, session_type}]
   const [classAttStats, setClassAttStats] = useState({});    // {name: {morning, night}}
+  // 출석 셀 hover tooltip — { x, y, lines: [{label, color}, ...], status }
+  const [attTip, setAttTip] = useState(null);
   const isMobile = useMobile();
   useEffect(() => {
     // 학년 정보: RLS 우회용 SECURITY DEFINER RPC 사용 (학생/학부모도 다른 학생 학년 조회 가능)
@@ -2124,9 +2126,17 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
     }
   });
 
-  // 본인 출석 set: "M-YYYY-MM-DD" 또는 "N-YYYY-MM-DD" (M=모닝, N=나잇)
-  const myAttSet = new Set();
-  myAttLogs.forEach(l => myAttSet.add(`${l.session_type}-${l.session_date}`));
+  // 본인 출석 — 임계값(M=15, N=60) 통과해야 출석 인정. participation_minutes=null은 면제(인정)
+  // myAttSet: 출석 인정 (카운트 대상) / myAttUnderSet: 참석은 했으나 시간 미달 / myAttMinutes: 분 표시용
+  const myAttSet      = new Set();
+  const myAttUnderSet = new Set();
+  const myAttMinutes  = new Map();
+  myAttLogs.forEach(l => {
+    const key = `${l.session_type}-${l.session_date}`;
+    myAttMinutes.set(key, l.participation_minutes ?? null);
+    if (isValidAttendance(l.session_type, l.participation_minutes, l.session_date)) myAttSet.add(key);
+    else myAttUnderSet.add(key);
+  });
 
   // 시간 기준 — allStats / mentor / mastery 모두 공통 사용 (TDZ 회피 위해 위로 이동)
   const today = new Date();
@@ -2590,26 +2600,45 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
                                       ? <div style={{width:cell,height:cell,borderRadius:4,background:T.surfaceAlt,border:`1px solid ${T.border}`}}/>
                                       : wDates.map((dt,i)=>{
                                           const dk=fk(dt);
-                                          let done;
+                                          let done, underMin = false, mins = null;
                                           if (type === "N") {
                                             const sessionIdx = ROSTER2_NAVER_DATES.findIndex(d => fk(d) === dk);
                                             done = sessionIdx >= 0 && myCertSessions.has(sessionIdx);
                                           } else {
                                             const dbType = type === "나" ? "N" : "M";
-                                            done = myAttSet.has(`${dbType}-${dk}`);
+                                            done    = myAttSet.has(`${dbType}-${dk}`);
+                                            underMin= myAttUnderSet.has(`${dbType}-${dk}`);
+                                            mins    = myAttMinutes.get(`${dbType}-${dk}`);
                                           }
                                           const isPast=dt<todayMidnight;
-                                          const missed = isPast && !done;
+                                          const missed = isPast && !done && !underMin;
+                                          const minThr = type === "나" ? MIN_ATTENDANCE_MINUTES.N : type === "M" ? MIN_ATTENDANCE_MINUTES.M : null;
+                                          const status = done ? "완료" : underMin ? "참여시간미달" : missed ? "미완료" : "예정";
+                                          const tipTypeLabel = type === "M" ? "미라클모닝" : type === "나" ? "미라클나이트" : "카페 인증";
+                                          const tipLines = [
+                                            { label: `${dt.getMonth()+1}/${dt.getDate()} · ${tipTypeLabel}`, color: color },
+                                            ...(type !== "N" ? [{ label: `상태: ${status}`, color: done ? "#16A34A" : underMin ? "#9A3412" : missed ? "#B91C1C" : T.muted }] : []),
+                                            ...(mins != null ? [{ label: `참여 시간: ${mins}분`, color: T.navy }] : []),
+                                            ...(underMin && minThr ? [{ label: `(인정 기준 ${minThr}분 미만)`, color: "#9A3412" }] : []),
+                                          ];
+                                          const showTip = (e) => setAttTip({ x: e.clientX, y: e.clientY, lines: tipLines });
+                                          const moveTip = (e) => setAttTip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                                          const hideTip = () => setAttTip(null);
                                           return(
-                                            <div key={i} title={`${dt.getMonth()+1}/${dt.getDate()}`} style={{
-                                              width:cell,height:cell,borderRadius:4,
-                                              background:done?color:missed?"transparent":"#F0F2FA",
-                                              border:`1px solid ${done?color:missed?`${color}35`:"#E2E6F3"}`,
-                                              display:"flex",alignItems:"center",justifyContent:"center",
-                                              flexShrink:0, position:"relative", overflow:"hidden"
-                                            }}>
+                                            <div key={i}
+                                              onMouseEnter={showTip} onMouseMove={moveTip} onMouseLeave={hideTip}
+                                              style={{
+                                                width:cell,height:cell,borderRadius:4,
+                                                background:done?color:underMin?"#FED7AA":missed?"transparent":"#F0F2FA",
+                                                border:`1px solid ${done?color:underMin?"#FB923C":missed?`${color}35`:"#E2E6F3"}`,
+                                                display:"flex",alignItems:"center",justifyContent:"center",
+                                                flexShrink:0, position:"relative", overflow:"hidden", cursor:"pointer"
+                                              }}>
                                               {done && (
                                                 <span style={{fontSize:isMobile?7:8,fontWeight:700,color:"#fff"}}>{dt.getDate()}</span>
+                                              )}
+                                              {underMin && (
+                                                <span style={{fontSize:isMobile?7:8,fontWeight:700,color:"#9A3412"}}>{dt.getDate()}</span>
                                               )}
                                               {missed && (<>
                                                 {/* 사선 */}
@@ -2617,7 +2646,7 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
                                                   background:`${color}60`,transform:"rotate(-45deg)",transformOrigin:"center"}}/>
                                                 <span style={{fontSize:isMobile?7:8,fontWeight:400,color:`${color}70`,zIndex:1}}>{dt.getDate()}</span>
                                               </>)}
-                                              {!done && !missed && (
+                                              {!done && !missed && !underMin && (
                                                 <span style={{fontSize:isMobile?7:8,fontWeight:700,color:"#C8CEED"}}>{dt.getDate()}</span>
                                               )}
                                             </div>
@@ -2650,6 +2679,9 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
                 <div style={{width:12,height:12,borderRadius:3,border:"1px solid #C8CEED",position:"relative",overflow:"hidden"}}>
                   <div style={{position:"absolute",top:"50%",left:"-5%",width:"110%",height:"1.5px",background:"#94A3B8",transform:"rotate(-45deg)",transformOrigin:"center"}}/>
                 </div> 미완료
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:T.muted}}>
+                <div style={{width:12,height:12,borderRadius:3,background:"#FED7AA",border:"1px solid #FB923C"}}/> 참여시간미달
               </div>
               <div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:T.muted}}>
                 <div style={{width:12,height:12,borderRadius:3,background:"#F0F2FA",border:"1px solid #E2E6F3"}}/> 예정
@@ -2960,6 +2992,29 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
         </div>
       </div>
 
+      {/* 출석 셀 hover tooltip — 즉시 표시 + ChartTip 스타일 */}
+      {attTip && (
+        <div style={{
+          position:"fixed",
+          left: Math.min(window.innerWidth - 240, attTip.x + 14),
+          top:  Math.max(8, attTip.y - 12),
+          background: T.surface,
+          border: `1px solid ${T.border}`,
+          borderRadius: 8,
+          padding: "8px 12px",
+          fontSize: 11,
+          boxShadow: "0 4px 14px rgba(25,29,84,0.18)",
+          zIndex: 10000,
+          pointerEvents: "none",
+          whiteSpace: "nowrap",
+        }}>
+          {attTip.lines.map((l,i) => (
+            <div key={i} style={{color: l.color, fontWeight: i===0?700:600, fontSize: i===0?11:10.5, marginBottom: i===attTip.lines.length-1?0:3}}>
+              {l.label}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -2982,6 +3037,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
   // 관리자가 학생 화면을 read-only로 보기 위한 state. profile 객체가 들어있으면 풀스크린 오버레이 표시
   // 학생 사이드바와 동일하게 cert / dashboard / history 3개 탭 지원 (학부모 viewerMode="parent" 컴포넌트 재사용)
   const [viewAsStudent, setViewAsStudent] = useState(null);
+  // 출석 셀 hover tooltip (관리자 그리드용) — { x, y, lines: [...] }
+  const [gridTip, setGridTip] = useState(null);
   const [viewAsTab, setViewAsTab] = useState("cert"); // "cert" | "dashboard" | "history"
   const [viewAsLogs, setViewAsLogs] = useState([]);
   const [viewAsLoading, setViewAsLoading] = useState(false);
@@ -3110,7 +3167,11 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           if(idx >= 0){
             // session_type: "M" 또는 "N"(나잇) → roster2 키는 "M" 또는 "나"
             const rosterType = r.session_type === "N" ? "나" : "M";
-            map[`${idx}-${rosterType}-${r.session_date}`] = true;
+            const valid = isValidAttendance(r.session_type, r.participation_minutes, r.session_date);
+            map[`${idx}-${rosterType}-${r.session_date}`] = {
+              valid,
+              minutes: r.participation_minutes,
+            };
           }
         });
         setAttendance2(map);
@@ -4548,8 +4609,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           const k = `${studentIdx}-${type}-${dateKey}`;
           setAttendance2(prev => ({...prev, [k]: !prev[k]}));
         };
+        // 반환: null(미참석) / { valid: boolean, minutes: number|null }
         const getAtt = (studentIdx, type, dateKey) => {
-          return attendance2[`${studentIdx}-${type}-${dateKey}`] || false;
+          return attendance2[`${studentIdx}-${type}-${dateKey}`] || null;
         };
 
         // Group A ↔ Group B 매칭 (이름 또는 전화 마지막4자리)
@@ -4697,8 +4759,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                       </tr>
                     ) : filtered.map((s, rowI) => {
                       const nCount = naverDates.filter((_, idx) => !!getNaverCertForSession(s.name, idx)).length;
-                      const mCount = morningDates.filter(dt => getAtt(s.idx,"M",fmtKey(dt))).length;
-                      const naCount = nightDates.filter(dt => getAtt(s.idx,"나",fmtKey(dt))).length;
+                      // 분 임계값 미달은 카운트 제외 (att.valid만 카운트)
+                      const mCount = morningDates.filter(dt => { const a = getAtt(s.idx,"M",fmtKey(dt));  return a && a.valid; }).length;
+                      const naCount = nightDates.filter(dt => { const a = getAtt(s.idx,"나",fmtKey(dt)); return a && a.valid; }).length;
                       return (
                         <tr key={s.idx} style={{background: rowI%2===0 ? T.surface : T.surfaceAlt}}>
                           {/* 고정: 번호 */}
@@ -4758,18 +4821,37 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                               const naverMatch = sec.type === "N" ? getNaverCertForSession(s.name, di) : null;
                               const hasNaverCert = !!naverMatch;
                               const isLate = hasNaverCert && naverMatch.isLate;
-                              const checked = sec.type === "N" ? hasNaverCert : getAtt(s.idx, sec.type, key);
+                              // M/나 출석: {valid, minutes}. 미달은 valid=false, minutes는 표시용
+                              const att = sec.type !== "N" ? getAtt(s.idx, sec.type, key) : null;
+                              const checked = sec.type === "N" ? hasNaverCert : !!(att && att.valid);
+                              const underMin = sec.type !== "N" && att && !att.valid;
+                              const minThr = sec.type === "나" ? MIN_ATTENDANCE_MINUTES.N : sec.type === "M" ? MIN_ATTENDANCE_MINUTES.M : null;
+                              const status = sec.type === "N"
+                                ? (hasNaverCert ? (isLate ? "지각 인정" : "정시 인증") : "미인증")
+                                : (checked ? "완료" : underMin ? "참여시간미달" : "미참여");
+                              const tipLines = [
+                                { label: `${s.name} · ${dt.getMonth()+1}/${dt.getDate()} · ${sec.label}`, color: sec.color },
+                                { label: `상태: ${status}`, color: checked ? "#16A34A" : underMin ? "#9A3412" : (sec.type==="N" && isLate) ? "#B45309" : T.muted },
+                                ...(att && att.minutes != null ? [{ label: `참여 시간: ${att.minutes}분`, color: T.navy }] : []),
+                                ...(underMin && minThr ? [{ label: `(인정 기준 ${minThr}분 미만)`, color: "#9A3412" }] : []),
+                              ];
+                              const showTip = (e) => setGridTip({ x: e.clientX, y: e.clientY, lines: tipLines });
+                              const moveTip = (e) => setGridTip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                              const hideTip = () => setGridTip(null);
                               return (
                                 <td key={`${si}-${di}`}
+                                  onMouseEnter={showTip} onMouseMove={moveTip} onMouseLeave={hideTip}
                                   style={{
                                     width: CELL_W, minWidth: CELL_W,
                                     height: CELL_H,
                                     textAlign:"center", verticalAlign:"middle",
                                     cursor:"default",
                                     fontSize: 12,
-                                    fontWeight: checked ? 800 : 400,
-                                    color: checked ? (sec.type==="N" && isLate ? "#B45309" : sec.color) : "transparent",
-                                    background: checked ? (sec.type==="N" && isLate ? "#FEF3C7" : sec.bg) : "transparent",
+                                    fontWeight: (checked||underMin) ? 800 : 400,
+                                    color: checked ? (sec.type==="N" && isLate ? "#B45309" : sec.color)
+                                                   : underMin ? "#9A3412" : "transparent",
+                                    background: checked ? (sec.type==="N" && isLate ? "#FEF3C7" : sec.bg)
+                                                       : underMin ? "#FED7AA" : "transparent",
                                     borderBottom:`1px solid ${T.border}`,
                                     borderLeft: di===0 ? `2px solid ${sec.color}` : `1px solid ${T.border}`,
                                     userSelect:"none",
@@ -4777,7 +4859,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                                   }}>
                                   {sec.type === "N"
                                     ? (hasNaverCert ? (isLate ? "△" : "O") : "")
-                                    : (checked ? "✓" : "")}
+                                    : (checked ? "✓" : underMin ? "△" : "")}
                                 </td>
                               );
                             })
@@ -4833,6 +4915,30 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
         </div>
         );
       })()}
+
+      {/* 관리자 전체현황 그리드 출석 셀 hover tooltip */}
+      {gridTip && (
+        <div style={{
+          position:"fixed",
+          left: Math.min(window.innerWidth - 280, gridTip.x + 14),
+          top:  Math.max(8, gridTip.y - 12),
+          background: T.surface,
+          border: `1px solid ${T.border}`,
+          borderRadius: 8,
+          padding: "8px 12px",
+          fontSize: 11,
+          boxShadow: "0 4px 14px rgba(25,29,84,0.18)",
+          zIndex: 10000,
+          pointerEvents: "none",
+          whiteSpace: "nowrap",
+        }}>
+          {gridTip.lines.map((l,i) => (
+            <div key={i} style={{color: l.color, fontWeight: i===0?700:600, fontSize: i===0?11:10.5, marginBottom: i===gridTip.lines.length-1?0:3}}>
+              {l.label}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -5160,7 +5266,10 @@ const AttendanceUploadView = ({onRefresh}) => {
     return {name, code};
   };
 
+
   // CSV 처리
+  // Zoom 참가자 보고서: 같은 학생이 입퇴장 반복 시 여러 row로 분리됨 (예: 20분, 10분).
+  // 학생별로 모든 row의 분(참가 시간)을 합산한 뒤 임계값과 비교.
   const handleFile = async (file) => {
     setSaveMsg(null);
     const text = await file.text();
@@ -5169,7 +5278,10 @@ const AttendanceUploadView = ({onRefresh}) => {
     const header = parseCSVLine(lines[0]);
     const nameIdx = header.findIndex(h => h.includes("이름") || h.includes("원래"));
     const joinIdx = header.findIndex(h => h.includes("참가"));
+    // 분 컬럼 — "기간(분)" / "참가 시간(분)" / "Duration" 등
+    const durIdx  = header.findIndex(h => /기간|Duration|참여|지속/i.test(h) && /분|Minute|\(분\)/i.test(h));
     if(nameIdx < 0 || joinIdx < 0){ alert("CSV 헤더 형식이 다릅니다 (이름/참가 시간 필요)"); return; }
+    if(durIdx < 0){ alert('CSV에 분 컬럼이 없어요. 헤더에 "기간(분)" 또는 "Duration (Minutes)" 필요'); return; }
 
     // 첫 데이터 행에서 날짜/시간 파악 → 모닝/나잇 구분
     let sessionDate = null, sessionType = null;
@@ -5185,6 +5297,8 @@ const AttendanceUploadView = ({onRefresh}) => {
       }
     }
     if(!sessionDate){ alert("CSV에서 날짜를 인식하지 못했어요"); return; }
+    // 회차일 기준 실효 임계값 (6/2까지 유예 → 0, 이후 모닝15·나잇50)
+    const minMin = attendanceThreshold(sessionType, sessionDate);
 
     // 회차 매칭 (모닝/나잇)
     const dates = sessionType==="M" ? ROSTER2_MORNING_DATES : ROSTER2_NIGHT_DATES;
@@ -5194,20 +5308,22 @@ const AttendanceUploadView = ({onRefresh}) => {
       ? `${sessionDate.slice(5)} ${sessionIdx+1}회 ${typeLabel}`
       : `${sessionDate.slice(5)} ${typeLabel} (일정 외)`;
 
-    // 모든 참가자 → 이름 매칭
-    const matchedMap = {}; // student_id → {id,name,csvNames:[]}
-    const errors = []; // {csvName,reason}
-    const seenCsvNames = new Set();
+    // 학생별 분 합산. 같은 학생이 csv에 여러 줄(입퇴장 반복) 있으면 모두 합산.
+    // 미매칭 학생도 누적해서 한 번만 errors에 기록
+    const studentTotals = {}; // student_id → {id,name,csvNames:Set,totalMinutes}
+    const errorTotals = {};   // csvName → {csvName, reason, minutes}
     for(let i=1;i<lines.length;i++){
       const cols = parseCSVLine(lines[i]);
       const rawName = cols[nameIdx];
-      if(!rawName || seenCsvNames.has(rawName)) continue;
-      seenCsvNames.add(rawName);
+      if(!rawName) continue;
+      const mins = Math.max(0, parseInt((cols[durIdx]||"").replace(/[^\d]/g,""),10) || 0);
       // 외부인 ("아이작", "Kevin" 등 알려진 외부인은 제외)
       if(/iforyou76@/i.test(cols[1]||"")) continue;
+      if(rawName === "아이작" || rawName === "Kevin") continue;
       const {name, code} = parseParticipantName(rawName);
       if(!name && !code){
-        if(rawName !== "아이작" && rawName !== "Kevin") errors.push({csvName: rawName, reason: "이름/코드 파싱 실패"});
+        if(!errorTotals[rawName]) errorTotals[rawName] = {csvName: rawName, reason: "이름/코드 파싱 실패", minutes: 0};
+        errorTotals[rawName].minutes += mins;
         continue;
       }
       // 매칭 시도: 이름+뒷4 → 이름+중간4 → 이름만 → 코드만
@@ -5222,20 +5338,29 @@ const AttendanceUploadView = ({onRefresh}) => {
         else if(studentIndex.byMid4[code]) stu = studentIndex.byMid4[code];
       }
       if(stu){
-        if(!matchedMap[stu.id]) matchedMap[stu.id] = {id: stu.id, name: stu.name, csvNames: []};
-        matchedMap[stu.id].csvNames.push(rawName);
+        if(!studentTotals[stu.id]) studentTotals[stu.id] = {id: stu.id, name: stu.name, csvNames: new Set(), totalMinutes: 0};
+        studentTotals[stu.id].csvNames.add(rawName);
+        studentTotals[stu.id].totalMinutes += mins;
       } else {
-        errors.push({csvName: rawName, reason: name?`'${name}' 명단에 없음`:`코드 ${code||'?'} 매칭 실패`});
+        const key = rawName;
+        if(!errorTotals[key]) errorTotals[key] = {csvName: rawName, reason: name?`'${name}' 명단에 없음`:`코드 ${code||'?'} 매칭 실패`, minutes: 0};
+        errorTotals[key].minutes += mins;
       }
     }
-    const matched = Object.values(matchedMap).sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+    // 임계값 분리: 매칭된 학생을 출석 인정/미달로 분리
+    const allMatched = Object.values(studentTotals)
+      .map(s => ({...s, csvNames: [...s.csvNames]}))
+      .sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+    const matched   = allMatched.filter(s => s.totalMinutes >= minMin);
+    const underMin  = allMatched.filter(s => s.totalMinutes <  minMin);
+    const errors = Object.values(errorTotals);
     const errorActions = {};
     errors.forEach(e => { errorActions[e.csvName] = "ignore"; });
 
     setParsed({
       sessionDate, sessionType, sessionIdx,
-      sessionLabel, typeLabel,
-      matched, errors, errorActions,
+      sessionLabel, typeLabel, minMin,
+      matched, underMin, errors, errorActions,
       fileName: file.name,
     });
   };
@@ -5244,25 +5369,34 @@ const AttendanceUploadView = ({onRefresh}) => {
     if(!parsed) return;
     setSaving(true);
     setSaveMsg(null);
-    // 에러 학생 중 수동 할당된 것 추가
-    const extraIds = [];
+    // 에러 학생 중 수동 할당된 것 추가 (분 정보 없음 → 임계값 최소값으로 처리)
+    const minMin = parsed.minMin || 0;
+    const extraEntries = [];
     Object.entries(parsed.errorActions).forEach(([csvName, action])=>{
       if(action && action !== "ignore"){
         const sid = parseInt(action);
-        if(!isNaN(sid)) extraIds.push(sid);
+        if(!isNaN(sid)){
+          // 에러 학생의 합산 분 (있으면 사용, 없으면 임계값)
+          const errInfo = parsed.errors.find(e => e.csvName === csvName);
+          const minutes = errInfo && errInfo.minutes >= minMin ? errInfo.minutes : minMin;
+          extraEntries.push({ student_id: sid, minutes });
+        }
       }
     });
-    const allStudentIds = [...parsed.matched.map(m=>m.id), ...extraIds];
+    // 인정 + 미달 모두 DB 저장 (분은 그대로). 카운트 로직은 분 >= 임계값일 때만 출석으로 처리
+    const matchedEntries = parsed.matched.map(m => ({ student_id: m.id, minutes: m.totalMinutes }));
+    const underEntries   = (parsed.underMin || []).map(m => ({ student_id: m.id, minutes: m.totalMinutes }));
+    const entries = [...matchedEntries, ...underEntries, ...extraEntries];
     const {error} = await supabase.rpc("save_attendance_batch", {
       p_session_date: parsed.sessionDate,
       p_session_type: parsed.sessionType,
-      p_student_ids: allStudentIds,
+      p_entries: entries,
     });
     setSaving(false);
     if(error){
       setSaveMsg({type:"error", text:`저장 실패: ${error.message}`});
     } else {
-      setSaveMsg({type:"success", text:`✅ ${parsed.sessionLabel} 출석 ${allStudentIds.length}명 저장 완료!`});
+      setSaveMsg({type:"success", text:`✅ ${parsed.sessionLabel} 출석 ${entries.length}명 저장 완료!`});
       setTimeout(()=>{ setParsed(null); setSaveMsg(null); if(fileRef.current) fileRef.current.value=""; },2500);
       onRefresh && onRefresh();
     }
@@ -5310,6 +5444,9 @@ const AttendanceUploadView = ({onRefresh}) => {
           <Card style={{padding:"18px 20px",background:parsed.sessionIdx>=0?"#F0FDF4":"#FEF3C7",border:`2px solid ${parsed.sessionIdx>=0?"#86EFAC":"#FCD34D"}`}}>
             <div style={{fontSize:12,color:T.muted,marginBottom:6}}>파일: {parsed.fileName}</div>
             <div style={{fontSize:20,fontWeight:900,color:T.navy}}>{parsed.sessionLabel}</div>
+            <div style={{fontSize:12,color:T.navy,marginTop:6,fontWeight:600}}>
+              출석 인정 기준: {parsed.minMin > 0 ? <><strong>{parsed.minMin}분 이상</strong> 참여</> : <strong>참여 시 인정 (유예 기간)</strong>}
+            </div>
             {parsed.sessionIdx < 0 && (
               <div style={{fontSize:11,color:"#B45309",marginTop:6}}>⚠️ ROSTER2 회차 일정에 없는 날짜입니다. 저장은 가능하지만 회차 표시는 안 됩니다.</div>
             )}
@@ -5318,23 +5455,48 @@ const AttendanceUploadView = ({onRefresh}) => {
           {/* 인정 명단 */}
           <Card style={{padding:"16px 20px"}}>
             <div style={{fontSize:14,fontWeight:800,color:T.navy,marginBottom:10}}>
-              ✅ 출석 인정 ({parsed.matched.length}명)
+              ✅ 출석 인정 ({parsed.matched.length}명) <span style={{fontSize:11,color:T.muted,fontWeight:500}}>· {parsed.minMin}분 이상</span>
             </div>
             {parsed.matched.length === 0 ? (
               <div style={{fontSize:12,color:T.muted,textAlign:"center",padding:"16px 0"}}>매칭된 학생 없음</div>
             ) : (
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:6}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:6}}>
                 {parsed.matched.map(m => (
-                  <div key={m.id} style={{padding:"6px 10px",borderRadius:8,background:"#F0FDF4",border:"1px solid #86EFAC",fontSize:12,color:T.navy}}>
-                    <span style={{fontWeight:700}}>{m.name}</span>
-                    {m.csvNames[0] !== m.name && (
-                      <div style={{fontSize:9,color:T.muted,marginTop:2}}>CSV: {m.csvNames[0]}</div>
-                    )}
+                  <div key={m.id} style={{padding:"6px 10px",borderRadius:8,background:"#F0FDF4",border:"1px solid #86EFAC",fontSize:12,color:T.navy,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <span style={{fontWeight:700}}>{m.name}</span>
+                      {m.csvNames[0] !== m.name && (
+                        <div style={{fontSize:9,color:T.muted,marginTop:2}}>CSV: {m.csvNames[0]}</div>
+                      )}
+                    </div>
+                    <span style={{fontSize:11,fontWeight:700,color:"#16A34A",padding:"2px 6px",borderRadius:6,background:"#fff",border:"1px solid #BBF7D0",whiteSpace:"nowrap"}}>{m.totalMinutes}분</span>
                   </div>
                 ))}
               </div>
             )}
           </Card>
+
+          {/* 미달 명단 — 임계값 미만 참여자 (출석 인정 X) */}
+          {parsed.underMin && parsed.underMin.length > 0 && (
+            <Card style={{padding:"16px 20px",background:"#FFF7ED",border:"1px solid #FDBA74"}}>
+              <div style={{fontSize:14,fontWeight:800,color:"#9A3412",marginBottom:10}}>
+                ⏱️ 출석 미달 ({parsed.underMin.length}명) <span style={{fontSize:11,color:"#B45309",fontWeight:500}}>· {parsed.minMin}분 미만 — 출석 처리 안 됨</span>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:6}}>
+                {parsed.underMin.map(m => (
+                  <div key={m.id} style={{padding:"6px 10px",borderRadius:8,background:"#fff",border:"1px solid #FED7AA",fontSize:12,color:"#9A3412",display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <span style={{fontWeight:700}}>{m.name}</span>
+                      {m.csvNames[0] !== m.name && (
+                        <div style={{fontSize:9,color:T.muted,marginTop:2}}>CSV: {m.csvNames[0]}</div>
+                      )}
+                    </div>
+                    <span style={{fontSize:11,fontWeight:700,color:"#DC2626",padding:"2px 6px",borderRadius:6,background:"#fff",border:"1px solid #FECACA",whiteSpace:"nowrap"}}>{m.totalMinutes}분</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* 에러 처리 */}
           {parsed.errors.length > 0 && (
