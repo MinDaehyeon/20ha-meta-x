@@ -7,6 +7,34 @@
 
 ---
 
+## v2026.06.02-1 — 2026-06-02
+**커밋:** [681f0d8](https://github.com/MinDaehyeon/20ha-meta-x/commit/681f0d8)
+
+### 주요 변경
+
+**기능 확장 — 관리자 "학생 화면 보기" 메뉴 3개 모두 지원**
+- 기존(v-9): 카페 인증(StudentCertView)만 표시
+- 추가: **메타인지 분석**(StudentDashboard) + **학습 기록**(LogHistory)
+- 풀스크린 오버레이 상단에 탭 UI (인증현황 / 메타인지 분석 / 학습 기록) — 학생 본인 사이드바와 동일 구조
+- viewAsStudent 진입 시 `get_child_logs` RPC로 학생 logs 1회 fetch (fire-and-forget `.then(_,_)`)
+- 학부모 `viewerMode="parent"` 컴포넌트를 그대로 재사용 — 추가 컴포넌트 분기 없음
+- DB (`20260602100000_admin_view_student_logs.sql`): `get_child_logs` RPC에 admin role OR 분기 추가
+
+**보안 강화 — 비밀번호 변경 폼 현재 비밀번호 재인증**
+- 취약점: ProfileModal에서 새 비밀번호만 입력하면 `supabase.auth.updateUser` 호출 → 로그인 세션이 살아있는 디바이스를 잠시 빌린 누구든 비밀번호 변경 가능
+- 수정:
+  - "현재 비밀번호 (보안 확인)" 입력 필드 추가 (`autoComplete="current-password"`)
+  - 비밀번호 변경 시도 시 `supabase.auth.signInWithPassword`로 재인증 검증
+  - 실패 시 "현재 비밀번호가 올바르지 않습니다." 표시
+  - `newPw === currentPw` 동일성 사전 차단
+
+**Playwright 검증 (dev)**
+- [G] 박성빈 학생화면 → 메타인지(24일·EI 차트) / 학습기록(24건·페이지네이션) 정상
+- [B] 현재 비번 누락 차단, 잘못된 현재 비번 차단 모두 동작
+- [C] 학부모 자녀 인증현황 3메뉴 사전 검증 통과 (코드 변경 없음, 운영 검증만)
+
+---
+
 ## v2026.06.01-9 — 2026-06-01
 **커밋:** [1bcd917](https://github.com/MinDaehyeon/20ha-meta-x/commit/1bcd917)
 
