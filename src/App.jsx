@@ -5160,7 +5160,12 @@ const AttendanceUploadView = ({onRefresh}) => {
     return {name, code};
   };
 
+  // 출석 인정 임계값 (분): 모닝 15분 이상, 나잇 60분 이상 참여 시 인정
+  const MIN_MINUTES = { M: 15, N: 60 };
+
   // CSV 처리
+  // Zoom 참가자 보고서: 같은 학생이 입퇴장 반복 시 여러 row로 분리됨 (예: 20분, 10분).
+  // 학생별로 모든 row의 분(참가 시간)을 합산한 뒤 임계값과 비교.
   const handleFile = async (file) => {
     setSaveMsg(null);
     const text = await file.text();
@@ -5169,7 +5174,10 @@ const AttendanceUploadView = ({onRefresh}) => {
     const header = parseCSVLine(lines[0]);
     const nameIdx = header.findIndex(h => h.includes("이름") || h.includes("원래"));
     const joinIdx = header.findIndex(h => h.includes("참가"));
+    // 분 컬럼 — "기간(분)" / "참가 시간(분)" / "Duration" 등
+    const durIdx  = header.findIndex(h => /기간|Duration|참여|지속/i.test(h) && /분|Minute|\(분\)/i.test(h));
     if(nameIdx < 0 || joinIdx < 0){ alert("CSV 헤더 형식이 다릅니다 (이름/참가 시간 필요)"); return; }
+    if(durIdx < 0){ alert('CSV에 분 컬럼이 없어요. 헤더에 "기간(분)" 또는 "Duration (Minutes)" 필요'); return; }
 
     // 첫 데이터 행에서 날짜/시간 파악 → 모닝/나잇 구분
     let sessionDate = null, sessionType = null;
@@ -5185,6 +5193,7 @@ const AttendanceUploadView = ({onRefresh}) => {
       }
     }
     if(!sessionDate){ alert("CSV에서 날짜를 인식하지 못했어요"); return; }
+    const minMin = MIN_MINUTES[sessionType] || 0;
 
     // 회차 매칭 (모닝/나잇)
     const dates = sessionType==="M" ? ROSTER2_MORNING_DATES : ROSTER2_NIGHT_DATES;
@@ -5194,20 +5203,22 @@ const AttendanceUploadView = ({onRefresh}) => {
       ? `${sessionDate.slice(5)} ${sessionIdx+1}회 ${typeLabel}`
       : `${sessionDate.slice(5)} ${typeLabel} (일정 외)`;
 
-    // 모든 참가자 → 이름 매칭
-    const matchedMap = {}; // student_id → {id,name,csvNames:[]}
-    const errors = []; // {csvName,reason}
-    const seenCsvNames = new Set();
+    // 학생별 분 합산. 같은 학생이 csv에 여러 줄(입퇴장 반복) 있으면 모두 합산.
+    // 미매칭 학생도 누적해서 한 번만 errors에 기록
+    const studentTotals = {}; // student_id → {id,name,csvNames:Set,totalMinutes}
+    const errorTotals = {};   // csvName → {csvName, reason, minutes}
     for(let i=1;i<lines.length;i++){
       const cols = parseCSVLine(lines[i]);
       const rawName = cols[nameIdx];
-      if(!rawName || seenCsvNames.has(rawName)) continue;
-      seenCsvNames.add(rawName);
+      if(!rawName) continue;
+      const mins = Math.max(0, parseInt((cols[durIdx]||"").replace(/[^\d]/g,""),10) || 0);
       // 외부인 ("아이작", "Kevin" 등 알려진 외부인은 제외)
       if(/iforyou76@/i.test(cols[1]||"")) continue;
+      if(rawName === "아이작" || rawName === "Kevin") continue;
       const {name, code} = parseParticipantName(rawName);
       if(!name && !code){
-        if(rawName !== "아이작" && rawName !== "Kevin") errors.push({csvName: rawName, reason: "이름/코드 파싱 실패"});
+        if(!errorTotals[rawName]) errorTotals[rawName] = {csvName: rawName, reason: "이름/코드 파싱 실패", minutes: 0};
+        errorTotals[rawName].minutes += mins;
         continue;
       }
       // 매칭 시도: 이름+뒷4 → 이름+중간4 → 이름만 → 코드만
@@ -5222,20 +5233,29 @@ const AttendanceUploadView = ({onRefresh}) => {
         else if(studentIndex.byMid4[code]) stu = studentIndex.byMid4[code];
       }
       if(stu){
-        if(!matchedMap[stu.id]) matchedMap[stu.id] = {id: stu.id, name: stu.name, csvNames: []};
-        matchedMap[stu.id].csvNames.push(rawName);
+        if(!studentTotals[stu.id]) studentTotals[stu.id] = {id: stu.id, name: stu.name, csvNames: new Set(), totalMinutes: 0};
+        studentTotals[stu.id].csvNames.add(rawName);
+        studentTotals[stu.id].totalMinutes += mins;
       } else {
-        errors.push({csvName: rawName, reason: name?`'${name}' 명단에 없음`:`코드 ${code||'?'} 매칭 실패`});
+        const key = rawName;
+        if(!errorTotals[key]) errorTotals[key] = {csvName: rawName, reason: name?`'${name}' 명단에 없음`:`코드 ${code||'?'} 매칭 실패`, minutes: 0};
+        errorTotals[key].minutes += mins;
       }
     }
-    const matched = Object.values(matchedMap).sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+    // 임계값 분리: 매칭된 학생을 출석 인정/미달로 분리
+    const allMatched = Object.values(studentTotals)
+      .map(s => ({...s, csvNames: [...s.csvNames]}))
+      .sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+    const matched   = allMatched.filter(s => s.totalMinutes >= minMin);
+    const underMin  = allMatched.filter(s => s.totalMinutes <  minMin);
+    const errors = Object.values(errorTotals);
     const errorActions = {};
     errors.forEach(e => { errorActions[e.csvName] = "ignore"; });
 
     setParsed({
       sessionDate, sessionType, sessionIdx,
-      sessionLabel, typeLabel,
-      matched, errors, errorActions,
+      sessionLabel, typeLabel, minMin,
+      matched, underMin, errors, errorActions,
       fileName: file.name,
     });
   };
@@ -5244,25 +5264,32 @@ const AttendanceUploadView = ({onRefresh}) => {
     if(!parsed) return;
     setSaving(true);
     setSaveMsg(null);
-    // 에러 학생 중 수동 할당된 것 추가
-    const extraIds = [];
+    // 에러 학생 중 수동 할당된 것 추가 (분 정보 없음 → 임계값 최소값으로 처리)
+    const minMin = parsed.minMin || 0;
+    const extraEntries = [];
     Object.entries(parsed.errorActions).forEach(([csvName, action])=>{
       if(action && action !== "ignore"){
         const sid = parseInt(action);
-        if(!isNaN(sid)) extraIds.push(sid);
+        if(!isNaN(sid)){
+          // 에러 학생의 합산 분 (있으면 사용, 없으면 임계값)
+          const errInfo = parsed.errors.find(e => e.csvName === csvName);
+          const minutes = errInfo && errInfo.minutes >= minMin ? errInfo.minutes : minMin;
+          extraEntries.push({ student_id: sid, minutes });
+        }
       }
     });
-    const allStudentIds = [...parsed.matched.map(m=>m.id), ...extraIds];
+    const matchedEntries = parsed.matched.map(m => ({ student_id: m.id, minutes: m.totalMinutes }));
+    const entries = [...matchedEntries, ...extraEntries];
     const {error} = await supabase.rpc("save_attendance_batch", {
       p_session_date: parsed.sessionDate,
       p_session_type: parsed.sessionType,
-      p_student_ids: allStudentIds,
+      p_entries: entries,
     });
     setSaving(false);
     if(error){
       setSaveMsg({type:"error", text:`저장 실패: ${error.message}`});
     } else {
-      setSaveMsg({type:"success", text:`✅ ${parsed.sessionLabel} 출석 ${allStudentIds.length}명 저장 완료!`});
+      setSaveMsg({type:"success", text:`✅ ${parsed.sessionLabel} 출석 ${entries.length}명 저장 완료!`});
       setTimeout(()=>{ setParsed(null); setSaveMsg(null); if(fileRef.current) fileRef.current.value=""; },2500);
       onRefresh && onRefresh();
     }
@@ -5310,6 +5337,9 @@ const AttendanceUploadView = ({onRefresh}) => {
           <Card style={{padding:"18px 20px",background:parsed.sessionIdx>=0?"#F0FDF4":"#FEF3C7",border:`2px solid ${parsed.sessionIdx>=0?"#86EFAC":"#FCD34D"}`}}>
             <div style={{fontSize:12,color:T.muted,marginBottom:6}}>파일: {parsed.fileName}</div>
             <div style={{fontSize:20,fontWeight:900,color:T.navy}}>{parsed.sessionLabel}</div>
+            <div style={{fontSize:12,color:T.navy,marginTop:6,fontWeight:600}}>
+              출석 인정 기준: <strong>{parsed.minMin}분 이상</strong> 참여
+            </div>
             {parsed.sessionIdx < 0 && (
               <div style={{fontSize:11,color:"#B45309",marginTop:6}}>⚠️ ROSTER2 회차 일정에 없는 날짜입니다. 저장은 가능하지만 회차 표시는 안 됩니다.</div>
             )}
@@ -5318,23 +5348,48 @@ const AttendanceUploadView = ({onRefresh}) => {
           {/* 인정 명단 */}
           <Card style={{padding:"16px 20px"}}>
             <div style={{fontSize:14,fontWeight:800,color:T.navy,marginBottom:10}}>
-              ✅ 출석 인정 ({parsed.matched.length}명)
+              ✅ 출석 인정 ({parsed.matched.length}명) <span style={{fontSize:11,color:T.muted,fontWeight:500}}>· {parsed.minMin}분 이상</span>
             </div>
             {parsed.matched.length === 0 ? (
               <div style={{fontSize:12,color:T.muted,textAlign:"center",padding:"16px 0"}}>매칭된 학생 없음</div>
             ) : (
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:6}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:6}}>
                 {parsed.matched.map(m => (
-                  <div key={m.id} style={{padding:"6px 10px",borderRadius:8,background:"#F0FDF4",border:"1px solid #86EFAC",fontSize:12,color:T.navy}}>
-                    <span style={{fontWeight:700}}>{m.name}</span>
-                    {m.csvNames[0] !== m.name && (
-                      <div style={{fontSize:9,color:T.muted,marginTop:2}}>CSV: {m.csvNames[0]}</div>
-                    )}
+                  <div key={m.id} style={{padding:"6px 10px",borderRadius:8,background:"#F0FDF4",border:"1px solid #86EFAC",fontSize:12,color:T.navy,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <span style={{fontWeight:700}}>{m.name}</span>
+                      {m.csvNames[0] !== m.name && (
+                        <div style={{fontSize:9,color:T.muted,marginTop:2}}>CSV: {m.csvNames[0]}</div>
+                      )}
+                    </div>
+                    <span style={{fontSize:11,fontWeight:700,color:"#16A34A",padding:"2px 6px",borderRadius:6,background:"#fff",border:"1px solid #BBF7D0",whiteSpace:"nowrap"}}>{m.totalMinutes}분</span>
                   </div>
                 ))}
               </div>
             )}
           </Card>
+
+          {/* 미달 명단 — 임계값 미만 참여자 (출석 인정 X) */}
+          {parsed.underMin && parsed.underMin.length > 0 && (
+            <Card style={{padding:"16px 20px",background:"#FFF7ED",border:"1px solid #FDBA74"}}>
+              <div style={{fontSize:14,fontWeight:800,color:"#9A3412",marginBottom:10}}>
+                ⏱️ 출석 미달 ({parsed.underMin.length}명) <span style={{fontSize:11,color:"#B45309",fontWeight:500}}>· {parsed.minMin}분 미만 — 출석 처리 안 됨</span>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:6}}>
+                {parsed.underMin.map(m => (
+                  <div key={m.id} style={{padding:"6px 10px",borderRadius:8,background:"#fff",border:"1px solid #FED7AA",fontSize:12,color:"#9A3412",display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <span style={{fontWeight:700}}>{m.name}</span>
+                      {m.csvNames[0] !== m.name && (
+                        <div style={{fontSize:9,color:T.muted,marginTop:2}}>CSV: {m.csvNames[0]}</div>
+                      )}
+                    </div>
+                    <span style={{fontSize:11,fontWeight:700,color:"#DC2626",padding:"2px 6px",borderRadius:6,background:"#fff",border:"1px solid #FECACA",whiteSpace:"nowrap"}}>{m.totalMinutes}분</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* 에러 처리 */}
           {parsed.errors.length > 0 && (
