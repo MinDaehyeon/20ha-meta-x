@@ -5213,26 +5213,15 @@ const AttendanceUploadView = ({onRefresh}) => {
     if(durIdx < 0){ alert('CSV에 분 컬럼이 없어요. 헤더에 "기간(분)" 또는 "Duration (Minutes)" 필요'); return; }
 
     // 첫 데이터 행에서 날짜/시간 파악 → 모닝/나잇 구분
-    // Zoom CSV 형식이 두 가지로 나옴 — 둘 다 지원:
-    //   A. "2026/05/22 06:57:23 AM" (슬래시 + 12시간 + AM/PM)
-    //   B. "2026-05-26 22:54" (하이픈 + 24시간, AM/PM 없음)
     let sessionDate = null, sessionType = null;
     for(let i=1;i<lines.length;i++){
       const cols = parseCSVLine(lines[i]);
       const t = cols[joinIdx];
-      if(!t) continue;
-      // 형식 A
-      let m = t.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})\s+\d{1,2}:\d{2}(?::\d{2})?\s*(AM|PM)/i);
+      // "2026/05/22 06:57:23 AM" 형태
+      const m = t && t.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})\s+\d{1,2}:\d{2}(?::\d{2})?\s*(AM|PM)/i);
       if(m){
         sessionDate = `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
-        sessionType = m[4].toUpperCase()==="AM" ? "M" : "N";
-        break;
-      }
-      // 형식 B (24시간) — 시간(HH) < 12면 모닝, ≥ 12면 나잇
-      m = t.match(/(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}):\d{2}/);
-      if(m){
-        sessionDate = `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
-        sessionType = parseInt(m[4],10) < 12 ? "M" : "N";
+        sessionType = m[4].toUpperCase()==="AM" ? "M" : "N"; // M=모닝, N=나잇
         break;
       }
     }
