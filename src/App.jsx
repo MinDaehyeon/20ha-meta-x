@@ -2979,8 +2979,20 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
   const [filterStatus, setFilterStatus] = useState("all"); // "all"|"pending"|"approved"|"rejected"
   const [filterRole, setFilterRole]   = useState("all"); // "all"|"student"|"parent"
   const [detailStudent, setDetailStudent] = useState(null);
-  // 관리자가 학생 화면을 read-only로 보기 위한 state. profile 객체가 들어있으면 풀스크린 오버레이로 학생 인증 화면을 표시
+  // 관리자가 학생 화면을 read-only로 보기 위한 state. profile 객체가 들어있으면 풀스크린 오버레이 표시
+  // 학생 사이드바와 동일하게 cert / dashboard / history 3개 탭 지원 (학부모 viewerMode="parent" 컴포넌트 재사용)
   const [viewAsStudent, setViewAsStudent] = useState(null);
+  const [viewAsTab, setViewAsTab] = useState("cert"); // "cert" | "dashboard" | "history"
+  const [viewAsLogs, setViewAsLogs] = useState([]);
+  const [viewAsLoading, setViewAsLoading] = useState(false);
+  useEffect(() => {
+    if (!viewAsStudent) { setViewAsLogs([]); return; }
+    setViewAsTab("cert"); setViewAsLoading(true);
+    supabase.rpc("get_child_logs", { child_id: viewAsStudent.id }).then(({data, error}) => {
+      setViewAsLogs(data || []);
+      setViewAsLoading(false);
+    }, () => { setViewAsLoading(false); });
+  }, [viewAsStudent]);
 
   // 기수 데이터 (회원 관리·2기 명단 공용)
   const ROSTER2_NAMES = new Set(["강예나","김가흔","김은채","김태준","박재현","손연재","윤준원","최지유","배정윤","심수윤","한설아","강가인","권민유","권순혁","최유주","김도현","김시원","김시윤","김아란","김준범","김지우","김호진","나지성","문지유","박지우","서소윤","서지우","송민건","양소윤","오수연","우정훈","윤서준","이유빈","이홍윤","임다은","정유진","박선율","한채린","오수빈","남희수","김가인","양은정","테스트학생","한유찬","문성민"]);
@@ -4781,8 +4793,15 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
         );
       })()}
 
-      {/* 관리자 "학생 화면 보기" 풀스크린 오버레이 — viewerMode="parent"로 학생 본인 화면 그대로 렌더 */}
-      {viewAsStudent && (
+      {/* 관리자 "학생 화면 보기" 풀스크린 오버레이 — viewerMode="parent"로 학생 본인 화면 그대로 렌더
+          학부모 사이드바와 동일하게 cert/dashboard/history 3개 탭 지원 */}
+      {viewAsStudent && (() => {
+        const tabs = [
+          {k:"cert", label:"20HA 2기 인증현황"},
+          {k:"dashboard", label:"메타인지 분석"},
+          {k:"history", label:"학습 기록"},
+        ];
+        return (
         <div style={{position:"fixed",inset:0,background:T.bg,zIndex:9999,overflow:"auto"}}>
           <div style={{position:"sticky",top:0,zIndex:1,background:"#FEF3C7",borderBottom:"1px solid #FDE68A",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
             <div style={{fontSize:13,fontWeight:700,color:"#92400E"}}>
@@ -4790,11 +4809,30 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
             </div>
             <button onClick={()=>setViewAsStudent(null)} style={{fontSize:12,fontWeight:700,padding:"6px 14px",borderRadius:8,border:"none",background:T.navy,color:T.white,cursor:"pointer"}}>← 돌아가기</button>
           </div>
+          <div style={{background:T.surface,borderBottom:`1px solid ${T.border}`,padding:"8px 16px",display:"flex",gap:6,overflowX:"auto"}}>
+            {tabs.map(t => (
+              <button key={t.k} onClick={()=>setViewAsTab(t.k)}
+                style={{padding:"7px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,whiteSpace:"nowrap",
+                  background: viewAsTab===t.k ? T.navy : "transparent",
+                  color: viewAsTab===t.k ? T.white : T.navy}}>
+                {t.label}
+              </button>
+            ))}
+          </div>
           <div style={{padding:"16px",maxWidth:1280,margin:"0 auto"}}>
-            <StudentCertView profile={viewAsStudent} viewerMode="parent" />
+            {viewAsLoading && viewAsTab !== "cert" ? (
+              <Card style={{padding:40, textAlign:"center", color:T.muted}}>학생 데이터 불러오는 중…</Card>
+            ) : viewAsTab === "cert" ? (
+              <StudentCertView profile={viewAsStudent} viewerMode="parent" />
+            ) : viewAsTab === "dashboard" ? (
+              <StudentDashboard logs={viewAsLogs} profile={viewAsStudent} isAdminView={true} />
+            ) : (
+              <LogHistory logs={viewAsLogs} onDelete={null} isAdmin={false} allProfiles={[viewAsStudent]} />
+            )}
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
@@ -6651,6 +6689,7 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
   useDraftBackup(PROFILE_DRAFT_KEY, { name, birthYear, birthMonth, birthDay, target });
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url||"");
   const [uploading, setUploading] = useState(false);
+  const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw]         = useState("");
   const [newPwC, setNewPwC]       = useState("");
   const [saving, setSaving]       = useState(false);
@@ -6707,10 +6746,26 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
     setErr("");
     if(newPw){
       const pwRegex=/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/;
+      if(!currentPw){ setErr("비밀번호 변경 시에는 현재 비밀번호를 입력해주세요."); return; }
       if(newPw!==newPwC){ setErr("비밀번호가 일치하지 않습니다."); return; }
       if(!pwRegex.test(newPw)){ setErr("대소문자+특수문자 포함 8자 이상이어야 합니다."); return; }
+      if(currentPw === newPw){ setErr("현재 비밀번호와 동일합니다. 다른 비밀번호를 입력해주세요."); return; }
     }
     setSaving(true);
+    // 비밀번호 변경 시도 시 현재 비밀번호로 재인증 (로그인된 디바이스를 잠시 빌린 사람의 비번 변경 차단)
+    if(newPw){
+      const { data: { session: curSess } } = await supabase.auth.getSession();
+      const email = curSess?.user?.email;
+      if(!email){ setSaving(false); setErr("세션이 만료되었습니다. 다시 로그인 후 시도해주세요."); return; }
+      const { error: reauthErr } = await supabase.auth.signInWithPassword({ email, password: currentPw });
+      if(reauthErr){
+        setSaving(false);
+        const m = reauthErr.message?.toLowerCase()||"";
+        if(m.includes("invalid")) setErr("현재 비밀번호가 올바르지 않습니다.");
+        else setErr("재인증 실패: "+reauthErr.message);
+        return;
+      }
+    }
     const targetEI = GRADE_MIN[target]||85;
     const by = birthYear?Number(birthYear):null, bm = birthMonth?Number(birthMonth):null, bd = birthDay?Number(birthDay):null;
     const newGrade = calcGrade(by, bm) || profile.grade;
@@ -6800,10 +6855,11 @@ const ProfileModal = ({profile, onClose, onSave, onDelete}) => {
             </div>
           </>}
 
-          {/* 비밀번호 변경 */}
+          {/* 비밀번호 변경 — 보안: 현재 비밀번호 재확인 후에만 변경 가능 (잠시 빌린 디바이스로 비번 변경 차단) */}
           <div style={{borderTop:`1px solid ${T.border}`,paddingTop:14}}>
             <label style={{...css.label,marginBottom:10}}>비밀번호 변경 <span style={{fontWeight:400,color:T.muted}}>(변경 시에만 입력)</span></label>
             <div style={{display:"grid",gap:10}}>
+              <input name="current-password" type="password" value={currentPw} onChange={e=>setCurrentPw(e.target.value)} placeholder="현재 비밀번호 (보안 확인)" autoComplete="current-password" style={css.input}/>
               <input name="new-password" type="password" value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="새 비밀번호 (대소문자+특수문자 8자↑)" autoComplete="new-password" style={css.input}/>
               <input name="new-password-confirm" type="password" value={newPwC} onChange={e=>setNewPwC(e.target.value)} placeholder="새 비밀번호 확인" autoComplete="new-password" style={css.input}/>
             </div>
