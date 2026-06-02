@@ -58,6 +58,16 @@ export const ROSTER2_DAY_KO  = ['일','월','화','수','목','금','토'];
 export const roster2FmtKey   = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 export const roster2Fmt      = (dt) => `${dt.getMonth()+1}/${dt.getDate()}`;
 
+// 출석 인정 임계값 (분): 미라클 모닝 15분 이상, 나잇 60분 이상 참여 시 출석
+// participation_minutes === null 은 면제·행사(예: 6/3 일정변경, 김도현 영작수업) — 출석 인정
+export const MIN_ATTENDANCE_MINUTES = { M: 15, N: 60 };
+export const isValidAttendance = (sessionType, minutes) => {
+  if (minutes === null || minutes === undefined) return true; // 면제/행사
+  const threshold = MIN_ATTENDANCE_MINUTES[sessionType];
+  if (!threshold) return true;
+  return minutes >= threshold;
+};
+
 // 카페 인증 지각 판정: 회차일 다음날 12:00 KST 까지는 정시 인정
 // sessionDate: ROSTER2_NAVER_DATES의 Date (KST 자정), posted_at: ISO 또는 Date
 export const isLateByDeadline = (posted_at, sessionDate) => {

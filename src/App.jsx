@@ -14,7 +14,7 @@ import { HI, navIcon, KakaoIcon, GoogleIcon, NaverIcon } from "./components/icon
 import { Card, Pill, NavyNum, SectionTitle, Divider, Spinner, ChartTip } from "./components/ui";
 import { QUANT_ITEMS, QUAL_ITEMS, SUBJECTS, SUBJECT_CONFIG, ERR_CODES, ERR_LABELS, GRADES } from "./utils/constants";
 import { calcGrade, gradeInfo, calcEI } from "./utils/grade";
-import { ROSTER2, ROSTER2_NAVER_DATES, ROSTER2_MORNING_DATES, ROSTER2_NIGHT_DATES, ROSTER2_DAY_KO, roster2FmtKey, roster2Fmt, isLateByDeadline, INIT_ATTENDANCE2 } from "./utils/roster2";
+import { ROSTER2, ROSTER2_NAVER_DATES, ROSTER2_MORNING_DATES, ROSTER2_NIGHT_DATES, ROSTER2_DAY_KO, roster2FmtKey, roster2Fmt, isLateByDeadline, INIT_ATTENDANCE2, MIN_ATTENDANCE_MINUTES, isValidAttendance } from "./utils/roster2";
 import { draftKey, restoreDraft, clearDraft, useDraftBackup } from "./utils/draft";
 
 // ══════════════════════════════════════════════════════
@@ -2124,9 +2124,17 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
     }
   });
 
-  // 본인 출석 set: "M-YYYY-MM-DD" 또는 "N-YYYY-MM-DD" (M=모닝, N=나잇)
-  const myAttSet = new Set();
-  myAttLogs.forEach(l => myAttSet.add(`${l.session_type}-${l.session_date}`));
+  // 본인 출석 — 임계값(M=15, N=60) 통과해야 출석 인정. participation_minutes=null은 면제(인정)
+  // myAttSet: 출석 인정 (카운트 대상) / myAttUnderSet: 참석은 했으나 시간 미달 / myAttMinutes: 분 표시용
+  const myAttSet      = new Set();
+  const myAttUnderSet = new Set();
+  const myAttMinutes  = new Map();
+  myAttLogs.forEach(l => {
+    const key = `${l.session_type}-${l.session_date}`;
+    myAttMinutes.set(key, l.participation_minutes ?? null);
+    if (isValidAttendance(l.session_type, l.participation_minutes)) myAttSet.add(key);
+    else myAttUnderSet.add(key);
+  });
 
   // 시간 기준 — allStats / mentor / mastery 모두 공통 사용 (TDZ 회피 위해 위로 이동)
   const today = new Date();
@@ -2590,26 +2598,34 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
                                       ? <div style={{width:cell,height:cell,borderRadius:4,background:T.surfaceAlt,border:`1px solid ${T.border}`}}/>
                                       : wDates.map((dt,i)=>{
                                           const dk=fk(dt);
-                                          let done;
+                                          let done, underMin = false, mins = null;
                                           if (type === "N") {
                                             const sessionIdx = ROSTER2_NAVER_DATES.findIndex(d => fk(d) === dk);
                                             done = sessionIdx >= 0 && myCertSessions.has(sessionIdx);
                                           } else {
                                             const dbType = type === "나" ? "N" : "M";
-                                            done = myAttSet.has(`${dbType}-${dk}`);
+                                            done    = myAttSet.has(`${dbType}-${dk}`);
+                                            underMin= myAttUnderSet.has(`${dbType}-${dk}`);
+                                            mins    = myAttMinutes.get(`${dbType}-${dk}`);
                                           }
                                           const isPast=dt<todayMidnight;
-                                          const missed = isPast && !done;
+                                          const missed = isPast && !done && !underMin;
+                                          const tip = mins != null
+                                            ? `${dt.getMonth()+1}/${dt.getDate()} · 참여 ${mins}분${underMin?` (미달, ${type==="나"?60:15}분 미만)`:""}`
+                                            : `${dt.getMonth()+1}/${dt.getDate()}`;
                                           return(
-                                            <div key={i} title={`${dt.getMonth()+1}/${dt.getDate()}`} style={{
+                                            <div key={i} title={tip} style={{
                                               width:cell,height:cell,borderRadius:4,
-                                              background:done?color:missed?"transparent":"#F0F2FA",
-                                              border:`1px solid ${done?color:missed?`${color}35`:"#E2E6F3"}`,
+                                              background:done?color:underMin?"#FED7AA":missed?"transparent":"#F0F2FA",
+                                              border:`1px solid ${done?color:underMin?"#FB923C":missed?`${color}35`:"#E2E6F3"}`,
                                               display:"flex",alignItems:"center",justifyContent:"center",
                                               flexShrink:0, position:"relative", overflow:"hidden"
                                             }}>
                                               {done && (
                                                 <span style={{fontSize:isMobile?7:8,fontWeight:700,color:"#fff"}}>{dt.getDate()}</span>
+                                              )}
+                                              {underMin && (
+                                                <span style={{fontSize:isMobile?7:8,fontWeight:700,color:"#9A3412"}} title={tip}>{dt.getDate()}</span>
                                               )}
                                               {missed && (<>
                                                 {/* 사선 */}
@@ -2617,7 +2633,7 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
                                                   background:`${color}60`,transform:"rotate(-45deg)",transformOrigin:"center"}}/>
                                                 <span style={{fontSize:isMobile?7:8,fontWeight:400,color:`${color}70`,zIndex:1}}>{dt.getDate()}</span>
                                               </>)}
-                                              {!done && !missed && (
+                                              {!done && !missed && !underMin && (
                                                 <span style={{fontSize:isMobile?7:8,fontWeight:700,color:"#C8CEED"}}>{dt.getDate()}</span>
                                               )}
                                             </div>
@@ -3110,7 +3126,11 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           if(idx >= 0){
             // session_type: "M" 또는 "N"(나잇) → roster2 키는 "M" 또는 "나"
             const rosterType = r.session_type === "N" ? "나" : "M";
-            map[`${idx}-${rosterType}-${r.session_date}`] = true;
+            const valid = isValidAttendance(r.session_type, r.participation_minutes);
+            map[`${idx}-${rosterType}-${r.session_date}`] = {
+              valid,
+              minutes: r.participation_minutes,
+            };
           }
         });
         setAttendance2(map);
@@ -4548,8 +4568,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           const k = `${studentIdx}-${type}-${dateKey}`;
           setAttendance2(prev => ({...prev, [k]: !prev[k]}));
         };
+        // 반환: null(미참석) / { valid: boolean, minutes: number|null }
         const getAtt = (studentIdx, type, dateKey) => {
-          return attendance2[`${studentIdx}-${type}-${dateKey}`] || false;
+          return attendance2[`${studentIdx}-${type}-${dateKey}`] || null;
         };
 
         // Group A ↔ Group B 매칭 (이름 또는 전화 마지막4자리)
@@ -4697,8 +4718,9 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                       </tr>
                     ) : filtered.map((s, rowI) => {
                       const nCount = naverDates.filter((_, idx) => !!getNaverCertForSession(s.name, idx)).length;
-                      const mCount = morningDates.filter(dt => getAtt(s.idx,"M",fmtKey(dt))).length;
-                      const naCount = nightDates.filter(dt => getAtt(s.idx,"나",fmtKey(dt))).length;
+                      // 분 임계값 미달은 카운트 제외 (att.valid만 카운트)
+                      const mCount = morningDates.filter(dt => { const a = getAtt(s.idx,"M",fmtKey(dt));  return a && a.valid; }).length;
+                      const naCount = nightDates.filter(dt => { const a = getAtt(s.idx,"나",fmtKey(dt)); return a && a.valid; }).length;
                       return (
                         <tr key={s.idx} style={{background: rowI%2===0 ? T.surface : T.surfaceAlt}}>
                           {/* 고정: 번호 */}
@@ -4758,18 +4780,26 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                               const naverMatch = sec.type === "N" ? getNaverCertForSession(s.name, di) : null;
                               const hasNaverCert = !!naverMatch;
                               const isLate = hasNaverCert && naverMatch.isLate;
-                              const checked = sec.type === "N" ? hasNaverCert : getAtt(s.idx, sec.type, key);
+                              // M/나 출석: {valid, minutes}. 미달은 valid=false, minutes는 표시용
+                              const att = sec.type !== "N" ? getAtt(s.idx, sec.type, key) : null;
+                              const checked = sec.type === "N" ? hasNaverCert : !!(att && att.valid);
+                              const underMin = sec.type !== "N" && att && !att.valid;
+                              const cellTip = att != null && att.minutes != null
+                                ? `${s.name} · ${dt.getMonth()+1}/${dt.getDate()} ${sec.label} · 참여 ${att.minutes}분${underMin?` (미달)`:""}`
+                                : "";
                               return (
-                                <td key={`${si}-${di}`}
+                                <td key={`${si}-${di}`} title={cellTip}
                                   style={{
                                     width: CELL_W, minWidth: CELL_W,
                                     height: CELL_H,
                                     textAlign:"center", verticalAlign:"middle",
                                     cursor:"default",
                                     fontSize: 12,
-                                    fontWeight: checked ? 800 : 400,
-                                    color: checked ? (sec.type==="N" && isLate ? "#B45309" : sec.color) : "transparent",
-                                    background: checked ? (sec.type==="N" && isLate ? "#FEF3C7" : sec.bg) : "transparent",
+                                    fontWeight: (checked||underMin) ? 800 : 400,
+                                    color: checked ? (sec.type==="N" && isLate ? "#B45309" : sec.color)
+                                                   : underMin ? "#9A3412" : "transparent",
+                                    background: checked ? (sec.type==="N" && isLate ? "#FEF3C7" : sec.bg)
+                                                       : underMin ? "#FED7AA" : "transparent",
                                     borderBottom:`1px solid ${T.border}`,
                                     borderLeft: di===0 ? `2px solid ${sec.color}` : `1px solid ${T.border}`,
                                     userSelect:"none",
@@ -4777,7 +4807,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                                   }}>
                                   {sec.type === "N"
                                     ? (hasNaverCert ? (isLate ? "△" : "O") : "")
-                                    : (checked ? "✓" : "")}
+                                    : (checked ? "✓" : underMin ? "△" : "")}
                                 </td>
                               );
                             })
@@ -5278,8 +5308,10 @@ const AttendanceUploadView = ({onRefresh}) => {
         }
       }
     });
+    // 인정 + 미달 모두 DB 저장 (분은 그대로). 카운트 로직은 분 >= 임계값일 때만 출석으로 처리
     const matchedEntries = parsed.matched.map(m => ({ student_id: m.id, minutes: m.totalMinutes }));
-    const entries = [...matchedEntries, ...extraEntries];
+    const underEntries   = (parsed.underMin || []).map(m => ({ student_id: m.id, minutes: m.totalMinutes }));
+    const entries = [...matchedEntries, ...underEntries, ...extraEntries];
     const {error} = await supabase.rpc("save_attendance_batch", {
       p_session_date: parsed.sessionDate,
       p_session_type: parsed.sessionType,
