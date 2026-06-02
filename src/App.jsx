@@ -2668,6 +2668,9 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
                 </div> 미완료
               </div>
               <div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:T.muted}}>
+                <div style={{width:12,height:12,borderRadius:3,background:"#FED7AA",border:"1px solid #FB923C"}}/> 참여시간미달
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:T.muted}}>
                 <div style={{width:12,height:12,borderRadius:3,background:"#F0F2FA",border:"1px solid #E2E6F3"}}/> 예정
               </div>
               <div style={{marginLeft:"auto",fontSize:10,color:T.muted,opacity:0.6}}>
