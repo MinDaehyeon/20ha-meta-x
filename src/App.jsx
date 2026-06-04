@@ -3924,9 +3924,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                       const hasFidelity = rec.fidelity_score !== null && rec.fidelity_score !== undefined;
                       const openScoreModal = () => setCertScoreModal({
                         id: rec.id, postTitle: rec.post_title,
-                        submit:   hasSubmit   ? String(rec.submit_score)   : "",
-                        mission:  hasMission  ? String(rec.mission_score)  : "",
-                        fidelity: hasFidelity ? String(rec.fidelity_score) : "",
+                        // 미채점 글은 만점 기준값(제출 50 / 미션 30 / 충실도 20)을 기본 입력해 둠
+                        submit:   hasSubmit   ? String(rec.submit_score)   : "50",
+                        mission:  hasMission  ? String(rec.mission_score)  : "30",
+                        fidelity: hasFidelity ? String(rec.fidelity_score) : "20",
                       });
                       const openSessionModal = () => setCertSessionModal({
                         id: rec.id, postTitle: rec.post_title, posted_at: rec.posted_at,
