@@ -3092,6 +3092,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
   const [certTimeFilter, setCertTimeFilter] = useState("all"); // "all" | "ontime" | "late"
   const [certRecords, setCertRecords] = useState([]);
   const [certRecordsLoading, setCertRecordsLoading] = useState(false);
+  const [certChecked, setCertChecked] = useState(() => new Set()); // 일괄 채점용 선택된 글 id
+  const [bulkScoring, setBulkScoring] = useState(false);
   const [certStatusFilter, setCertStatusFilter] = useState("all");
   const [certEditRecord, setCertEditRecord] = useState(null); // 편집 중인 행 {id,...}
   const [crawlRunning, setCrawlRunning] = useState(false);
@@ -3243,6 +3245,26 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
     };
     setCertRecords(prev => prev.map(r => r.id===certId ? {...r, ...patch} : r));
     setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, ...patch} : c));
+  };
+
+  // 체크한 글들을 한 번에 만점(제출50/미션30/충실도20 = 종합 100점) 처리
+  const bulkFullScore = async () => {
+    const ids = [...certChecked];
+    if (ids.length === 0 || bulkScoring) return;
+    if (!window.confirm(`체크한 ${ids.length}건을 만점(제출 50 / 미션 30 / 충실도 20 = 종합 100점)으로 처리할까요?`)) return;
+    setBulkScoring(true);
+    try {
+      await Promise.all(ids.map(id =>
+        supabase.rpc("update_cert_scores", { p_cert_id: id, p_submit: 50, p_mission: 30, p_fidelity: 20 })
+      ));
+      const idSet = new Set(ids);
+      const patch = { submit_score: 50, mission_score: 30, fidelity_score: 20, completeness_score: 100, compliance_score: null };
+      setCertRecords(prev => prev.map(r => idSet.has(r.id) ? {...r, ...patch} : r));
+      setAttendanceCerts(prev => prev.map(c => idSet.has(c.id) ? {...c, ...patch} : c));
+      setCertChecked(new Set());
+    } finally {
+      setBulkScoring(false);
+    }
   };
 
   const updateCertRecord = async (id, updates) => {
@@ -3891,6 +3913,25 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                     )}
                   </div>
                 </Card>
+                {/* 일괄 채점 바: 체크한 글 한 번에 만점 처리 */}
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"}}>
+                  <span style={{fontSize:12,fontWeight:700,color:certChecked.size>0?T.navy:T.muted}}>
+                    선택 {certChecked.size}건
+                  </span>
+                  <button onClick={bulkFullScore} disabled={certChecked.size===0||bulkScoring}
+                    style={{padding:"6px 14px",borderRadius:6,border:"none",fontSize:12,fontWeight:700,
+                      cursor:(certChecked.size===0||bulkScoring)?"default":"pointer",
+                      background:(certChecked.size===0||bulkScoring)?"#E5E7EB":T.orange,
+                      color:(certChecked.size===0||bulkScoring)?T.muted:T.white}}>
+                    {bulkScoring?"처리 중...":"✓ 체크한 글 만점처리 (100점)"}
+                  </button>
+                  {certChecked.size>0 && !bulkScoring && (
+                    <button onClick={()=>setCertChecked(new Set())}
+                      style={{padding:"6px 10px",borderRadius:6,border:`1px solid ${T.border}`,fontSize:12,fontWeight:600,background:T.white,color:T.muted,cursor:"pointer"}}>
+                      선택 해제
+                    </button>
+                  )}
+                </div>
                 <div style={{fontSize:12,color:T.muted,marginBottom:10}}>
                   {filterActive
                     ? <>필터 결과 <strong style={{color:T.navy}}>{filteredRecords.length}</strong>건 / 전체 {certRecords.length}건 · {safePage}/{totalPages}페이지</>
@@ -3902,8 +3943,24 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                 ):(
                   <Card style={{padding:0,overflow:"hidden"}}>
                     {/* 헤더 */}
-                    <div style={{display:"grid",gridTemplateColumns:"50px 80px 80px 60px 1fr 90px 65px 50px 50px 50px 56px",
+                    <div style={{display:"grid",gridTemplateColumns:"34px 50px 80px 80px 60px 1fr 90px 65px 50px 50px 50px 56px",
                       background:T.navy,padding:"9px 12px",gap:6,alignItems:"center"}}>
+                      {(()=>{
+                        const pageIds = pageRecords.map(r=>r.id);
+                        const allChecked = pageIds.length>0 && pageIds.every(id=>certChecked.has(id));
+                        return (
+                          <div style={{display:"flex",justifyContent:"center"}}>
+                            <input type="checkbox" checked={allChecked} title="이 페이지 전체 선택"
+                              onChange={()=>setCertChecked(prev=>{
+                                const n=new Set(prev);
+                                if(allChecked) pageIds.forEach(id=>n.delete(id));
+                                else pageIds.forEach(id=>n.add(id));
+                                return n;
+                              })}
+                              style={{width:14,height:14,accentColor:T.orange,cursor:"pointer"}}/>
+                          </div>
+                        );
+                      })()}
                       {["글번호","학생","회차","정시여부","제목","닉네임","작성일","제출","미션","충실도","종합"].map(h=>(
                         <div key={h} style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.85)",textAlign:h==="제목"?"left":"center"}}>{h}</div>
                       ))}
@@ -3938,10 +3995,17 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                         borderRadius:4, border:"1px dashed transparent",
                         color: has ? T.navy : T.muted, textAlign:"center",
                       });
+                      const isChecked = certChecked.has(rec.id);
                       return (
-                        <div key={rec.id} style={{display:"grid",gridTemplateColumns:"50px 80px 80px 60px 1fr 90px 65px 50px 50px 50px 56px",
+                        <div key={rec.id} style={{display:"grid",gridTemplateColumns:"34px 50px 80px 80px 60px 1fr 90px 65px 50px 50px 50px 56px",
                           padding:"8px 12px",gap:6,borderTop:`1px solid ${T.border}`,
-                          background:rowBg,alignItems:"center"}}>
+                          background:isChecked?"#FFF7ED":rowBg,alignItems:"center"}}>
+                          {/* 체크박스 */}
+                          <div style={{display:"flex",justifyContent:"center"}}>
+                            <input type="checkbox" checked={isChecked}
+                              onChange={()=>setCertChecked(prev=>{const n=new Set(prev); n.has(rec.id)?n.delete(rec.id):n.add(rec.id); return n;})}
+                              style={{width:14,height:14,accentColor:T.orange,cursor:"pointer"}}/>
+                          </div>
                           {/* 글번호 */}
                           <div style={{fontSize:11,color:T.muted,textAlign:"center",fontFamily:"monospace"}}>{articleId}</div>
                           {/* 학생 (가운데) */}
