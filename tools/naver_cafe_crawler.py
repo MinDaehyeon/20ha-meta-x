@@ -201,6 +201,20 @@ def fetch_existing_urls():
     return set()
 
 
+def fetch_excluded_urls():
+    """관리자가 영구 제외 처리한 글 URL — 삭제해도 재수집하지 않도록 스킵."""
+    r = requests.get(
+        f"{SUPABASE_URL}/rest/v1/cafe_excluded_urls?select=post_url",
+        headers={"apikey": SERVICE_KEY, "Authorization": f"Bearer {SERVICE_KEY}"},
+        timeout=15,
+    )
+    if r.status_code == 200:
+        return {row["post_url"] for row in r.json() if row.get("post_url")}
+    # 테이블이 없거나 조회 실패해도 크롤링 자체는 진행
+    print(f"[supabase] 제외 URL 조회 실패(무시): {r.status_code}")
+    return set()
+
+
 # ── 크롤링 ─────────────────────────────────────────────────────────────────
 
 def crawl_board(existing_urls, students):
@@ -306,6 +320,12 @@ if __name__ == "__main__":
 
     existing_urls = fetch_existing_urls()
     print(f"[supabase] 기존 저장: {len(existing_urls)}건")
+
+    # 영구 제외 URL을 기존 URL 집합에 합쳐 재수집 방지 (삭제된 글이 다시 올라오지 않도록)
+    excluded_urls = fetch_excluded_urls()
+    if excluded_urls:
+        existing_urls |= excluded_urls
+        print(f"[supabase] 제외 URL: {len(excluded_urls)}건 (스킵)")
 
     # 기존 unchecked 레코드 title 대조 업데이트
     update_existing_title_checks(students)
