@@ -7358,6 +7358,18 @@ const ChallengeAdmin = () => {
   const [posts, setPosts]           = useState([]);
   const [loading, setLoading]       = useState(false);
   const [crawlRunning, setCrawlRunning] = useState(false);
+  const [participants, setParticipants] = useState([]);
+  const [showForm, setShowForm]     = useState(false);
+  const [form, setForm]             = useState(null); // {key|null, name, board_url, participantsText, active}
+  const [saving, setSaving]         = useState(false);
+
+  const reloadChallenges = async (selectKey) => {
+    const { data } = await supabase.rpc("get_challenges");
+    const list = (data && data.length) ? data : CHALLENGE_FALLBACK;
+    setChallenges(list);
+    if (selectKey) setActiveKey(selectKey);
+    else if (!list.find(c => c.key === activeKey)) setActiveKey(list[0]?.key);
+  };
 
   useEffect(() => {
     supabase.rpc("get_challenges").then(
@@ -7365,6 +7377,61 @@ const ChallengeAdmin = () => {
       () => {}
     );
   }, []);
+
+  const loadParticipants = async (key) => {
+    const { data } = await supabase.rpc("get_challenge_participants", { p_key: key });
+    setParticipants(data || []);
+  };
+  useEffect(() => { loadParticipants(activeKey); }, [activeKey]);
+
+  // 게시판 URL에서 카페 club id / 게시판 menu id 추출 (20HA와 동일 형식)
+  const parseBoard = (url) => {
+    const u = url || "";
+    let m = u.match(/cafes\/(\d+)\/menus\/(\d+)/);
+    if (m) return { cafeId: m[1], menuId: m[2] };
+    m = u.match(/clubid=(\d+)[\s\S]*?menuid=(\d+)/i);
+    if (m) return { cafeId: m[1], menuId: m[2] };
+    m = u.match(/menus\/(\d+)/);
+    if (m) return { cafeId: null, menuId: m[1] };
+    return { cafeId: null, menuId: null };
+  };
+
+  const openNew  = () => { setForm({ key: null, name: "", board_url: "", participantsText: "", active: true }); setShowForm(true); };
+  const openEdit = async () => {
+    const { data } = await supabase.rpc("get_challenge_participants", { p_key: activeKey });
+    setForm({
+      key: active.key, name: active.name || "", board_url: active.board_url || "",
+      participantsText: (data || []).map(p => p.name).join("\n"),
+      active: active.active !== false,
+    });
+    setShowForm(true);
+  };
+
+  const saveForm = async () => {
+    if (!form.name.trim()) { alert("챌린지명을 입력해주세요."); return; }
+    setSaving(true);
+    try {
+      const key = form.key || ("c" + Date.now().toString(36));
+      const { cafeId, menuId } = parseBoard(form.board_url);
+      await supabase.rpc("upsert_challenge", {
+        p_key: key, p_name: form.name.trim(), p_board_url: form.board_url.trim() || null,
+        p_cafe_id: cafeId, p_board_menu_id: menuId, p_active: form.active,
+      });
+      const names = form.participantsText.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+      await supabase.rpc("set_challenge_participants", { p_key: key, p_names: names });
+      await reloadChallenges(key);
+      await loadParticipants(key);
+      setShowForm(false);
+    } catch (e) { alert("저장 실패: " + (e.message || e)); }
+    setSaving(false);
+  };
+
+  const removeChallenge = async () => {
+    if (!window.confirm(`'${active.name}' 챌린지를 삭제할까요?\n수집된 글·명단도 함께 삭제됩니다.`)) return;
+    await supabase.rpc("delete_challenge", { p_key: activeKey });
+    setShowForm(false);
+    await reloadChallenges();
+  };
 
   const loadPosts = async (key) => {
     setLoading(true);
@@ -7411,18 +7478,29 @@ const ChallengeAdmin = () => {
     <div>
       <div style={{ fontSize:18, fontWeight:800, color:T.navy, marginBottom:14 }}>📋 챌린지 관리</div>
 
-      {/* 챌린지 선택 탭 */}
-      <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap" }}>
+      {/* 챌린지 선택 탭 + 관리 버튼 */}
+      <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap", alignItems:"center" }}>
         {challenges.map(c => {
           const on = c.key === activeKey;
           return (
             <button key={c.key} onClick={() => setActiveKey(c.key)}
               style={{ padding:"9px 18px", borderRadius:10, border:`1px solid ${on?T.navy:T.border}`,
                 background:on?T.navy:T.white, color:on?T.white:T.navy, fontSize:13, fontWeight:700, cursor:"pointer" }}>
-              {c.name}
+              {c.name}{c.active === false ? " (비활성)" : ""}
             </button>
           );
         })}
+        <div style={{ flex:1 }}/>
+        {active.key && (
+          <button onClick={openEdit}
+            style={{ padding:"9px 14px", borderRadius:10, border:`1px solid ${T.border}`, background:T.white, color:T.navy, fontSize:13, fontWeight:700, cursor:"pointer" }}>
+            ⚙️ 설정
+          </button>
+        )}
+        <button onClick={openNew}
+          style={{ padding:"9px 16px", borderRadius:10, border:"none", background:T.orange, color:T.white, fontSize:13, fontWeight:800, cursor:"pointer" }}>
+          + 새 챌린지
+        </button>
       </div>
 
       {/* 현황표 / 인증글 서브탭 */}
@@ -7441,19 +7519,43 @@ const ChallengeAdmin = () => {
       </div>
 
       {subTab === "status" ? (
-        // ── 현황표 (참여 명단·회차 등록 후 채워질 틀) ──
+        // ── 현황표 (명단 기반 — 회차별 마감은 추후) ──
         <Card style={{ padding:24 }}>
           <div style={{ fontSize:15, fontWeight:700, color:T.navy, marginBottom:8 }}>{active.name} · 제출 현황표</div>
-          <div style={{ fontSize:13, color:T.muted, lineHeight:1.8, marginBottom:16 }}>
-            참여 <strong>명단</strong>과 <strong>회차별 마감일</strong>을 등록하면,<br/>
-            여기에 <strong>참여자 × 회차</strong> 제출 현황표가 표시됩니다. <span style={{color:T.orange}}>(명단·회차 정보 입력 예정)</span>
-          </div>
-          {/* 현재 크롤링된 글 기준 간단 요약 */}
-          <div style={{ display:"flex", gap:24, padding:"14px 18px", background:T.surfaceAlt||"#F9FAFB", borderRadius:10 }}>
-            <div><div style={{ fontSize:11, color:T.muted, fontWeight:600 }}>크롤링된 글</div><div style={{ fontSize:20, fontWeight:800, color:T.navy }}>{posts.length}건</div></div>
+          {/* 요약 */}
+          <div style={{ display:"flex", gap:24, padding:"14px 18px", background:T.surfaceAlt||"#F9FAFB", borderRadius:10, marginBottom:18 }}>
+            <div><div style={{ fontSize:11, color:T.muted, fontWeight:600 }}>참여 명단</div><div style={{ fontSize:20, fontWeight:800, color:T.navy }}>{participants.length}명</div></div>
+            <div><div style={{ fontSize:11, color:T.muted, fontWeight:600 }}>수집된 글</div><div style={{ fontSize:20, fontWeight:800, color:T.navy }}>{posts.length}건</div></div>
             <div><div style={{ fontSize:11, color:T.muted, fontWeight:600 }}>확인 완료</div><div style={{ fontSize:20, fontWeight:800, color:"#16A34A" }}>{checkedCount}건</div></div>
-            <div><div style={{ fontSize:11, color:T.muted, fontWeight:600 }}>미확인</div><div style={{ fontSize:20, fontWeight:800, color:T.orange }}>{posts.length - checkedCount}건</div></div>
           </div>
+          {participants.length === 0 ? (
+            <div style={{ fontSize:13, color:T.muted, lineHeight:1.8 }}>
+              아직 참여 명단이 없습니다. 우측 상단 <strong>⚙️ 설정</strong>에서 <strong>명단</strong>과 <strong>게시판 URL</strong>을 등록하세요.<br/>
+              <span style={{ color:T.orange }}>회차별 마감일 기준 현황표는 회차 정보 입력 후 제공됩니다.</span>
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize:12, color:T.muted, marginBottom:8 }}>※ 회차 정보 입력 전까지는 참여자별 <strong>제출 글 수</strong>·<strong>확인 수</strong>로 표시합니다.</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 90px 90px", background:T.navy, padding:"8px 12px", gap:8, borderRadius:"8px 8px 0 0" }}>
+                {["참여자","제출 글","확인"].map(h => (
+                  <div key={h} style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.85)", textAlign:h==="참여자"?"left":"center" }}>{h}</div>
+                ))}
+              </div>
+              {participants.map((pt, i) => {
+                const mine = posts.filter(p => p.parsed_name && p.parsed_name === pt.name);
+                const sub = mine.length;
+                const chk = mine.filter(p => p.checked).length;
+                return (
+                  <div key={pt.id} style={{ display:"grid", gridTemplateColumns:"1fr 90px 90px", padding:"8px 12px", gap:8, alignItems:"center",
+                    borderLeft:`1px solid ${T.border}`, borderRight:`1px solid ${T.border}`, borderBottom:`1px solid ${T.border}`, background:i%2===0?T.white:"#F9FAFB" }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:T.navy }}>{pt.name}</div>
+                    <div style={{ fontSize:13, textAlign:"center", color: sub>0?T.navy:T.muted, fontWeight:700 }}>{sub}</div>
+                    <div style={{ fontSize:13, textAlign:"center", color: chk>0?"#16A34A":T.muted, fontWeight:700 }}>{chk}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </Card>
       ) : (
         // ── 인증글 크롤링 + 확인 체크 ──
@@ -7510,6 +7612,60 @@ const ChallengeAdmin = () => {
               })}
             </Card>
           )}
+        </div>
+      )}
+
+      {/* 챌린지 추가/수정 모달 */}
+      {showForm && form && (
+        <div onClick={() => !saving && setShowForm(false)}
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:10000, padding:16 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background:T.white, borderRadius:14, padding:24, width:"100%", maxWidth:480, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 10px 40px rgba(0,0,0,0.25)" }}>
+            <div style={{ fontSize:17, fontWeight:800, color:T.navy, marginBottom:16 }}>
+              {form.key ? "챌린지 설정" : "새 챌린지 추가"}
+            </div>
+
+            <label style={{ fontSize:12, fontWeight:700, color:T.navy, display:"block", marginBottom:6 }}>챌린지명 *</label>
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="예: 사고력 영작"
+              style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1px solid ${T.border}`, fontSize:14, marginBottom:16, boxSizing:"border-box" }}/>
+
+            <label style={{ fontSize:12, fontWeight:700, color:T.navy, display:"block", marginBottom:6 }}>게시판 URL <span style={{ fontWeight:400, color:T.muted }}>(네이버 카페 게시판 링크, 나중에 입력 가능)</span></label>
+            <input value={form.board_url} onChange={e => setForm(f => ({ ...f, board_url: e.target.value }))}
+              placeholder="https://cafe.naver.com/f-e/cafes/31045190/menus/165"
+              style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1px solid ${T.border}`, fontSize:13, marginBottom:4, boxSizing:"border-box" }}/>
+            {form.board_url && (() => { const { cafeId, menuId } = parseBoard(form.board_url); return (
+              <div style={{ fontSize:11, color: menuId ? "#16A34A" : T.orange, marginBottom:16 }}>
+                {menuId ? `✓ 인식됨 — 카페 ${cafeId || "31045190"} / 게시판 ${menuId}` : "⚠️ 게시판 번호를 인식하지 못했어요. /menus/번호 형식 링크인지 확인해주세요."}
+              </div>
+            ); })()}
+            {!form.board_url && <div style={{ marginBottom:16 }}/>}
+
+            <label style={{ fontSize:12, fontWeight:700, color:T.navy, display:"block", marginBottom:6 }}>참여 명단 <span style={{ fontWeight:400, color:T.muted }}>(한 줄에 한 명, 또는 쉼표로 구분)</span></label>
+            <textarea value={form.participantsText} onChange={e => setForm(f => ({ ...f, participantsText: e.target.value }))}
+              placeholder={"홍길동\n김철수\n이영희"}
+              rows={6}
+              style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1px solid ${T.border}`, fontSize:13, marginBottom:16, boxSizing:"border-box", resize:"vertical", fontFamily:"inherit" }}/>
+
+            <label style={{ display:"flex", alignItems:"center", gap:8, marginBottom:20, cursor:"pointer" }}>
+              <input type="checkbox" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))}
+                style={{ width:16, height:16, accentColor:T.navy, cursor:"pointer" }}/>
+              <span style={{ fontSize:13, color:T.text }}>활성 (목록·크롤링 사용)</span>
+            </label>
+
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
+              {form.key
+                ? <button onClick={removeChallenge} disabled={saving}
+                    style={{ padding:"8px 14px", borderRadius:8, border:`1px solid ${T.danger||"#DC2626"}`, background:T.white, color:T.danger||"#DC2626", fontSize:13, fontWeight:700, cursor:"pointer" }}>삭제</button>
+                : <span/>}
+              <div style={{ display:"flex", gap:8 }}>
+                <button onClick={() => setShowForm(false)} disabled={saving}
+                  style={{ padding:"8px 18px", borderRadius:8, border:`1px solid ${T.border}`, background:T.white, color:T.muted, fontSize:13, fontWeight:600, cursor:"pointer" }}>취소</button>
+                <button onClick={saveForm} disabled={saving}
+                  style={{ ...css.btnOrange, padding:"8px 20px", fontSize:13, opacity:saving?0.6:1 }}>{saving ? "저장 중..." : "저장"}</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
