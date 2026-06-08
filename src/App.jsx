@@ -7530,9 +7530,9 @@ const ChallengeAdmin = () => {
         </button>
       </div>
 
-      {/* 전체 현황 / 회차별 확인 서브탭 */}
+      {/* 전체 현황 / 인증글 확인 / 회차별 확인 서브탭 */}
       <div style={{ display:"flex", gap:6, marginBottom:16, borderBottom:`1px solid ${T.border}` }}>
-        {[{ k:"overview", l:"📊 전체 현황" }, { k:"rounds", l:"📝 회차별 확인" }].map(t => {
+        {[{ k:"overview", l:"📊 전체 현황" }, { k:"posts", l:"📝 인증글 확인" }, { k:"rounds", l:"🔢 회차별 확인" }].map(t => {
           const on = t.k === subTab;
           return (
             <button key={t.k} onClick={() => setSubTab(t.k)}
@@ -7619,11 +7619,11 @@ const ChallengeAdmin = () => {
             <div style={{ fontSize:12, color:T.orange, marginTop:10 }}>⚠️ 회차 정보가 없습니다. ⚙️ 설정에서 회차별 마감일을 등록하면 열이 생깁니다.</div>
           )}
           <div style={{ fontSize:11, color:T.muted, marginTop:10, lineHeight:1.7 }}>
-            ※ 글 제목에서 이름·회차를 자동 인식해 매칭합니다. 칸을 누르지 않고 확인 처리는 <strong>회차별 확인</strong> 탭에서 합니다.
+            ※ 글 제목에서 이름·회차를 자동 인식해 매칭합니다. 글 확인(체크)은 <strong>인증글 확인</strong> 탭에서 합니다.
           </div>
         </div>
-      ) : (
-        // ── 회차별 확인 (크롤링 + 회차 필터 + 확인 체크) ──
+      ) : subTab === "posts" ? (
+        // ── 인증글 확인 (크롤링 + 회차 필터 + 확인 체크) ──
         <div>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12, flexWrap:"wrap" }}>
             <button onClick={triggerCrawl} disabled={crawlRunning}
@@ -7689,6 +7689,55 @@ const ChallengeAdmin = () => {
                 });
               })()}
             </Card>
+          )}
+        </div>
+      ) : (
+        // ── 회차별 확인 (회차별 통계) ──
+        <div>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12, flexWrap:"wrap" }}>
+            <button onClick={() => { loadPosts(activeKey); loadParticipants(activeKey); loadRounds(activeKey); }}
+              style={{ padding:"8px 14px", borderRadius:8, border:`1px solid ${T.border}`, background:T.white, color:T.navy, fontSize:13, fontWeight:700, cursor:"pointer" }}>
+              ↻ 새로고침
+            </button>
+            <span style={{ fontSize:12, color:T.muted }}>회차별 제출·확인 통계 {participants.length>0 && <>(명단 {participants.length}명 기준)</>}</span>
+          </div>
+          {rounds.length === 0 ? (
+            <Card style={{ padding:24 }}>
+              <div style={{ fontSize:13, color:T.muted, lineHeight:1.8 }}>
+                회차 정보가 없습니다. 우측 상단 <strong>⚙️ 설정</strong>에서 회차별 마감일을 등록하세요.
+              </div>
+            </Card>
+          ) : (
+            <Card style={{ padding:0, overflow:"hidden" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"90px 100px 1fr 1fr 1fr", background:T.navy, padding:"10px 12px", gap:8 }}>
+                {["회차","마감일","제출(명)","확인완료(명)","미제출(명)"].map(h => (
+                  <div key={h} style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.85)", textAlign:h==="회차"||h==="마감일"?"left":"center" }}>{h}</div>
+                ))}
+              </div>
+              {rounds.map((r, i) => {
+                const ps = posts.filter(p => p.parsed_round === r.round_no);
+                // 제출 인원 = 이름 기준 중복 제거 (명단이 있으면 명단과 매칭된 인원, 없으면 글의 고유 이름 수)
+                const submitNames = new Set(ps.map(p => p.parsed_name).filter(Boolean));
+                const checkNames  = new Set(ps.filter(p => p.checked).map(p => p.parsed_name).filter(Boolean));
+                const total = participants.length;
+                const submitCnt = total > 0 ? participants.filter(pt => submitNames.has(pt.name)).length : submitNames.size;
+                const checkCnt  = total > 0 ? participants.filter(pt => checkNames.has(pt.name)).length  : checkNames.size;
+                const missCnt   = total > 0 ? total - submitCnt : null;
+                return (
+                  <div key={r.round_no} style={{ display:"grid", gridTemplateColumns:"90px 100px 1fr 1fr 1fr", padding:"10px 12px", gap:8, alignItems:"center",
+                    borderTop:`1px solid ${T.border}`, background:i%2===0?T.white:"#F9FAFB" }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:T.navy }}>{r.round_no}주차</div>
+                    <div style={{ fontSize:12, color:T.muted }}>~ {fmtDeadline(r.deadline)}</div>
+                    <div style={{ fontSize:14, fontWeight:800, color:T.navy, textAlign:"center" }}>{submitCnt}{total>0 && <span style={{ fontSize:11, color:T.muted, fontWeight:600 }}> /{total}</span>}</div>
+                    <div style={{ fontSize:14, fontWeight:800, color:"#16A34A", textAlign:"center" }}>{checkCnt}{total>0 && <span style={{ fontSize:11, color:T.muted, fontWeight:600 }}> /{total}</span>}</div>
+                    <div style={{ fontSize:14, fontWeight:800, color: missCnt===null?T.muted:(missCnt>0?T.orange:"#16A34A"), textAlign:"center" }}>{missCnt===null ? "—" : missCnt}</div>
+                  </div>
+                );
+              })}
+            </Card>
+          )}
+          {participants.length === 0 && rounds.length > 0 && (
+            <div style={{ fontSize:11, color:T.muted, marginTop:10 }}>※ 참여 명단을 등록하면 미제출 인원과 명단 대비 비율(/N)이 함께 표시됩니다. (현재는 수집된 글의 고유 이름 수 기준)</div>
           )}
         </div>
       )}
