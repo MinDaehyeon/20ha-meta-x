@@ -7582,10 +7582,13 @@ const ChallengeAdmin = () => {
             </Card>
           ) : (
             <Card style={{ padding:0, overflow:"auto" }}>
-              <div style={{ minWidth: 180 + rounds.length*78 }}>
+              {(() => { const COLS = `100px 100px 120px repeat(${rounds.length}, 64px) 60px`; return (
+              <div style={{ minWidth: 320 + rounds.length*64 + 60 }}>
                 {/* 헤더 */}
-                <div style={{ display:"grid", gridTemplateColumns:`180px repeat(${rounds.length}, 78px) 70px`, background:T.navy, position:"sticky", top:0 }}>
-                  <div style={{ padding:"10px 12px", fontSize:12, fontWeight:700, color:"#fff" }}>참여자</div>
+                <div style={{ display:"grid", gridTemplateColumns:COLS, background:T.navy, position:"sticky", top:0 }}>
+                  <div style={{ padding:"10px 12px", fontSize:12, fontWeight:700, color:"#fff" }}>학생 이름</div>
+                  <div style={{ padding:"10px 8px", fontSize:12, fontWeight:700, color:"#fff", borderLeft:"1px solid rgba(255,255,255,0.12)" }}>학부모 이름</div>
+                  <div style={{ padding:"10px 8px", fontSize:12, fontWeight:700, color:"#fff", borderLeft:"1px solid rgba(255,255,255,0.12)" }}>연락처</div>
                   {rounds.map(r => (
                     <div key={r.round_no} style={{ padding:"6px 4px", textAlign:"center", color:"#fff", borderLeft:"1px solid rgba(255,255,255,0.12)" }}>
                       <div style={{ fontSize:12, fontWeight:700 }}>{r.round_no}주차</div>
@@ -7598,14 +7601,11 @@ const ChallengeAdmin = () => {
                 {participants.map((pt, i) => {
                   let done = 0;
                   return (
-                    <div key={pt.id} style={{ display:"grid", gridTemplateColumns:`180px repeat(${rounds.length}, 78px) 70px`,
+                    <div key={pt.id} style={{ display:"grid", gridTemplateColumns:COLS,
                       borderTop:`1px solid ${T.border}`, background:i%2===0?T.white:"#F9FAFB", alignItems:"stretch" }}>
-                      <div style={{ padding:"8px 12px", display:"flex", flexDirection:"column", justifyContent:"center" }}>
-                        <span style={{ fontSize:13, fontWeight:600, color: pt.name ? T.navy : T.muted }}>
-                          {pt.name || pt.parent_name || "—"}{!pt.name && pt.parent_name ? <span style={{ fontSize:10, color:T.muted, fontWeight:400 }}> (학부모)</span> : null}
-                        </span>
-                        {pt.phone ? <span style={{ fontSize:10, color:T.muted }}>{pt.phone.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3")}</span> : null}
-                      </div>
+                      <div style={{ padding:"8px 12px", display:"flex", alignItems:"center", fontSize:13, fontWeight:600, color: pt.name?T.navy:"#D1D5DB" }}>{pt.name || "—"}</div>
+                      <div style={{ padding:"8px 8px", display:"flex", alignItems:"center", fontSize:12, color: pt.parent_name?T.text:"#D1D5DB", borderLeft:`1px solid ${T.border}` }}>{pt.parent_name || "—"}</div>
+                      <div style={{ padding:"8px 8px", display:"flex", alignItems:"center", fontSize:11, color: pt.phone?T.muted:"#D1D5DB", borderLeft:`1px solid ${T.border}` }}>{pt.phone ? pt.phone.replace(/(\d{2,3})(\d{3,4})(\d{4})/, "$1-$2-$3") : "—"}</div>
                       {rounds.map(r => {
                         const ps = posts.filter(p => p.parsed_name === pt.name && p.parsed_round === r.round_no);
                         const checked = ps.some(p => p.checked);
@@ -7628,6 +7628,7 @@ const ChallengeAdmin = () => {
                   );
                 })}
               </div>
+              ); })()}
             </Card>
           )}
           {rounds.length === 0 && participants.length > 0 && (
