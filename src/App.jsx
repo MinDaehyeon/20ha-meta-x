@@ -7504,15 +7504,6 @@ const ChallengeAdmin = () => {
   };
   const matchByPost = {}; posts.forEach(p => { const m = matchOf(p); matchByPost[p.id] = m.p ? m.p.id : null; });
 
-  // 자동 연결: 아직 연결 안 된 글을 뒤4자리/이름으로 매칭해 participant_id 저장
-  const autoLink = async () => {
-    const ups = [];
-    posts.forEach(p => { if (!p.participant_id) { const m = matchOf(p); if (m.p) ups.push({ id: p.id, pid: m.p.id }); } });
-    if (!ups.length) { alert("자동 연결할 새 글이 없습니다. (이미 연결됐거나, 뒤4자리·이름이 명단과 매칭되지 않는 글들입니다)"); return; }
-    await Promise.all(ups.map(u => supabase.rpc("set_challenge_post_participant", { p_post_id: u.id, p_participant_id: u.pid })));
-    setPosts(prev => prev.map(p => { const u = ups.find(x => x.id === p.id); return u ? { ...p, participant_id: u.pid } : p; }));
-    alert(`${ups.length}건 자동 연결 완료.`);
-  };
   const assignPost = async (post, pid) => {
     const v = pid === "" ? null : Number(pid);
     setPosts(prev => prev.map(p => p.id === post.id ? { ...p, participant_id: v } : p));
@@ -7682,10 +7673,6 @@ const ChallengeAdmin = () => {
               style={{ padding:"8px 14px", borderRadius:8, border:`1px solid ${T.border}`, background:T.white, color:T.navy, fontSize:13, fontWeight:700, cursor:"pointer" }}>
               ↻ 새로고침
             </button>
-            <button onClick={autoLink}
-              style={{ padding:"8px 14px", borderRadius:8, border:"none", background:T.navy, color:T.white, fontSize:13, fontWeight:700, cursor:"pointer" }}>
-              🔗 자동 연결
-            </button>
             <select value={roundFilter} onChange={e => setRoundFilter(e.target.value)}
               style={{ padding:"7px 10px", borderRadius:8, border:`1px solid ${T.border}`, fontSize:13, background:T.white, color:T.navy, cursor:"pointer" }}>
               <option value="all">회차 전체</option>
@@ -7706,8 +7693,8 @@ const ChallengeAdmin = () => {
           ) : (
             <Card style={{ padding:0, overflow:"hidden" }}>
               {/* 헤더 */}
-              <div style={{ display:"grid", gridTemplateColumns:"54px 54px 74px 92px 1fr 56px 170px", background:T.navy, padding:"9px 12px", gap:8, alignItems:"center" }}>
-                {["확인","회차","글번호","닉네임","제목","작성일","참여자 연결"].map(h => (
+              <div style={{ display:"grid", gridTemplateColumns:"170px 54px 74px 92px 1fr 56px 64px", background:T.navy, padding:"9px 12px", gap:8, alignItems:"center" }}>
+                {["참여자 연결","회차","글번호","닉네임","제목","작성일","확인"].map(h => (
                   <div key={h} style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.85)", textAlign:(h==="제목"||h==="참여자 연결")?"left":"center" }}>{h}</div>
                 ))}
               </div>
@@ -7722,21 +7709,8 @@ const ChallengeAdmin = () => {
                   const articleId = p.post_url ? p.post_url.split("/").pop() : p.id;
                   const m = matchOf(p);
                   return (
-                    <div key={p.id} style={{ display:"grid", gridTemplateColumns:"54px 54px 74px 92px 1fr 56px 170px", padding:"9px 12px", gap:8, alignItems:"center",
+                    <div key={p.id} style={{ display:"grid", gridTemplateColumns:"170px 54px 74px 92px 1fr 56px 64px", padding:"9px 12px", gap:8, alignItems:"center",
                       borderTop:`1px solid ${T.border}`, background:p.checked ? "#F0FDF4" : (i%2===0?T.white:"#F9FAFB") }}>
-                      <div style={{ display:"flex", justifyContent:"center" }}>
-                        <input type="checkbox" checked={p.checked} onChange={() => toggleCheck(p)}
-                          style={{ width:18, height:18, accentColor:"#16A34A", cursor:"pointer" }}/>
-                      </div>
-                      <div style={{ fontSize:11, textAlign:"center", color: p.parsed_round?T.navy:T.muted, fontWeight:700 }}>{p.parsed_round ? `${p.parsed_round}주차` : "—"}</div>
-                      <div style={{ fontSize:11, color:T.muted, textAlign:"center", fontFamily:"monospace" }}>{articleId}</div>
-                      <div style={{ fontSize:12, color:T.navy, fontWeight:600, textAlign:"center", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.naver_nickname || "—"}</div>
-                      <div style={{ fontSize:12, overflow:"hidden" }}>
-                        <a href={p.post_url} target="_blank" rel="noreferrer"
-                          style={{ color:T.navy, textDecoration:"none", fontWeight:600, display:"block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
-                          title={p.post_title}>{p.post_title || "(제목 없음)"}</a>
-                      </div>
-                      <div style={{ fontSize:11, color:T.muted, textAlign:"center" }}>{fmtDate(p.posted_at)}</div>
                       {/* 참여자 연결 */}
                       <div style={{ fontSize:11, overflow:"hidden" }}>
                         {editPost === p.id ? (
@@ -7762,6 +7736,25 @@ const ChallengeAdmin = () => {
                             )}
                           </div>
                         )}
+                      </div>
+                      {/* 회차 */}
+                      <div style={{ fontSize:11, textAlign:"center", color: p.parsed_round?T.navy:T.muted, fontWeight:700 }}>{p.parsed_round ? `${p.parsed_round}주차` : "—"}</div>
+                      {/* 글번호 */}
+                      <div style={{ fontSize:11, color:T.muted, textAlign:"center", fontFamily:"monospace" }}>{articleId}</div>
+                      {/* 닉네임 */}
+                      <div style={{ fontSize:12, color:T.navy, fontWeight:600, textAlign:"center", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.naver_nickname || "—"}</div>
+                      {/* 제목 */}
+                      <div style={{ fontSize:12, overflow:"hidden" }}>
+                        <a href={p.post_url} target="_blank" rel="noreferrer"
+                          style={{ color:T.navy, textDecoration:"none", fontWeight:600, display:"block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
+                          title={p.post_title}>{p.post_title || "(제목 없음)"}</a>
+                      </div>
+                      {/* 작성일 */}
+                      <div style={{ fontSize:11, color:T.muted, textAlign:"center" }}>{fmtDate(p.posted_at)}</div>
+                      {/* 확인 */}
+                      <div style={{ display:"flex", justifyContent:"center" }}>
+                        <input type="checkbox" checked={p.checked} onChange={() => toggleCheck(p)}
+                          style={{ width:18, height:18, accentColor:"#16A34A", cursor:"pointer" }}/>
                       </div>
                     </div>
                   );
