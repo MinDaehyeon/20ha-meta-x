@@ -7341,6 +7341,182 @@ const SideNav = ({nav, view, showInput, onNavigate, profile, isAdmin, isParent, 
 };
 
 // ══════════════════════════════════════════════════════
+// ADMIN: 챌린지 관리 (학생 아이디 무관 — 크롤링 + 확인 체크만)
+// 챌린지: 사고력 영작 / 독서챌린지 / 수학독해 챌린지
+// 참여 명단·회차별 마감은 추후 입력 (현재는 틀)
+// ══════════════════════════════════════════════════════
+const CHALLENGE_FALLBACK = [
+  { key:"sagoyeong", name:"사고력 영작" },
+  { key:"reading",   name:"독서챌린지" },
+  { key:"mathread",  name:"수학독해 챌린지" },
+];
+
+const ChallengeAdmin = () => {
+  const [challenges, setChallenges] = useState(CHALLENGE_FALLBACK);
+  const [activeKey, setActiveKey]   = useState("sagoyeong");
+  const [subTab, setSubTab]         = useState("posts"); // "status" | "posts"
+  const [posts, setPosts]           = useState([]);
+  const [loading, setLoading]       = useState(false);
+  const [crawlRunning, setCrawlRunning] = useState(false);
+
+  useEffect(() => {
+    supabase.rpc("get_challenges").then(
+      ({ data }) => { if (data && data.length) setChallenges(data); },
+      () => {}
+    );
+  }, []);
+
+  const loadPosts = async (key) => {
+    setLoading(true);
+    const { data } = await supabase.rpc("get_challenge_posts", { p_challenge_key: key, p_limit: 500 });
+    setPosts(data || []);
+    setLoading(false);
+  };
+  useEffect(() => { loadPosts(activeKey); }, [activeKey]);
+
+  const active = challenges.find(c => c.key === activeKey) || {};
+  const checkedCount = posts.filter(p => p.checked).length;
+
+  const toggleCheck = async (post) => {
+    const next = !post.checked;
+    setPosts(prev => prev.map(p => p.id === post.id ? { ...p, checked: next, checked_at: next ? new Date().toISOString() : null } : p));
+    await supabase.rpc("toggle_challenge_check", { p_post_id: post.id, p_checked: next });
+  };
+
+  const triggerCrawl = async () => {
+    if (!active.naver_board_id) {
+      alert(`'${active.name}' 챌린지의 네이버 게시판이 아직 설정되지 않았습니다.\n참여 명단·회차 정보와 함께 게시판을 등록하면 크롤링할 수 있어요.`);
+      return;
+    }
+    const token = (process.env.REACT_APP_GITHUB_TOKEN || "").trim();
+    if (!token) { alert("REACT_APP_GITHUB_TOKEN 환경변수가 설정되지 않았습니다."); return; }
+    setCrawlRunning(true);
+    try {
+      const ref = ["meta-x.ai.kr", "20ha-meta-x.vercel.app"].includes(window.location.hostname) ? "main" : "dev";
+      const r = await fetch(
+        "https://api.github.com/repos/MinDaehyeon/20ha-meta-x/actions/workflows/challenge_crawler.yml/dispatches",
+        { method:"POST",
+          headers:{ "Authorization":`Bearer ${token}`, "Accept":"application/vnd.github+json", "Content-Type":"application/json" },
+          body: JSON.stringify({ ref, inputs: { challenge_key: activeKey } }) }
+      );
+      if (r.status === 204) alert("크롤링 시작됐습니다!\n약 1분 후 새로고침 하면 글이 업데이트됩니다.");
+      else alert("실행 실패: " + r.status);
+    } catch (e) { alert("오류: " + e.message); }
+    setCrawlRunning(false);
+  };
+
+  const fmtDate = (ts) => { if (!ts) return "—"; const k = new Date(new Date(ts).getTime() + 9*3600*1000); return `${k.getUTCMonth()+1}/${k.getUTCDate()}`; };
+
+  return (
+    <div>
+      <div style={{ fontSize:18, fontWeight:800, color:T.navy, marginBottom:14 }}>📋 챌린지 관리</div>
+
+      {/* 챌린지 선택 탭 */}
+      <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap" }}>
+        {challenges.map(c => {
+          const on = c.key === activeKey;
+          return (
+            <button key={c.key} onClick={() => setActiveKey(c.key)}
+              style={{ padding:"9px 18px", borderRadius:10, border:`1px solid ${on?T.navy:T.border}`,
+                background:on?T.navy:T.white, color:on?T.white:T.navy, fontSize:13, fontWeight:700, cursor:"pointer" }}>
+              {c.name}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 현황표 / 인증글 서브탭 */}
+      <div style={{ display:"flex", gap:6, marginBottom:16, borderBottom:`1px solid ${T.border}` }}>
+        {[{ k:"status", l:"📊 현황표" }, { k:"posts", l:"📝 인증글 크롤링·확인" }].map(t => {
+          const on = t.k === subTab;
+          return (
+            <button key={t.k} onClick={() => setSubTab(t.k)}
+              style={{ padding:"9px 16px", border:"none", background:"none", cursor:"pointer",
+                fontSize:13, fontWeight:on?800:600, color:on?T.navy:T.muted,
+                borderBottom:on?`3px solid ${T.orange}`:"3px solid transparent", marginBottom:-1 }}>
+              {t.l}
+            </button>
+          );
+        })}
+      </div>
+
+      {subTab === "status" ? (
+        // ── 현황표 (참여 명단·회차 등록 후 채워질 틀) ──
+        <Card style={{ padding:24 }}>
+          <div style={{ fontSize:15, fontWeight:700, color:T.navy, marginBottom:8 }}>{active.name} · 제출 현황표</div>
+          <div style={{ fontSize:13, color:T.muted, lineHeight:1.8, marginBottom:16 }}>
+            참여 <strong>명단</strong>과 <strong>회차별 마감일</strong>을 등록하면,<br/>
+            여기에 <strong>참여자 × 회차</strong> 제출 현황표가 표시됩니다. <span style={{color:T.orange}}>(명단·회차 정보 입력 예정)</span>
+          </div>
+          {/* 현재 크롤링된 글 기준 간단 요약 */}
+          <div style={{ display:"flex", gap:24, padding:"14px 18px", background:T.surfaceAlt||"#F9FAFB", borderRadius:10 }}>
+            <div><div style={{ fontSize:11, color:T.muted, fontWeight:600 }}>크롤링된 글</div><div style={{ fontSize:20, fontWeight:800, color:T.navy }}>{posts.length}건</div></div>
+            <div><div style={{ fontSize:11, color:T.muted, fontWeight:600 }}>확인 완료</div><div style={{ fontSize:20, fontWeight:800, color:"#16A34A" }}>{checkedCount}건</div></div>
+            <div><div style={{ fontSize:11, color:T.muted, fontWeight:600 }}>미확인</div><div style={{ fontSize:20, fontWeight:800, color:T.orange }}>{posts.length - checkedCount}건</div></div>
+          </div>
+        </Card>
+      ) : (
+        // ── 인증글 크롤링 + 확인 체크 ──
+        <div>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12, flexWrap:"wrap" }}>
+            <button onClick={triggerCrawl} disabled={crawlRunning}
+              style={{ ...css.btnOrange, padding:"8px 16px", fontSize:13, background:"#059669", opacity:crawlRunning?0.6:1 }}>
+              {crawlRunning ? "⏳ 실행 중..." : "🔄 지금 크롤링"}
+            </button>
+            <button onClick={() => loadPosts(activeKey)}
+              style={{ padding:"8px 14px", borderRadius:8, border:`1px solid ${T.border}`, background:T.white, color:T.navy, fontSize:13, fontWeight:700, cursor:"pointer" }}>
+              ↻ 새로고침
+            </button>
+            <span style={{ fontSize:12, color:T.muted }}>확인 <strong style={{ color:"#16A34A" }}>{checkedCount}</strong> / 총 {posts.length}건</span>
+            {!active.naver_board_id && (
+              <span style={{ fontSize:12, color:T.orange, fontWeight:600 }}>⚠️ 게시판 미설정 (명단·회차와 함께 등록 예정)</span>
+            )}
+          </div>
+
+          {loading ? (
+            <div style={{ textAlign:"center", padding:40, color:T.muted, fontSize:13 }}>불러오는 중...</div>
+          ) : (
+            <Card style={{ padding:0, overflow:"hidden" }}>
+              {/* 헤더 */}
+              <div style={{ display:"grid", gridTemplateColumns:"60px 90px 110px 1fr 70px", background:T.navy, padding:"9px 12px", gap:8, alignItems:"center" }}>
+                {["확인","글번호","닉네임","제목","작성일"].map(h => (
+                  <div key={h} style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.85)", textAlign:h==="제목"?"left":"center" }}>{h}</div>
+                ))}
+              </div>
+              {posts.length === 0 && (
+                <div style={{ padding:28, textAlign:"center", color:T.muted, fontSize:13 }}>
+                  아직 크롤링된 글이 없습니다. 게시판 설정 후 "지금 크롤링"을 눌러주세요.
+                </div>
+              )}
+              {posts.map((p, i) => {
+                const articleId = p.post_url ? p.post_url.split("/").pop() : p.id;
+                return (
+                  <div key={p.id} style={{ display:"grid", gridTemplateColumns:"60px 90px 110px 1fr 70px", padding:"9px 12px", gap:8, alignItems:"center",
+                    borderTop:`1px solid ${T.border}`, background:p.checked ? "#F0FDF4" : (i%2===0?T.white:"#F9FAFB") }}>
+                    <div style={{ display:"flex", justifyContent:"center" }}>
+                      <input type="checkbox" checked={p.checked} onChange={() => toggleCheck(p)}
+                        style={{ width:18, height:18, accentColor:"#16A34A", cursor:"pointer" }}/>
+                    </div>
+                    <div style={{ fontSize:11, color:T.muted, textAlign:"center", fontFamily:"monospace" }}>{articleId}</div>
+                    <div style={{ fontSize:12, color:T.navy, fontWeight:600, textAlign:"center", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.naver_nickname || "—"}</div>
+                    <div style={{ fontSize:12, overflow:"hidden" }}>
+                      <a href={p.post_url} target="_blank" rel="noreferrer"
+                        style={{ color:T.navy, textDecoration:"none", fontWeight:600, display:"block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
+                        title={p.post_title}>{p.post_title || "(제목 없음)"}</a>
+                    </div>
+                    <div style={{ fontSize:11, color:T.muted, textAlign:"center" }}>{fmtDate(p.posted_at)}</div>
+                  </div>
+                );
+              })}
+            </Card>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════
 // ROOT APP
 // ══════════════════════════════════════════════════════
 export default function App() {
@@ -7365,6 +7541,7 @@ export default function App() {
     if(path === "/input")   return "input";
     if(path === "/users")   return "users";
     if(path === "/roster2") return "roster2";
+    if(path === "/challenge") return "challenge";
     if(path === "/attendance") return "attendance";
     if(path === "/manjeom")    return "manjeom";
     if(path === "/makeup")     return "roster2"; // backward-compat → roster2 makeup sub-tab
@@ -7383,6 +7560,7 @@ export default function App() {
       : v === "cert" ? "/cert"
       : v === "users" ? "/users"
       : v === "roster2" ? "/roster2"
+      : v === "challenge" ? "/challenge"
       : v === "attendance" ? "/attendance"
       : v === "manjeom" ? "/manjeom"
       : "/";
@@ -7399,6 +7577,7 @@ export default function App() {
       else if(path==="/cert")       { setView("cert");       setShowInput(false); }
       else if(path==="/users")      { setView("users");      setShowInput(false); }
       else if(path==="/roster2")    { setView("roster2");    setShowInput(false); }
+      else if(path==="/challenge")  { setView("challenge");  setShowInput(false); }
       else if(path==="/attendance") { setView("attendance"); setShowInput(false); }
       else if(path==="/manjeom")    { setView("manjeom");    setShowInput(false); }
       else if(path==="/makeup")     { setView("roster2");    setShowInput(false); }
@@ -7619,6 +7798,7 @@ export default function App() {
     ? [
         { key:"users",       label:"회원 관리",          icon:"users"     },
         { key:"roster2",     label:"20HA 2기 현황",      icon:"trophy"    },
+        { key:"challenge",   label:"챌린지 관리",         icon:"clipboard" },
         { key:"manjeom",     label:"만점 테스트",         icon:"cap"       },
         { key:"history",     label:"전체 기록",           icon:"calendar"  },
       ]
@@ -7731,6 +7911,8 @@ export default function App() {
             <StudentCertView profile={profile}/>
           ) : view === "manjeom" && isAdmin ? (
             <ManjeomView onRefresh={refreshData} allProfiles={allProfiles}/>
+          ) : view === "challenge" && isAdmin ? (
+            <ChallengeAdmin/>
           ) : (view === "users" || view === "cert" || view === "roster2" || view === "attendance") && isAdmin ? (
             <AdminDashboard
               allLogs={logs} allProfiles={allProfiles} onRefresh={refreshData}

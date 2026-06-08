@@ -1,0 +1,31 @@
+name: 챌린지 인증글 크롤링
+
+on:
+  workflow_dispatch:
+    inputs:
+      challenge_key:
+        description: '크롤링할 챌린지 key (sagoyeong | reading | mathread)'
+        required: true
+        type: string
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 패키지 설치
+        run: pip install -r requirements.txt
+
+      - name: 크롤링 실행
+        run: python tools/challenge_crawler.py
+        env:
+          CHALLENGE_KEY: ${{ inputs.challenge_key }}
+          NAVER_CAFE_ID: '31045190'
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CRAWL_DAYS: '30'
