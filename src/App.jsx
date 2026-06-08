@@ -7422,9 +7422,10 @@ const ChallengeAdmin = () => {
       supabase.rpc("get_challenge_participants", { p_key: activeKey }),
       supabase.rpc("get_challenge_rounds", { p_key: activeKey }),
     ]);
+    const pText = (pData || []).map(p => p.name || p.parent_name || "").filter(Boolean).join("\n");
     setForm({
       key: active.key, name: active.name || "", board_url: active.board_url || "",
-      participantsText: (pData || []).map(p => p.name).join("\n"),
+      participantsText: pText, _participantsOriginal: pText, _participantsCount: (pData || []).length,
       roundsText: (rData || []).map(r => `${r.round_no}주차  ${r.deadline || ""}`.trim()).join("\n"),
       active: active.active !== false,
     });
@@ -7441,8 +7442,17 @@ const ChallengeAdmin = () => {
         p_key: key, p_name: form.name.trim(), p_board_url: form.board_url.trim() || null,
         p_cafe_id: cafeId, p_board_menu_id: menuId, p_active: form.active,
       });
-      const names = form.participantsText.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
-      await supabase.rpc("set_challenge_participants", { p_key: key, p_names: names });
+      // 명단 보호: 텍스트가 실제로 바뀐 경우에만 재작성 (게시판·회차만 수정 시 풍부한 명단 데이터 유지)
+      const changed = (form.participantsText || "").trim() !== (form._participantsOriginal || "").trim();
+      if (changed) {
+        if (form.key && form._participantsCount > 0 &&
+            !window.confirm(`명단을 새로 입력한 내용으로 덮어씁니다.\n(기존 ${form._participantsCount}명의 연락처·부가정보가 사라지고 입력한 이름만 남습니다.)\n계속할까요?`)) {
+          // 명단 덮어쓰기 취소 — 나머지(게시판·회차)는 저장 진행
+        } else {
+          const names = form.participantsText.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+          await supabase.rpc("set_challenge_participants", { p_key: key, p_names: names });
+        }
+      }
       const roundsArr = parseRoundsText(form.roundsText).map(r => ({ round: r.round, deadline: r.deadline }));
       await supabase.rpc("set_challenge_rounds", { p_key: key, p_rounds: roundsArr });
       await reloadChallenges(key);
@@ -7590,7 +7600,12 @@ const ChallengeAdmin = () => {
                   return (
                     <div key={pt.id} style={{ display:"grid", gridTemplateColumns:`180px repeat(${rounds.length}, 78px) 70px`,
                       borderTop:`1px solid ${T.border}`, background:i%2===0?T.white:"#F9FAFB", alignItems:"stretch" }}>
-                      <div style={{ padding:"8px 12px", fontSize:13, fontWeight:600, color:T.navy, display:"flex", alignItems:"center" }}>{pt.name}</div>
+                      <div style={{ padding:"8px 12px", display:"flex", flexDirection:"column", justifyContent:"center" }}>
+                        <span style={{ fontSize:13, fontWeight:600, color: pt.name ? T.navy : T.muted }}>
+                          {pt.name || pt.parent_name || "—"}{!pt.name && pt.parent_name ? <span style={{ fontSize:10, color:T.muted, fontWeight:400 }}> (학부모)</span> : null}
+                        </span>
+                        {pt.phone ? <span style={{ fontSize:10, color:T.muted }}>{pt.phone.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3")}</span> : null}
+                      </div>
                       {rounds.map(r => {
                         const ps = posts.filter(p => p.parsed_name === pt.name && p.parsed_round === r.round_no);
                         const checked = ps.some(p => p.checked);
