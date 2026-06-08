@@ -7354,7 +7354,8 @@ const CHALLENGE_FALLBACK = [
 const ChallengeAdmin = () => {
   const [challenges, setChallenges] = useState(CHALLENGE_FALLBACK);
   const [activeKey, setActiveKey]   = useState("sagoyeong");
-  const [subTab, setSubTab]         = useState("posts"); // "status" | "posts"
+  const [subTab, setSubTab]         = useState("overview"); // "overview"(전체현황) | "rounds"(회차별 확인)
+  const [roundFilter, setRoundFilter] = useState("all");
   const [posts, setPosts]           = useState([]);
   const [loading, setLoading]       = useState(false);
   const [crawlRunning, setCrawlRunning] = useState(false);
@@ -7529,9 +7530,9 @@ const ChallengeAdmin = () => {
         </button>
       </div>
 
-      {/* 현황표 / 인증글 서브탭 */}
+      {/* 전체 현황 / 회차별 확인 서브탭 */}
       <div style={{ display:"flex", gap:6, marginBottom:16, borderBottom:`1px solid ${T.border}` }}>
-        {[{ k:"status", l:"📊 현황표" }, { k:"posts", l:"📝 인증글 크롤링·확인" }].map(t => {
+        {[{ k:"overview", l:"📊 전체 현황" }, { k:"rounds", l:"📝 회차별 확인" }].map(t => {
           const on = t.k === subTab;
           return (
             <button key={t.k} onClick={() => setSubTab(t.k)}
@@ -7544,61 +7545,85 @@ const ChallengeAdmin = () => {
         })}
       </div>
 
-      {subTab === "status" ? (
-        // ── 현황표 (명단 기반 — 회차별 마감은 추후) ──
-        <Card style={{ padding:24 }}>
-          <div style={{ fontSize:15, fontWeight:700, color:T.navy, marginBottom:8 }}>{active.name} · 제출 현황표</div>
-          {/* 회차별 마감일 */}
-          {rounds.length > 0 && (
-            <div style={{ marginBottom:16 }}>
-              <div style={{ fontSize:12, fontWeight:700, color:T.navy, marginBottom:6 }}>회차별 미션 마감일</div>
-              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-                {rounds.map(r => (
-                  <div key={r.round_no} style={{ padding:"6px 12px", borderRadius:8, border:`1px solid ${T.border}`, background:T.white, fontSize:12 }}>
-                    <span style={{ fontWeight:700, color:T.navy }}>{r.round_no}주차</span>
-                    <span style={{ color:T.muted, marginLeft:6 }}>~ {fmtDeadline(r.deadline)}</span>
-                  </div>
-                ))}
-              </div>
+      {subTab === "overview" ? (
+        // ── 전체 현황 (참여자 × 회차 매트릭스, 20HA 전체현황 스타일) ──
+        <div>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12, flexWrap:"wrap" }}>
+            <button onClick={() => { loadPosts(activeKey); loadParticipants(activeKey); loadRounds(activeKey); }}
+              style={{ padding:"8px 14px", borderRadius:8, border:`1px solid ${T.border}`, background:T.white, color:T.navy, fontSize:13, fontWeight:700, cursor:"pointer" }}>
+              ↻ 새로고침
+            </button>
+            <span style={{ fontSize:12, color:T.muted }}>참여 <strong style={{ color:T.navy }}>{participants.length}</strong>명 · 회차 <strong style={{ color:T.navy }}>{rounds.length}</strong>개 · 수집글 {posts.length}건 · 확인 <strong style={{ color:"#16A34A" }}>{checkedCount}</strong>건</span>
+            {/* 범례 */}
+            <div style={{ display:"flex", gap:12, marginLeft:"auto", fontSize:11, color:T.muted, alignItems:"center" }}>
+              <span><span style={{ color:"#16A34A", fontWeight:800 }}>●</span> 확인완료</span>
+              <span><span style={{ color:T.orange, fontWeight:800 }}>●</span> 제출(미확인)</span>
+              <span><span style={{ color:"#D1D5DB", fontWeight:800 }}>●</span> 미제출</span>
             </div>
-          )}
-          {/* 요약 */}
-          <div style={{ display:"flex", gap:24, padding:"14px 18px", background:T.surfaceAlt||"#F9FAFB", borderRadius:10, marginBottom:18 }}>
-            <div><div style={{ fontSize:11, color:T.muted, fontWeight:600 }}>참여 명단</div><div style={{ fontSize:20, fontWeight:800, color:T.navy }}>{participants.length}명</div></div>
-            <div><div style={{ fontSize:11, color:T.muted, fontWeight:600 }}>수집된 글</div><div style={{ fontSize:20, fontWeight:800, color:T.navy }}>{posts.length}건</div></div>
-            <div><div style={{ fontSize:11, color:T.muted, fontWeight:600 }}>확인 완료</div><div style={{ fontSize:20, fontWeight:800, color:"#16A34A" }}>{checkedCount}건</div></div>
           </div>
+
           {participants.length === 0 ? (
-            <div style={{ fontSize:13, color:T.muted, lineHeight:1.8 }}>
-              아직 참여 명단이 없습니다. 우측 상단 <strong>⚙️ 설정</strong>에서 <strong>명단</strong>과 <strong>게시판 URL</strong>을 등록하세요.<br/>
-              <span style={{ color:T.orange }}>회차별 마감일 기준 현황표는 회차 정보 입력 후 제공됩니다.</span>
-            </div>
-          ) : (
-            <div>
-              <div style={{ fontSize:12, color:T.muted, marginBottom:8 }}>※ 회차 정보 입력 전까지는 참여자별 <strong>제출 글 수</strong>·<strong>확인 수</strong>로 표시합니다.</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 90px 90px", background:T.navy, padding:"8px 12px", gap:8, borderRadius:"8px 8px 0 0" }}>
-                {["참여자","제출 글","확인"].map(h => (
-                  <div key={h} style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.85)", textAlign:h==="참여자"?"left":"center" }}>{h}</div>
-                ))}
+            <Card style={{ padding:24 }}>
+              <div style={{ fontSize:13, color:T.muted, lineHeight:1.9 }}>
+                아직 <strong>참여 명단</strong>이 없습니다. 우측 상단 <strong>⚙️ 설정</strong>에서 명단을 등록하면<br/>
+                <strong>참여자 × 회차</strong> 전체 현황표가 여기에 표시됩니다.
+                {rounds.length > 0 && <><br/><span style={{ color:T.navy }}>회차: {rounds.map(r => `${r.round_no}주차(~${fmtDeadline(r.deadline)})`).join(" · ")}</span></>}
               </div>
-              {participants.map((pt, i) => {
-                const mine = posts.filter(p => p.parsed_name && p.parsed_name === pt.name);
-                const sub = mine.length;
-                const chk = mine.filter(p => p.checked).length;
-                return (
-                  <div key={pt.id} style={{ display:"grid", gridTemplateColumns:"1fr 90px 90px", padding:"8px 12px", gap:8, alignItems:"center",
-                    borderLeft:`1px solid ${T.border}`, borderRight:`1px solid ${T.border}`, borderBottom:`1px solid ${T.border}`, background:i%2===0?T.white:"#F9FAFB" }}>
-                    <div style={{ fontSize:13, fontWeight:600, color:T.navy }}>{pt.name}</div>
-                    <div style={{ fontSize:13, textAlign:"center", color: sub>0?T.navy:T.muted, fontWeight:700 }}>{sub}</div>
-                    <div style={{ fontSize:13, textAlign:"center", color: chk>0?"#16A34A":T.muted, fontWeight:700 }}>{chk}</div>
-                  </div>
-                );
-              })}
-            </div>
+            </Card>
+          ) : (
+            <Card style={{ padding:0, overflow:"auto" }}>
+              <div style={{ minWidth: 180 + rounds.length*78 }}>
+                {/* 헤더 */}
+                <div style={{ display:"grid", gridTemplateColumns:`180px repeat(${rounds.length}, 78px) 70px`, background:T.navy, position:"sticky", top:0 }}>
+                  <div style={{ padding:"10px 12px", fontSize:12, fontWeight:700, color:"#fff" }}>참여자</div>
+                  {rounds.map(r => (
+                    <div key={r.round_no} style={{ padding:"6px 4px", textAlign:"center", color:"#fff", borderLeft:"1px solid rgba(255,255,255,0.12)" }}>
+                      <div style={{ fontSize:12, fontWeight:700 }}>{r.round_no}주차</div>
+                      <div style={{ fontSize:10, color:"rgba(255,255,255,0.7)" }}>~{fmtDeadline(r.deadline)}</div>
+                    </div>
+                  ))}
+                  <div style={{ padding:"10px 4px", textAlign:"center", fontSize:12, fontWeight:700, color:"#fff", borderLeft:"1px solid rgba(255,255,255,0.12)" }}>제출/{rounds.length}</div>
+                </div>
+                {/* 행 */}
+                {participants.map((pt, i) => {
+                  let done = 0;
+                  return (
+                    <div key={pt.id} style={{ display:"grid", gridTemplateColumns:`180px repeat(${rounds.length}, 78px) 70px`,
+                      borderTop:`1px solid ${T.border}`, background:i%2===0?T.white:"#F9FAFB", alignItems:"stretch" }}>
+                      <div style={{ padding:"8px 12px", fontSize:13, fontWeight:600, color:T.navy, display:"flex", alignItems:"center" }}>{pt.name}</div>
+                      {rounds.map(r => {
+                        const ps = posts.filter(p => p.parsed_name === pt.name && p.parsed_round === r.round_no);
+                        const checked = ps.some(p => p.checked);
+                        const submitted = ps.length > 0;
+                        if (submitted) done++;
+                        const sym = checked ? "●" : submitted ? "●" : "–";
+                        const color = checked ? "#16A34A" : submitted ? T.orange : "#D1D5DB";
+                        const bg = checked ? "#F0FDF4" : submitted ? (T.orangePale || "#FFF7ED") : "transparent";
+                        return (
+                          <div key={r.round_no} title={ps.length ? ps.map(p=>p.post_title).join("\n") : "미제출"}
+                            style={{ borderLeft:`1px solid ${T.border}`, display:"flex", alignItems:"center", justifyContent:"center", background:bg, fontSize:16, fontWeight:800, color }}>
+                            {sym}
+                          </div>
+                        );
+                      })}
+                      <div style={{ borderLeft:`1px solid ${T.border}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color: done>0?T.navy:T.muted }}>
+                        {done}/{rounds.length}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
           )}
-        </Card>
+          {rounds.length === 0 && participants.length > 0 && (
+            <div style={{ fontSize:12, color:T.orange, marginTop:10 }}>⚠️ 회차 정보가 없습니다. ⚙️ 설정에서 회차별 마감일을 등록하면 열이 생깁니다.</div>
+          )}
+          <div style={{ fontSize:11, color:T.muted, marginTop:10, lineHeight:1.7 }}>
+            ※ 글 제목에서 이름·회차를 자동 인식해 매칭합니다. 칸을 누르지 않고 확인 처리는 <strong>회차별 확인</strong> 탭에서 합니다.
+          </div>
+        </div>
       ) : (
-        // ── 인증글 크롤링 + 확인 체크 ──
+        // ── 회차별 확인 (크롤링 + 회차 필터 + 확인 체크) ──
         <div>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12, flexWrap:"wrap" }}>
             <button onClick={triggerCrawl} disabled={crawlRunning}
@@ -7609,9 +7634,18 @@ const ChallengeAdmin = () => {
               style={{ padding:"8px 14px", borderRadius:8, border:`1px solid ${T.border}`, background:T.white, color:T.navy, fontSize:13, fontWeight:700, cursor:"pointer" }}>
               ↻ 새로고침
             </button>
-            <span style={{ fontSize:12, color:T.muted }}>확인 <strong style={{ color:"#16A34A" }}>{checkedCount}</strong> / 총 {posts.length}건</span>
+            <select value={roundFilter} onChange={e => setRoundFilter(e.target.value)}
+              style={{ padding:"7px 10px", borderRadius:8, border:`1px solid ${T.border}`, fontSize:13, background:T.white, color:T.navy, cursor:"pointer" }}>
+              <option value="all">회차 전체</option>
+              {rounds.map(r => <option key={r.round_no} value={String(r.round_no)}>{r.round_no}주차 (~{fmtDeadline(r.deadline)})</option>)}
+              <option value="none">회차 미분류</option>
+            </select>
+            {(() => {
+              const fp = posts.filter(p => roundFilter==="all" ? true : roundFilter==="none" ? !p.parsed_round : p.parsed_round===Number(roundFilter));
+              return <span style={{ fontSize:12, color:T.muted }}>확인 <strong style={{ color:"#16A34A" }}>{fp.filter(p=>p.checked).length}</strong> / {fp.length}건</span>;
+            })()}
             {!active.naver_board_id && (
-              <span style={{ fontSize:12, color:T.orange, fontWeight:600 }}>⚠️ 게시판 미설정 (명단·회차와 함께 등록 예정)</span>
+              <span style={{ fontSize:12, color:T.orange, fontWeight:600 }}>⚠️ 게시판 미설정 (⚙️ 설정에서 게시판 URL 등록)</span>
             )}
           </div>
 
@@ -7620,36 +7654,40 @@ const ChallengeAdmin = () => {
           ) : (
             <Card style={{ padding:0, overflow:"hidden" }}>
               {/* 헤더 */}
-              <div style={{ display:"grid", gridTemplateColumns:"60px 90px 110px 1fr 70px", background:T.navy, padding:"9px 12px", gap:8, alignItems:"center" }}>
-                {["확인","글번호","닉네임","제목","작성일"].map(h => (
+              <div style={{ display:"grid", gridTemplateColumns:"60px 60px 90px 110px 1fr 70px", background:T.navy, padding:"9px 12px", gap:8, alignItems:"center" }}>
+                {["확인","회차","글번호","닉네임","제목","작성일"].map(h => (
                   <div key={h} style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.85)", textAlign:h==="제목"?"left":"center" }}>{h}</div>
                 ))}
               </div>
-              {posts.length === 0 && (
-                <div style={{ padding:28, textAlign:"center", color:T.muted, fontSize:13 }}>
-                  아직 크롤링된 글이 없습니다. 게시판 설정 후 "지금 크롤링"을 눌러주세요.
-                </div>
-              )}
-              {posts.map((p, i) => {
-                const articleId = p.post_url ? p.post_url.split("/").pop() : p.id;
-                return (
-                  <div key={p.id} style={{ display:"grid", gridTemplateColumns:"60px 90px 110px 1fr 70px", padding:"9px 12px", gap:8, alignItems:"center",
-                    borderTop:`1px solid ${T.border}`, background:p.checked ? "#F0FDF4" : (i%2===0?T.white:"#F9FAFB") }}>
-                    <div style={{ display:"flex", justifyContent:"center" }}>
-                      <input type="checkbox" checked={p.checked} onChange={() => toggleCheck(p)}
-                        style={{ width:18, height:18, accentColor:"#16A34A", cursor:"pointer" }}/>
-                    </div>
-                    <div style={{ fontSize:11, color:T.muted, textAlign:"center", fontFamily:"monospace" }}>{articleId}</div>
-                    <div style={{ fontSize:12, color:T.navy, fontWeight:600, textAlign:"center", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.naver_nickname || "—"}</div>
-                    <div style={{ fontSize:12, overflow:"hidden" }}>
-                      <a href={p.post_url} target="_blank" rel="noreferrer"
-                        style={{ color:T.navy, textDecoration:"none", fontWeight:600, display:"block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
-                        title={p.post_title}>{p.post_title || "(제목 없음)"}</a>
-                    </div>
-                    <div style={{ fontSize:11, color:T.muted, textAlign:"center" }}>{fmtDate(p.posted_at)}</div>
+              {(() => {
+                const fp = posts.filter(p => roundFilter==="all" ? true : roundFilter==="none" ? !p.parsed_round : p.parsed_round===Number(roundFilter));
+                if (fp.length === 0) return (
+                  <div style={{ padding:28, textAlign:"center", color:T.muted, fontSize:13 }}>
+                    {posts.length === 0 ? '아직 크롤링된 글이 없습니다. "지금 크롤링"을 눌러주세요.' : "해당 회차의 글이 없습니다."}
                   </div>
                 );
-              })}
+                return fp.map((p, i) => {
+                  const articleId = p.post_url ? p.post_url.split("/").pop() : p.id;
+                  return (
+                    <div key={p.id} style={{ display:"grid", gridTemplateColumns:"60px 60px 90px 110px 1fr 70px", padding:"9px 12px", gap:8, alignItems:"center",
+                      borderTop:`1px solid ${T.border}`, background:p.checked ? "#F0FDF4" : (i%2===0?T.white:"#F9FAFB") }}>
+                      <div style={{ display:"flex", justifyContent:"center" }}>
+                        <input type="checkbox" checked={p.checked} onChange={() => toggleCheck(p)}
+                          style={{ width:18, height:18, accentColor:"#16A34A", cursor:"pointer" }}/>
+                      </div>
+                      <div style={{ fontSize:11, textAlign:"center", color: p.parsed_round?T.navy:T.muted, fontWeight:700 }}>{p.parsed_round ? `${p.parsed_round}주차` : "—"}</div>
+                      <div style={{ fontSize:11, color:T.muted, textAlign:"center", fontFamily:"monospace" }}>{articleId}</div>
+                      <div style={{ fontSize:12, color:T.navy, fontWeight:600, textAlign:"center", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.naver_nickname || "—"}</div>
+                      <div style={{ fontSize:12, overflow:"hidden" }}>
+                        <a href={p.post_url} target="_blank" rel="noreferrer"
+                          style={{ color:T.navy, textDecoration:"none", fontWeight:600, display:"block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
+                          title={p.post_title}>{p.post_title || "(제목 없음)"}</a>
+                      </div>
+                      <div style={{ fontSize:11, color:T.muted, textAlign:"center" }}>{fmtDate(p.posted_at)}</div>
+                    </div>
+                  );
+                });
+              })()}
             </Card>
           )}
         </div>
