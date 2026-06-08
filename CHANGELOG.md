@@ -7,6 +7,22 @@
 
 ---
 
+## v2026.06.08-1 — 2026-06-08
+**커밋:** [455daa9](https://github.com/MinDaehyeon/20ha-meta-x/commit/455daa9)
+
+### 주요 변경
+- **챌린지 관리 메뉴 신설** (관리자 전용, 학생 계정과 무관) — 사고력 영작 / 독서챌린지 / 수학독해 챌린지
+  - **전체 현황**: 참여자(학생/학부모/연락처) × 회차 매트릭스 표
+  - **인증글 확인**: 네이버 게시판 크롤링 + 회차 필터 + 글별 확인 체크(점수 아님)
+  - **회차별 확인**: 회차별 제출·확인·미제출 인원 통계
+  - 챌린지 추가/수정/삭제(이름·게시판 URL·명단·회차 마감일) UI
+- 3개 챌린지 게시판·회차 마감일·참여 명단(독서 392·수학독해 234·사고력 60) 등록
+
+### 백그라운드 변경
+- DB: challenges / challenge_posts / challenge_participants / challenge_rounds + RPC, challenge_crawler.py(+workflow)
+
+---
+
 ## v2026.06.04-2 — 2026-06-04
 **커밋:** [d61a116](https://github.com/MinDaehyeon/20ha-meta-x/commit/d61a116)
 

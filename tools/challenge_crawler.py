@@ -149,6 +149,53 @@ def upsert(posts):
         print(f"[supabase] 저장 실패: {r.status_code} — {r.text[:300]}")
 
 
+def auto_link():
+    """크롤 직후 연결 안 된 글을 명단과 매칭(뒤4자리 유니크 → 뒤4+이름 → 이름 유니크)해 participant_id 설정."""
+    parts = requests.get(
+        f"{SUPABASE_URL}/rest/v1/challenge_participants?challenge_key=eq.{CHALLENGE_KEY}&select=id,name,parent_name,phone",
+        headers=sb_headers(), timeout=15,
+    )
+    posts = requests.get(
+        f"{SUPABASE_URL}/rest/v1/challenge_posts?challenge_key=eq.{CHALLENGE_KEY}&participant_id=is.null&select=id,post_title,parsed_name",
+        headers=sb_headers(), timeout=15,
+    )
+    if parts.status_code != 200 or posts.status_code != 200:
+        print("[link] 조회 실패, 스킵"); return
+    parts = parts.json(); posts = posts.json()
+    by_l4, by_name = {}, {}
+    for p in parts:
+        ph = (p.get("phone") or "")
+        if len(ph) >= 4: by_l4.setdefault(ph[-4:], []).append(p)
+        if p.get("name"): by_name.setdefault(p["name"], []).append(p)
+
+    def last4(t):
+        ms = re.findall(r"\d{4}", t or "")
+        return ms[-1] if ms else None
+
+    linked = 0
+    for post in posts:
+        nm = (post.get("parsed_name") or "").strip()
+        l4 = last4(post.get("post_title"))
+        target = None
+        cands = by_l4.get(l4, []) if l4 else []
+        if len(cands) == 1:
+            target = cands[0]
+        elif len(cands) > 1:
+            byn = [c for c in cands if c.get("name") == nm or c.get("parent_name") == nm]
+            if len(byn) == 1: target = byn[0]
+        else:
+            byn = by_name.get(nm, [])
+            if len(byn) == 1: target = byn[0]
+        if target:
+            r = requests.patch(
+                f"{SUPABASE_URL}/rest/v1/challenge_posts?id=eq.{post['id']}",
+                headers={**sb_headers(), "Content-Type": "application/json"},
+                json={"participant_id": target["id"]}, timeout=10,
+            )
+            if r.status_code in (200, 204): linked += 1
+    print(f"[link] 자동 연결: {linked}/{len(posts)}건")
+
+
 if __name__ == "__main__":
     if not CHALLENGE_KEY:
         print("[설정] CHALLENGE_KEY 환경변수가 필요합니다.")
@@ -173,3 +220,4 @@ if __name__ == "__main__":
     print(f"[supabase] 기존 저장: {len(existing)}건")
     posts = crawl_board(board_id, existing, club_id=club_id, board_type=board_type)
     upsert(posts)
+    auto_link()

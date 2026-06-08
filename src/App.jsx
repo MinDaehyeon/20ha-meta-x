@@ -7354,8 +7354,9 @@ const CHALLENGE_FALLBACK = [
 const ChallengeAdmin = () => {
   const [challenges, setChallenges] = useState(CHALLENGE_FALLBACK);
   const [activeKey, setActiveKey]   = useState("sagoyeong");
-  const [subTab, setSubTab]         = useState("overview"); // "overview"(전체현황) | "rounds"(회차별 확인)
+  const [subTab, setSubTab]         = useState("overview"); // overview(전체현황) | posts(인증글 확인) | rounds(회차별 확인)
   const [roundFilter, setRoundFilter] = useState("all");
+  const [editPost, setEditPost]     = useState(null); // 참여자 수동 연결 편집 중인 글 id
   const [posts, setPosts]           = useState([]);
   const [loading, setLoading]       = useState(false);
   const [crawlRunning, setCrawlRunning] = useState(false);
@@ -7487,6 +7488,37 @@ const ChallengeAdmin = () => {
     await supabase.rpc("toggle_challenge_check", { p_post_id: post.id, p_checked: next });
   };
 
+  // ── 크롤 글 ↔ 명단 매칭 (뒤4자리 → 이름 → 수동) ──
+  const postLast4 = (t) => { const ms = (t || "").match(/\d{4}/g); return ms ? ms[ms.length - 1] : null; };
+  const partsByL4 = {}; participants.forEach(p => { if (p.phone) { const k = p.phone.slice(-4); (partsByL4[k] = partsByL4[k] || []).push(p); } });
+  const partsByName = {}; participants.forEach(p => { if (p.name) (partsByName[p.name] = partsByName[p.name] || []).push(p); });
+  const matchOf = (post) => {
+    if (post.participant_id) { const p = participants.find(x => x.id === post.participant_id); return { p: p || null, how: "수동" }; }
+    const nm = (post.parsed_name || "").trim();
+    const l4 = postLast4(post.post_title);
+    const cands = l4 ? (partsByL4[l4] || []) : [];
+    if (cands.length === 1) return { p: cands[0], how: "뒤4" };
+    if (cands.length > 1) { const byn = cands.filter(p => p.name === nm || p.parent_name === nm); if (byn.length === 1) return { p: byn[0], how: "뒤4+이름" }; return { p: null, how: "중복" }; }
+    const byn = partsByName[nm] || []; if (byn.length === 1) return { p: byn[0], how: "이름" };
+    return { p: null, how: "미매칭" };
+  };
+  const matchByPost = {}; posts.forEach(p => { const m = matchOf(p); matchByPost[p.id] = m.p ? m.p.id : null; });
+
+  // 자동 연결: 아직 연결 안 된 글을 뒤4자리/이름으로 매칭해 participant_id 저장
+  const autoLink = async () => {
+    const ups = [];
+    posts.forEach(p => { if (!p.participant_id) { const m = matchOf(p); if (m.p) ups.push({ id: p.id, pid: m.p.id }); } });
+    if (!ups.length) { alert("자동 연결할 새 글이 없습니다. (이미 연결됐거나, 뒤4자리·이름이 명단과 매칭되지 않는 글들입니다)"); return; }
+    await Promise.all(ups.map(u => supabase.rpc("set_challenge_post_participant", { p_post_id: u.id, p_participant_id: u.pid })));
+    setPosts(prev => prev.map(p => { const u = ups.find(x => x.id === p.id); return u ? { ...p, participant_id: u.pid } : p; }));
+    alert(`${ups.length}건 자동 연결 완료.`);
+  };
+  const assignPost = async (post, pid) => {
+    const v = pid === "" ? null : Number(pid);
+    setPosts(prev => prev.map(p => p.id === post.id ? { ...p, participant_id: v } : p));
+    await supabase.rpc("set_challenge_post_participant", { p_post_id: post.id, p_participant_id: v });
+  };
+
   const triggerCrawl = async () => {
     if (!active.naver_board_id) {
       alert(`'${active.name}' 챌린지의 네이버 게시판이 아직 설정되지 않았습니다.\n참여 명단·회차 정보와 함께 게시판을 등록하면 크롤링할 수 있어요.`);
@@ -7607,7 +7639,7 @@ const ChallengeAdmin = () => {
                       <div style={{ padding:"8px 8px", display:"flex", alignItems:"center", fontSize:12, color: pt.parent_name?T.text:"#D1D5DB", borderLeft:`1px solid ${T.border}` }}>{pt.parent_name || "—"}</div>
                       <div style={{ padding:"8px 8px", display:"flex", alignItems:"center", fontSize:11, color: pt.phone?T.muted:"#D1D5DB", borderLeft:`1px solid ${T.border}` }}>{pt.phone ? pt.phone.replace(/(\d{2,3})(\d{3,4})(\d{4})/, "$1-$2-$3") : "—"}</div>
                       {rounds.map(r => {
-                        const ps = posts.filter(p => p.parsed_name === pt.name && p.parsed_round === r.round_no);
+                        const ps = posts.filter(p => matchByPost[p.id] === pt.id && p.parsed_round === r.round_no);
                         const checked = ps.some(p => p.checked);
                         const submitted = ps.length > 0;
                         if (submitted) done++;
@@ -7650,6 +7682,10 @@ const ChallengeAdmin = () => {
               style={{ padding:"8px 14px", borderRadius:8, border:`1px solid ${T.border}`, background:T.white, color:T.navy, fontSize:13, fontWeight:700, cursor:"pointer" }}>
               ↻ 새로고침
             </button>
+            <button onClick={autoLink}
+              style={{ padding:"8px 14px", borderRadius:8, border:"none", background:T.navy, color:T.white, fontSize:13, fontWeight:700, cursor:"pointer" }}>
+              🔗 자동 연결
+            </button>
             <select value={roundFilter} onChange={e => setRoundFilter(e.target.value)}
               style={{ padding:"7px 10px", borderRadius:8, border:`1px solid ${T.border}`, fontSize:13, background:T.white, color:T.navy, cursor:"pointer" }}>
               <option value="all">회차 전체</option>
@@ -7670,9 +7706,9 @@ const ChallengeAdmin = () => {
           ) : (
             <Card style={{ padding:0, overflow:"hidden" }}>
               {/* 헤더 */}
-              <div style={{ display:"grid", gridTemplateColumns:"60px 60px 90px 110px 1fr 70px", background:T.navy, padding:"9px 12px", gap:8, alignItems:"center" }}>
-                {["확인","회차","글번호","닉네임","제목","작성일"].map(h => (
-                  <div key={h} style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.85)", textAlign:h==="제목"?"left":"center" }}>{h}</div>
+              <div style={{ display:"grid", gridTemplateColumns:"54px 54px 74px 92px 1fr 56px 170px", background:T.navy, padding:"9px 12px", gap:8, alignItems:"center" }}>
+                {["확인","회차","글번호","닉네임","제목","작성일","참여자 연결"].map(h => (
+                  <div key={h} style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.85)", textAlign:(h==="제목"||h==="참여자 연결")?"left":"center" }}>{h}</div>
                 ))}
               </div>
               {(() => {
@@ -7684,8 +7720,9 @@ const ChallengeAdmin = () => {
                 );
                 return fp.map((p, i) => {
                   const articleId = p.post_url ? p.post_url.split("/").pop() : p.id;
+                  const m = matchOf(p);
                   return (
-                    <div key={p.id} style={{ display:"grid", gridTemplateColumns:"60px 60px 90px 110px 1fr 70px", padding:"9px 12px", gap:8, alignItems:"center",
+                    <div key={p.id} style={{ display:"grid", gridTemplateColumns:"54px 54px 74px 92px 1fr 56px 170px", padding:"9px 12px", gap:8, alignItems:"center",
                       borderTop:`1px solid ${T.border}`, background:p.checked ? "#F0FDF4" : (i%2===0?T.white:"#F9FAFB") }}>
                       <div style={{ display:"flex", justifyContent:"center" }}>
                         <input type="checkbox" checked={p.checked} onChange={() => toggleCheck(p)}
@@ -7700,6 +7737,32 @@ const ChallengeAdmin = () => {
                           title={p.post_title}>{p.post_title || "(제목 없음)"}</a>
                       </div>
                       <div style={{ fontSize:11, color:T.muted, textAlign:"center" }}>{fmtDate(p.posted_at)}</div>
+                      {/* 참여자 연결 */}
+                      <div style={{ fontSize:11, overflow:"hidden" }}>
+                        {editPost === p.id ? (
+                          <select autoFocus defaultValue={p.participant_id || (m.p ? m.p.id : "")}
+                            onChange={e => { assignPost(p, e.target.value); setEditPost(null); }}
+                            onBlur={() => setEditPost(null)}
+                            style={{ width:"100%", padding:"4px 6px", borderRadius:6, border:`1px solid ${T.border}`, fontSize:11 }}>
+                            <option value="">— 연결 안함 —</option>
+                            {participants.map(pt => (
+                              <option key={pt.id} value={pt.id}>{(pt.name || pt.parent_name || "?")}{pt.phone ? " / " + pt.phone.slice(-4) : ""}{pt.parent_name && pt.name ? " ("+pt.parent_name+")" : ""}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div onClick={() => setEditPost(p.id)} title="클릭해서 수동 연결"
+                            style={{ cursor:"pointer", display:"flex", alignItems:"center", gap:4, padding:"3px 4px", borderRadius:6, border:`1px dashed ${m.p?"transparent":"#FCA5A5"}` }}>
+                            {m.p ? (
+                              <>
+                                <span style={{ fontWeight:700, color:T.navy }}>{m.p.name || m.p.parent_name}</span>
+                                <span style={{ fontSize:9, color:"#fff", background:p.participant_id?"#4F46E5":(m.how==="중복"?T.orange:"#16A34A"), borderRadius:4, padding:"1px 4px" }}>{p.participant_id?"수동":m.how}</span>
+                              </>
+                            ) : (
+                              <span style={{ color: m.how==="중복"?T.orange:"#DC2626", fontWeight:600 }}>{m.how==="중복"?"중복-수동지정":"미매칭-지정"}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 });
@@ -7732,12 +7795,12 @@ const ChallengeAdmin = () => {
               </div>
               {rounds.map((r, i) => {
                 const ps = posts.filter(p => p.parsed_round === r.round_no);
-                // 제출 인원 = 이름 기준 중복 제거 (명단이 있으면 명단과 매칭된 인원, 없으면 글의 고유 이름 수)
-                const submitNames = new Set(ps.map(p => p.parsed_name).filter(Boolean));
-                const checkNames  = new Set(ps.filter(p => p.checked).map(p => p.parsed_name).filter(Boolean));
+                // 명단에 연결된 글 기준으로 제출/확인 인원 집계 (연결 안 된 글은 제외)
+                const submitPids = new Set(ps.map(p => matchByPost[p.id]).filter(Boolean));
+                const checkPids  = new Set(ps.filter(p => p.checked).map(p => matchByPost[p.id]).filter(Boolean));
                 const total = participants.length;
-                const submitCnt = total > 0 ? participants.filter(pt => submitNames.has(pt.name)).length : submitNames.size;
-                const checkCnt  = total > 0 ? participants.filter(pt => checkNames.has(pt.name)).length  : checkNames.size;
+                const submitCnt = submitPids.size;
+                const checkCnt  = checkPids.size;
                 const missCnt   = total > 0 ? total - submitCnt : null;
                 return (
                   <div key={r.round_no} style={{ display:"grid", gridTemplateColumns:"90px 100px 1fr 1fr 1fr", padding:"10px 12px", gap:8, alignItems:"center",
