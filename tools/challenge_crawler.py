@@ -41,6 +41,8 @@ API_HEADERS = {
 # 제목에서 회차/이름 best-effort 추출 (형식 미확정 — 게시판 받은 뒤 정교화)
 ROUND_PATTERN = re.compile(r"(\d+)\s*(?:주차|회|차)")
 NAME_PATTERN  = re.compile(r"[가-힣]{2,4}")
+# 이름으로 오인하면 안 되는 토큰 (예: "[사전미션]박지우/..." 에서 사전미션 제외)
+NAME_STOPWORDS = {"주차", "사전미션", "사진미션", "미션", "사전", "어떻게", "공부", "독서", "학생", "학부모", "제출", "인증", "특강"}
 
 
 def sb_headers():
@@ -77,7 +79,7 @@ def parse_title(title):
     parsed_round = int(rnd.group(1)) if rnd else None
     s = ROUND_PATTERN.sub(" ", title)
     s = re.sub(r"[\[\]/_,]", " ", s)
-    names = [n for n in NAME_PATTERN.findall(s) if n not in {"주차"}]
+    names = [n for n in NAME_PATTERN.findall(s) if n not in NAME_STOPWORDS]
     parsed_name = names[0] if names else None
     return parsed_name, parsed_round
 
@@ -193,6 +195,14 @@ def auto_link():
                 json={"participant_id": target["id"]}, timeout=10,
             )
             if r.status_code in (200, 204): linked += 1
+            # 학부모만 있던 참여자라면, 글에서 알아낸 학생 이름을 채워줌
+            if not target.get("name") and re.fullmatch(r"[가-힣]{2,4}", nm or "") and nm not in NAME_STOPWORDS:
+                requests.patch(
+                    f"{SUPABASE_URL}/rest/v1/challenge_participants?id=eq.{target['id']}",
+                    headers={**sb_headers(), "Content-Type": "application/json"},
+                    json={"name": nm}, timeout=10,
+                )
+                target["name"] = nm  # 같은 실행 내 중복 방지
     print(f"[link] 자동 연결: {linked}/{len(posts)}건")
 
 

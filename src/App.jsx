@@ -7356,7 +7356,9 @@ const ChallengeAdmin = () => {
   const [activeKey, setActiveKey]   = useState("sagoyeong");
   const [subTab, setSubTab]         = useState("overview"); // overview(전체현황) | posts(인증글 확인) | rounds(회차별 확인)
   const [roundFilter, setRoundFilter] = useState("all");
-  const [editPost, setEditPost]     = useState(null); // 참여자 수동 연결 편집 중인 글 id
+  const [assignModal, setAssignModal] = useState(null); // 참여자 수동 연결 모달 대상 글
+  const [assignQuery, setAssignQuery] = useState("");    // 검색어(이름/번호)
+  const [editRoundPost, setEditRoundPost] = useState(null); // 회차 인라인 편집 중인 글 id
   const [posts, setPosts]           = useState([]);
   const [loading, setLoading]       = useState(false);
   const [crawlRunning, setCrawlRunning] = useState(false);
@@ -7504,10 +7506,24 @@ const ChallengeAdmin = () => {
   };
   const matchByPost = {}; posts.forEach(p => { const m = matchOf(p); matchByPost[p.id] = m.p ? m.p.id : null; });
 
+  const setPostRound = async (post, r) => {
+    const v = r === "" ? null : Number(r);
+    setPosts(prev => prev.map(p => p.id === post.id ? { ...p, parsed_round: v } : p));
+    await supabase.rpc("set_challenge_post_round", { p_post_id: post.id, p_round: v });
+  };
   const assignPost = async (post, pid) => {
     const v = pid === "" ? null : Number(pid);
     setPosts(prev => prev.map(p => p.id === post.id ? { ...p, participant_id: v } : p));
     await supabase.rpc("set_challenge_post_participant", { p_post_id: post.id, p_participant_id: v });
+    // 연결되면 글 제목의 학생 이름을 참여자(학부모만 있던 행)에 채워줌
+    if (v) {
+      const pt = participants.find(x => x.id === v);
+      const sn = (post.parsed_name || "").trim();
+      if (pt && !pt.name && /^[가-힣]{2,4}$/.test(sn)) {
+        await supabase.rpc("set_challenge_participant_name", { p_id: v, p_name: sn });
+        setParticipants(prev => prev.map(x => x.id === v ? { ...x, name: sn } : x));
+      }
+    }
   };
 
   const triggerCrawl = async () => {
@@ -7711,34 +7727,37 @@ const ChallengeAdmin = () => {
                   return (
                     <div key={p.id} style={{ display:"grid", gridTemplateColumns:"170px 54px 74px 92px 1fr 56px 64px", padding:"9px 12px", gap:8, alignItems:"center",
                       borderTop:`1px solid ${T.border}`, background:p.checked ? "#F0FDF4" : (i%2===0?T.white:"#F9FAFB") }}>
-                      {/* 참여자 연결 */}
+                      {/* 참여자 연결 (클릭 → 검색 모달) */}
                       <div style={{ fontSize:11, overflow:"hidden" }}>
-                        {editPost === p.id ? (
-                          <select autoFocus defaultValue={p.participant_id || (m.p ? m.p.id : "")}
-                            onChange={e => { assignPost(p, e.target.value); setEditPost(null); }}
-                            onBlur={() => setEditPost(null)}
-                            style={{ width:"100%", padding:"4px 6px", borderRadius:6, border:`1px solid ${T.border}`, fontSize:11 }}>
-                            <option value="">— 연결 안함 —</option>
-                            {participants.map(pt => (
-                              <option key={pt.id} value={pt.id}>{(pt.name || pt.parent_name || "?")}{pt.phone ? " / " + pt.phone.slice(-4) : ""}{pt.parent_name && pt.name ? " ("+pt.parent_name+")" : ""}</option>
-                            ))}
+                        <div onClick={() => { setAssignModal(p); setAssignQuery(""); }} title="클릭해서 참여자 검색·연결"
+                          style={{ cursor:"pointer", display:"flex", alignItems:"center", gap:4, padding:"3px 4px", borderRadius:6, border:`1px dashed ${m.p?"#E5E7EB":"#FCA5A5"}` }}>
+                          {m.p ? (
+                            <>
+                              <span style={{ fontWeight:700, color:T.navy, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.p.name || m.p.parent_name}</span>
+                              <span style={{ fontSize:9, color:"#fff", background:p.participant_id?"#4F46E5":(m.how==="중복"?T.orange:"#16A34A"), borderRadius:4, padding:"1px 4px", flexShrink:0 }}>{p.participant_id?"수동":m.how}</span>
+                            </>
+                          ) : (
+                            <span style={{ color: m.how==="중복"?T.orange:"#DC2626", fontWeight:600 }}>{m.how==="중복"?"중복-수동지정":"미매칭-지정"}</span>
+                          )}
+                        </div>
+                      </div>
+                      {/* 회차 (클릭 인라인 수정) */}
+                      <div style={{ textAlign:"center" }}>
+                        {editRoundPost === p.id ? (
+                          <select autoFocus defaultValue={p.parsed_round || ""}
+                            onChange={e => { setPostRound(p, e.target.value); setEditRoundPost(null); }}
+                            onBlur={() => setEditRoundPost(null)}
+                            style={{ width:"100%", padding:"2px", borderRadius:6, border:`1px solid ${T.border}`, fontSize:11 }}>
+                            <option value="">미분류</option>
+                            {rounds.map(r => <option key={r.round_no} value={r.round_no}>{r.round_no}주차</option>)}
                           </select>
                         ) : (
-                          <div onClick={() => setEditPost(p.id)} title="클릭해서 수동 연결"
-                            style={{ cursor:"pointer", display:"flex", alignItems:"center", gap:4, padding:"3px 4px", borderRadius:6, border:`1px dashed ${m.p?"transparent":"#FCA5A5"}` }}>
-                            {m.p ? (
-                              <>
-                                <span style={{ fontWeight:700, color:T.navy }}>{m.p.name || m.p.parent_name}</span>
-                                <span style={{ fontSize:9, color:"#fff", background:p.participant_id?"#4F46E5":(m.how==="중복"?T.orange:"#16A34A"), borderRadius:4, padding:"1px 4px" }}>{p.participant_id?"수동":m.how}</span>
-                              </>
-                            ) : (
-                              <span style={{ color: m.how==="중복"?T.orange:"#DC2626", fontWeight:600 }}>{m.how==="중복"?"중복-수동지정":"미매칭-지정"}</span>
-                            )}
-                          </div>
+                          <span onClick={() => setEditRoundPost(p.id)} title="클릭해서 회차 변경"
+                            style={{ cursor:"pointer", fontSize:11, fontWeight:700, color: p.parsed_round?T.navy:T.muted, borderBottom:"1px dashed #CBD5E1" }}>
+                            {p.parsed_round ? `${p.parsed_round}주차` : "—"}
+                          </span>
                         )}
                       </div>
-                      {/* 회차 */}
-                      <div style={{ fontSize:11, textAlign:"center", color: p.parsed_round?T.navy:T.muted, fontWeight:700 }}>{p.parsed_round ? `${p.parsed_round}주차` : "—"}</div>
                       {/* 글번호 */}
                       <div style={{ fontSize:11, color:T.muted, textAlign:"center", fontFamily:"monospace" }}>{articleId}</div>
                       {/* 닉네임 */}
@@ -7873,6 +7892,60 @@ const ChallengeAdmin = () => {
           </div>
         </div>
       )}
+
+      {/* 참여자 연결 검색 모달 */}
+      {assignModal && (() => {
+        const cur = matchOf(assignModal);
+        const q = assignQuery.trim();
+        const qDigits = q.replace(/[^0-9]/g, "");
+        const results = !q ? participants.slice(0, 30) : participants.filter(pt => {
+          const nameHit = (pt.name && pt.name.includes(q)) || (pt.parent_name && pt.parent_name.includes(q));
+          const phoneHit = qDigits && pt.phone && pt.phone.includes(qDigits);
+          return nameHit || phoneHit;
+        }).slice(0, 60);
+        const pick = (pid) => { assignPost(assignModal, pid === null ? "" : pid); setAssignModal(null); };
+        const fmtPhone = (ph) => ph ? ph.replace(/(\d{2,3})(\d{3,4})(\d{4})/, "$1-$2-$3") : "";
+        return (
+          <div onClick={() => setAssignModal(null)}
+            style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:10001, padding:16 }}>
+            <div onClick={e => e.stopPropagation()}
+              style={{ background:T.white, borderRadius:14, padding:20, width:"100%", maxWidth:460, maxHeight:"80vh", display:"flex", flexDirection:"column", boxShadow:"0 10px 40px rgba(0,0,0,0.25)" }}>
+              <div style={{ fontSize:15, fontWeight:800, color:T.navy, marginBottom:4 }}>참여자 연결</div>
+              <div style={{ fontSize:12, color:T.muted, marginBottom:10, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>글: {assignModal.post_title}</div>
+              <input autoFocus value={assignQuery} onChange={e => setAssignQuery(e.target.value)}
+                placeholder="이름 또는 전화번호로 검색"
+                style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1px solid ${T.border}`, fontSize:14, marginBottom:10, boxSizing:"border-box" }}/>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                <span style={{ fontSize:11, color:T.muted }}>{q ? `검색 결과 ${results.length}명` : `전체 ${participants.length}명 (앞 30명 표시 · 검색해서 좁히기)`}</span>
+                {(assignModal.participant_id || cur.p) && (
+                  <button onClick={() => pick(null)} style={{ fontSize:11, color:"#DC2626", background:"none", border:"none", cursor:"pointer", fontWeight:700 }}>연결 해제</button>
+                )}
+              </div>
+              <div style={{ overflowY:"auto", border:`1px solid ${T.border}`, borderRadius:8 }}>
+                {results.length === 0 && <div style={{ padding:20, textAlign:"center", color:T.muted, fontSize:13 }}>검색 결과가 없습니다.</div>}
+                {results.map(pt => {
+                  const isCur = cur.p && cur.p.id === pt.id;
+                  return (
+                    <div key={pt.id} onClick={() => pick(pt.id)}
+                      style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", cursor:"pointer", borderBottom:`1px solid ${T.border}`, background:isCur?"#EEF2FF":T.white }}
+                      onMouseEnter={e => { if(!isCur) e.currentTarget.style.background="#F9FAFB"; }}
+                      onMouseLeave={e => { if(!isCur) e.currentTarget.style.background=T.white; }}>
+                      <span style={{ fontSize:13, fontWeight:700, color:T.navy, minWidth:60 }}>{pt.name || "—"}</span>
+                      <span style={{ fontSize:12, color:T.muted, flex:1 }}>{pt.parent_name ? `학부모 ${pt.parent_name}` : ""}</span>
+                      <span style={{ fontSize:12, color:T.text, fontFamily:"monospace" }}>{fmtPhone(pt.phone)}</span>
+                      {isCur && <span style={{ fontSize:10, color:"#4F46E5", fontWeight:700 }}>현재</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ textAlign:"right", marginTop:12 }}>
+                <button onClick={() => setAssignModal(null)}
+                  style={{ padding:"8px 18px", borderRadius:8, border:`1px solid ${T.border}`, background:T.white, color:T.muted, fontSize:13, fontWeight:600, cursor:"pointer" }}>닫기</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
