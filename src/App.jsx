@@ -7359,8 +7359,9 @@ const ChallengeAdmin = () => {
   const [loading, setLoading]       = useState(false);
   const [crawlRunning, setCrawlRunning] = useState(false);
   const [participants, setParticipants] = useState([]);
+  const [rounds, setRounds]         = useState([]);
   const [showForm, setShowForm]     = useState(false);
-  const [form, setForm]             = useState(null); // {key|null, name, board_url, participantsText, active}
+  const [form, setForm]             = useState(null); // {key|null, name, board_url, participantsText, roundsText, active}
   const [saving, setSaving]         = useState(false);
 
   const reloadChallenges = async (selectKey) => {
@@ -7382,7 +7383,25 @@ const ChallengeAdmin = () => {
     const { data } = await supabase.rpc("get_challenge_participants", { p_key: key });
     setParticipants(data || []);
   };
-  useEffect(() => { loadParticipants(activeKey); }, [activeKey]);
+  const loadRounds = async (key) => {
+    const { data } = await supabase.rpc("get_challenge_rounds", { p_key: key });
+    setRounds(data || []);
+  };
+  useEffect(() => { loadParticipants(activeKey); loadRounds(activeKey); }, [activeKey]);
+
+  const fmtDeadline = (d) => { if (!d) return "—"; const [y, m, dd] = d.split("-"); return `${+m}/${+dd}`; };
+  // 회차 입력 텍스트 → [{round, deadline}] (예: "1주차 2026-06-07" / "1, 6/7")
+  const parseRoundsText = (text) => (text || "").split("\n").map(line => {
+    const t = line.trim(); if (!t) return null;
+    const rm = t.match(/(\d+)/); if (!rm) return null;
+    const round = parseInt(rm[1], 10);
+    let deadline = null;
+    const iso = t.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (iso) deadline = `${iso[1]}-${String(+iso[2]).padStart(2,"0")}-${String(+iso[3]).padStart(2,"0")}`;
+    else { const md = t.replace(/^\s*\d+\s*(주차|회|차)?/, "").match(/(\d{1,2})\s*[\/월.\-]\s*(\d{1,2})/);
+      if (md) deadline = `2026-${String(+md[1]).padStart(2,"0")}-${String(+md[2]).padStart(2,"0")}`; }
+    return { round, deadline };
+  }).filter(Boolean);
 
   // 게시판 URL에서 카페 club id / 게시판 menu id 추출 (20HA와 동일 형식)
   const parseBoard = (url) => {
@@ -7396,12 +7415,16 @@ const ChallengeAdmin = () => {
     return { cafeId: null, menuId: null };
   };
 
-  const openNew  = () => { setForm({ key: null, name: "", board_url: "", participantsText: "", active: true }); setShowForm(true); };
+  const openNew  = () => { setForm({ key: null, name: "", board_url: "", participantsText: "", roundsText: "", active: true }); setShowForm(true); };
   const openEdit = async () => {
-    const { data } = await supabase.rpc("get_challenge_participants", { p_key: activeKey });
+    const [{ data: pData }, { data: rData }] = await Promise.all([
+      supabase.rpc("get_challenge_participants", { p_key: activeKey }),
+      supabase.rpc("get_challenge_rounds", { p_key: activeKey }),
+    ]);
     setForm({
       key: active.key, name: active.name || "", board_url: active.board_url || "",
-      participantsText: (data || []).map(p => p.name).join("\n"),
+      participantsText: (pData || []).map(p => p.name).join("\n"),
+      roundsText: (rData || []).map(r => `${r.round_no}주차  ${r.deadline || ""}`.trim()).join("\n"),
       active: active.active !== false,
     });
     setShowForm(true);
@@ -7419,8 +7442,11 @@ const ChallengeAdmin = () => {
       });
       const names = form.participantsText.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
       await supabase.rpc("set_challenge_participants", { p_key: key, p_names: names });
+      const roundsArr = parseRoundsText(form.roundsText).map(r => ({ round: r.round, deadline: r.deadline }));
+      await supabase.rpc("set_challenge_rounds", { p_key: key, p_rounds: roundsArr });
       await reloadChallenges(key);
       await loadParticipants(key);
+      await loadRounds(key);
       setShowForm(false);
     } catch (e) { alert("저장 실패: " + (e.message || e)); }
     setSaving(false);
@@ -7522,6 +7548,20 @@ const ChallengeAdmin = () => {
         // ── 현황표 (명단 기반 — 회차별 마감은 추후) ──
         <Card style={{ padding:24 }}>
           <div style={{ fontSize:15, fontWeight:700, color:T.navy, marginBottom:8 }}>{active.name} · 제출 현황표</div>
+          {/* 회차별 마감일 */}
+          {rounds.length > 0 && (
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:T.navy, marginBottom:6 }}>회차별 미션 마감일</div>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                {rounds.map(r => (
+                  <div key={r.round_no} style={{ padding:"6px 12px", borderRadius:8, border:`1px solid ${T.border}`, background:T.white, fontSize:12 }}>
+                    <span style={{ fontWeight:700, color:T.navy }}>{r.round_no}주차</span>
+                    <span style={{ color:T.muted, marginLeft:6 }}>~ {fmtDeadline(r.deadline)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {/* 요약 */}
           <div style={{ display:"flex", gap:24, padding:"14px 18px", background:T.surfaceAlt||"#F9FAFB", borderRadius:10, marginBottom:18 }}>
             <div><div style={{ fontSize:11, color:T.muted, fontWeight:600 }}>참여 명단</div><div style={{ fontSize:20, fontWeight:800, color:T.navy }}>{participants.length}명</div></div>
@@ -7644,7 +7684,13 @@ const ChallengeAdmin = () => {
             <label style={{ fontSize:12, fontWeight:700, color:T.navy, display:"block", marginBottom:6 }}>참여 명단 <span style={{ fontWeight:400, color:T.muted }}>(한 줄에 한 명, 또는 쉼표로 구분)</span></label>
             <textarea value={form.participantsText} onChange={e => setForm(f => ({ ...f, participantsText: e.target.value }))}
               placeholder={"홍길동\n김철수\n이영희"}
-              rows={6}
+              rows={5}
+              style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1px solid ${T.border}`, fontSize:13, marginBottom:16, boxSizing:"border-box", resize:"vertical", fontFamily:"inherit" }}/>
+
+            <label style={{ fontSize:12, fontWeight:700, color:T.navy, display:"block", marginBottom:6 }}>회차별 마감일 <span style={{ fontWeight:400, color:T.muted }}>(한 줄에 "회차 날짜" — 예: 1주차 2026-06-14)</span></label>
+            <textarea value={form.roundsText} onChange={e => setForm(f => ({ ...f, roundsText: e.target.value }))}
+              placeholder={"1주차 2026-06-14\n2주차 2026-06-21\n3주차 2026-06-27"}
+              rows={5}
               style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1px solid ${T.border}`, fontSize:13, marginBottom:16, boxSizing:"border-box", resize:"vertical", fontFamily:"inherit" }}/>
 
             <label style={{ display:"flex", alignItems:"center", gap:8, marginBottom:20, cursor:"pointer" }}>

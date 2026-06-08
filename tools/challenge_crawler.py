@@ -50,7 +50,7 @@ def sb_headers():
 def fetch_challenge():
     """challenges 에서 이 챌린지의 게시판 id 등을 읽음."""
     r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/challenges?key=eq.{CHALLENGE_KEY}&select=key,name,naver_board_id,active",
+        f"{SUPABASE_URL}/rest/v1/challenges?key=eq.{CHALLENGE_KEY}&select=key,name,naver_cafe_id,naver_board_id,naver_board_type,active",
         headers=sb_headers(), timeout=15,
     )
     if r.status_code != 200 or not r.json():
@@ -82,14 +82,15 @@ def parse_title(title):
     return parsed_name, parsed_round
 
 
-def crawl_board(board_id, existing_urls):
+def crawl_board(board_id, existing_urls, club_id=None, board_type="L"):
     cutoff = datetime.now(KST) - timedelta(days=CRAWL_DAYS)
+    club = club_id or CAFE_CLUB_ID
     posts, page = [], 1
     while True:
         url = (
             f"https://apis.naver.com/cafe-web/cafe2/ArticleListV2.json"
-            f"?search.clubid={CAFE_CLUB_ID}&search.menuid={board_id}"
-            f"&search.boardtype=L&search.page={page}&search.perPage=20"
+            f"?search.clubid={club}&search.menuid={board_id}"
+            f"&search.boardtype={board_type or 'L'}&search.page={page}&search.perPage=20"
         )
         r = requests.get(url, headers=API_HEADERS, timeout=15)
         time.sleep(0.5)
@@ -110,7 +111,7 @@ def crawl_board(board_id, existing_urls):
                 found_old = True
                 continue
             article_id = a["articleId"]
-            post_url = f"https://cafe.naver.com/f-e/cafes/{CAFE_CLUB_ID}/articles/{article_id}"
+            post_url = f"https://cafe.naver.com/f-e/cafes/{club}/articles/{article_id}"
             if post_url in existing_urls:
                 continue
             title = a.get("subject", "")
@@ -165,8 +166,10 @@ if __name__ == "__main__":
         print(f"[설정] '{ch['name']}' 챌린지의 naver_board_id 가 아직 등록되지 않았습니다. 게시판 링크를 등록해주세요.")
         raise SystemExit(0)
 
-    print(f"[start] 챌린지 '{ch['name']}' (board={board_id}) 크롤링 시작")
+    club_id = ch.get("naver_cafe_id") or CAFE_CLUB_ID
+    board_type = ch.get("naver_board_type") or "L"
+    print(f"[start] 챌린지 '{ch['name']}' (cafe={club_id} board={board_id} type={board_type}) 크롤링 시작")
     existing = fetch_existing_urls()
     print(f"[supabase] 기존 저장: {len(existing)}건")
-    posts = crawl_board(board_id, existing)
+    posts = crawl_board(board_id, existing, club_id=club_id, board_type=board_type)
     upsert(posts)
