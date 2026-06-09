@@ -7358,6 +7358,7 @@ const ChallengeAdmin = () => {
   const [roundFilter, setRoundFilter] = useState("all");
   const [assignModal, setAssignModal] = useState(null); // 참여자 수동 연결 모달 대상 글
   const [assignQuery, setAssignQuery] = useState("");    // 검색어(이름/번호)
+  const [assignPage, setAssignPage]   = useState(1);     // 모달 목록 페이지
   const [editRoundPost, setEditRoundPost] = useState(null); // 회차 인라인 편집 중인 글 id
   const [posts, setPosts]           = useState([]);
   const [loading, setLoading]       = useState(false);
@@ -7729,7 +7730,7 @@ const ChallengeAdmin = () => {
                       borderTop:`1px solid ${T.border}`, background:p.checked ? "#F0FDF4" : (i%2===0?T.white:"#F9FAFB") }}>
                       {/* 참여자 연결 (클릭 → 검색 모달) */}
                       <div style={{ fontSize:11, overflow:"hidden" }}>
-                        <div onClick={() => { setAssignModal(p); setAssignQuery(""); }} title="클릭해서 참여자 검색·연결"
+                        <div onClick={() => { setAssignModal(p); setAssignQuery(""); setAssignPage(1); }} title="클릭해서 참여자 검색·연결"
                           style={{ cursor:"pointer", display:"flex", alignItems:"center", gap:4, padding:"3px 4px", borderRadius:6, border:`1px dashed ${m.p?"#E5E7EB":"#FCA5A5"}` }}>
                           {m.p ? (
                             <>
@@ -7898,11 +7899,15 @@ const ChallengeAdmin = () => {
         const cur = matchOf(assignModal);
         const q = assignQuery.trim();
         const qDigits = q.replace(/[^0-9]/g, "");
-        const results = !q ? participants.slice(0, 30) : participants.filter(pt => {
+        const filtered = !q ? participants : participants.filter(pt => {
           const nameHit = (pt.name && pt.name.includes(q)) || (pt.parent_name && pt.parent_name.includes(q));
           const phoneHit = qDigits && pt.phone && pt.phone.includes(qDigits);
           return nameHit || phoneHit;
-        }).slice(0, 60);
+        });
+        const PAGE = 20;
+        const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE));
+        const safePage = Math.min(assignPage, totalPages);
+        const results = filtered.slice((safePage - 1) * PAGE, safePage * PAGE);
         const pick = (pid) => { assignPost(assignModal, pid === null ? "" : pid); setAssignModal(null); };
         const fmtPhone = (ph) => ph ? ph.replace(/(\d{2,3})(\d{3,4})(\d{4})/, "$1-$2-$3") : "";
         return (
@@ -7912,11 +7917,11 @@ const ChallengeAdmin = () => {
               style={{ background:T.white, borderRadius:14, padding:20, width:"100%", maxWidth:460, maxHeight:"80vh", display:"flex", flexDirection:"column", boxShadow:"0 10px 40px rgba(0,0,0,0.25)" }}>
               <div style={{ fontSize:15, fontWeight:800, color:T.navy, marginBottom:4 }}>참여자 연결</div>
               <div style={{ fontSize:12, color:T.muted, marginBottom:10, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>글: {assignModal.post_title}</div>
-              <input autoFocus value={assignQuery} onChange={e => setAssignQuery(e.target.value)}
+              <input autoFocus value={assignQuery} onChange={e => { setAssignQuery(e.target.value); setAssignPage(1); }}
                 placeholder="이름 또는 전화번호로 검색"
                 style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1px solid ${T.border}`, fontSize:14, marginBottom:10, boxSizing:"border-box" }}/>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-                <span style={{ fontSize:11, color:T.muted }}>{q ? `검색 결과 ${results.length}명` : `전체 ${participants.length}명 (앞 30명 표시 · 검색해서 좁히기)`}</span>
+                <span style={{ fontSize:11, color:T.muted }}>{q ? `검색 결과 ${filtered.length}명` : `전체 ${participants.length}명`} · {safePage}/{totalPages}페이지</span>
                 {(assignModal.participant_id || cur.p) && (
                   <button onClick={() => pick(null)} style={{ fontSize:11, color:"#DC2626", background:"none", border:"none", cursor:"pointer", fontWeight:700 }}>연결 해제</button>
                 )}
@@ -7938,7 +7943,18 @@ const ChallengeAdmin = () => {
                   );
                 })}
               </div>
-              <div style={{ textAlign:"right", marginTop:12 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:12 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <button onClick={() => setAssignPage(1)} disabled={safePage===1}
+                    style={{ padding:"5px 9px", borderRadius:6, border:`1px solid ${T.border}`, background:T.white, color:safePage===1?"#CBD5E1":T.navy, fontSize:12, cursor:safePage===1?"default":"pointer" }}>«</button>
+                  <button onClick={() => setAssignPage(p => Math.max(1, p-1))} disabled={safePage===1}
+                    style={{ padding:"5px 9px", borderRadius:6, border:`1px solid ${T.border}`, background:T.white, color:safePage===1?"#CBD5E1":T.navy, fontSize:12, cursor:safePage===1?"default":"pointer" }}>‹ 이전</button>
+                  <span style={{ fontSize:12, color:T.muted, minWidth:60, textAlign:"center" }}>{safePage} / {totalPages}</span>
+                  <button onClick={() => setAssignPage(p => Math.min(totalPages, p+1))} disabled={safePage===totalPages}
+                    style={{ padding:"5px 9px", borderRadius:6, border:`1px solid ${T.border}`, background:T.white, color:safePage===totalPages?"#CBD5E1":T.navy, fontSize:12, cursor:safePage===totalPages?"default":"pointer" }}>다음 ›</button>
+                  <button onClick={() => setAssignPage(totalPages)} disabled={safePage===totalPages}
+                    style={{ padding:"5px 9px", borderRadius:6, border:`1px solid ${T.border}`, background:T.white, color:safePage===totalPages?"#CBD5E1":T.navy, fontSize:12, cursor:safePage===totalPages?"default":"pointer" }}>»</button>
+                </div>
                 <button onClick={() => setAssignModal(null)}
                   style={{ padding:"8px 18px", borderRadius:8, border:`1px solid ${T.border}`, background:T.white, color:T.muted, fontSize:13, fontWeight:600, cursor:"pointer" }}>닫기</button>
               </div>
