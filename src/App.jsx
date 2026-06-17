@@ -3162,9 +3162,23 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
       const f = new Date(minMs); const t = new Date(maxMs);
       const fromStr = `${f.getFullYear()}-${String(f.getMonth()+1).padStart(2,'0')}-${String(f.getDate()).padStart(2,'0')}`;
       const toStr   = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
-      supabase.rpc("get_attendance_logs", {p_from: fromStr, p_to: toStr}).then(({data})=>{
+      // ⚠️ PostgREST는 한 번에 최대 1000행만 반환(나머지는 조용히 잘림). 출석이 1000건을
+      //    넘으면 최신 회차가 화면에서 사라진다. → 1000건씩 페이지네이션으로 전부 로드.
+      //    (RPC에 ORDER BY 추가되어 페이지 경계가 안정적임)
+      (async () => {
+        const PAGE = 1000;
+        const all = [];
+        for (let from = 0; ; from += PAGE) {
+          const { data, error } = await supabase
+            .rpc("get_attendance_logs", { p_from: fromStr, p_to: toStr })
+            .range(from, from + PAGE - 1);
+          if (error) break;
+          const batch = data || [];
+          all.push(...batch);
+          if (batch.length < PAGE) break;
+        }
         const map = {};
-        (data||[]).forEach(r => {
+        all.forEach(r => {
           const idx = ROSTER2.findIndex(s => s.name === r.student_name);
           if(idx >= 0){
             // session_type: "M" 또는 "N"(나잇) → roster2 키는 "M" 또는 "나"
@@ -3177,7 +3191,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           }
         });
         setAttendance2(map);
-      });
+      })();
     }
   },[adminTab]);
 
