@@ -14,7 +14,7 @@ import { HI, navIcon, KakaoIcon, GoogleIcon, NaverIcon } from "./components/icon
 import { Card, Pill, NavyNum, SectionTitle, Divider, Spinner, ChartTip } from "./components/ui";
 import { QUANT_ITEMS, QUAL_ITEMS, SUBJECTS, SUBJECT_CONFIG, ERR_CODES, ERR_LABELS, GRADES } from "./utils/constants";
 import { calcGrade, gradeInfo, calcEI } from "./utils/grade";
-import { ROSTER2, ROSTER2_NAVER_DATES, ROSTER2_MORNING_DATES, ROSTER2_NIGHT_DATES, ROSTER2_DAY_KO, roster2FmtKey, roster2Fmt, isLateByDeadline, INIT_ATTENDANCE2, MIN_ATTENDANCE_MINUTES, isValidAttendance, attendanceThreshold } from "./utils/roster2";
+import { ROSTER2, ROSTER2_NAVER_DATES, ROSTER2_MORNING_DATES, ROSTER2_NIGHT_DATES, ROSTER2_DAY_KO, roster2FmtKey, roster2Fmt, isLateByDeadline, INIT_ATTENDANCE2, MIN_ATTENDANCE_MINUTES, isValidAttendance, attendanceThreshold, cafeArticleUrl } from "./utils/roster2";
 import { draftKey, restoreDraft, clearDraft, useDraftBackup } from "./utils/draft";
 
 // ══════════════════════════════════════════════════════
@@ -4065,7 +4065,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                           </div>
                           {/* 제목 (링크, 좌측 정렬) */}
                           <div style={{fontSize:11,overflow:"hidden"}}>
-                            <a href={rec.post_url} target="_blank" rel="noreferrer"
+                            <a href={cafeArticleUrl(rec.post_url)} target="_blank" rel="noreferrer"
                               style={{color:T.navy,textDecoration:"none",fontWeight:600,
                                 display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}
                               title={rec.post_title}
@@ -7779,7 +7779,7 @@ const ChallengeAdmin = () => {
                       <div style={{ fontSize:12, color:T.navy, fontWeight:600, textAlign:"center", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.naver_nickname || "—"}</div>
                       {/* 제목 */}
                       <div style={{ fontSize:12, overflow:"hidden" }}>
-                        <a href={p.post_url} target="_blank" rel="noreferrer"
+                        <a href={cafeArticleUrl(p.post_url)} target="_blank" rel="noreferrer"
                           style={{ color:T.navy, textDecoration:"none", fontWeight:600, display:"block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
                           title={p.post_title}>{p.post_title || "(제목 없음)"}</a>
                       </div>
