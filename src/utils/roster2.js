@@ -54,6 +54,12 @@ export const ROSTER2_NIGHT_DATES   = _genDates([0, 1, 2, 4, 5, 6])
   .concat([new Date(2026, 5, 3)])
   .sort((a, b) => a - b);
 
+// 네이버 카페 글 링크 보정.
+// f-e(SPA) 주소는 본문을 ca-fe iframe(?fromNext=true)으로 감싸는데, 새 탭 콜드 로드 시
+// 이 iframe이 비어 본문이 안 뜨고 새로고침해야 보이는 버그가 있다.
+// iframe 안쪽 실제 주소(ca-fe)로 바로 링크하면 첫 진입에도 본문이 렌더된다.
+export const cafeArticleUrl  = (u) => (u || "").replace("/f-e/cafes/", "/ca-fe/cafes/");
+
 export const ROSTER2_DAY_KO  = ['일','월','화','수','목','금','토'];
 export const roster2FmtKey   = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 export const roster2Fmt      = (dt) => `${dt.getMonth()+1}/${dt.getDate()}`;
