@@ -2115,15 +2115,22 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
     const k = new Date(new Date(ts).getTime() + 9*3600*1000);
     return `${k.getUTCFullYear()}-${String(k.getUTCMonth()+1).padStart(2,'0')}-${String(k.getUTCDate()).padStart(2,'0')}`;
   };
-  const myCertSessions = new Set();
-  myCafeCerts.forEach(c => {
+  // cert의 회차(1-based) 배열: 관리자 수동 회차(session_override) 우선, 없으면 작성일 자동 매칭.
+  // 관리자가 회차를 바꾸면 학생 화면에도 그대로 반영되도록 override를 최우선으로 본다.
+  const certSessionNums = (c) => {
+    if (c.session_override && c.session_override.length > 0) return c.session_override.map(Number);
     const postStr = kstStr_(c.posted_at);
     for (let i = ROSTER2_NAVER_DATES.length - 1; i >= 0; i--) {
-      if (postStr >= fk(ROSTER2_NAVER_DATES[i])) {
-        myCertSessions.add(i);
-        break;
-      }
+      if (postStr >= fk(ROSTER2_NAVER_DATES[i])) return [i + 1];
     }
+    return [];
+  };
+  const myCertSessions = new Set();
+  myCafeCerts.forEach(c => {
+    certSessionNums(c).forEach(n => {
+      const idx = n - 1;
+      if (idx >= 0 && idx < ROSTER2_NAVER_DATES.length) myCertSessions.add(idx);
+    });
   });
 
   // 본인 출석 — 임계값(M=15, N=60) 통과해야 출석 인정. participation_minutes=null은 면제(인정)
@@ -2699,27 +2706,21 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
               <span style={{fontSize:10,fontWeight:400,color:T.muted}}>· 회차별 점수 / 채점 상태</span>
             </div>
             {(()=>{
-              const kstStr = ts => {
-                const k = new Date(new Date(ts).getTime() + 9*3600*1000);
-                return `${k.getUTCFullYear()}-${String(k.getUTCMonth()+1).padStart(2,'0')}-${String(k.getUTCDate()).padStart(2,'0')}`;
-              };
-              // 회차별로 본인 cert 매칭 (지각도 해당 회차에 포함)
+              // 회차별로 본인 cert 매칭 (지각도 해당 회차에 포함).
+              // 관리자 수동 회차(session_override)를 반영하도록 certSessionNums 사용.
               const sessionMap = {};
               ROSTER2_NAVER_DATES.forEach((dt, idx) => {
                 sessionMap[idx] = {date: dt, cert: null, isLate: false};
               });
               myCafeCerts.forEach(c => {
-                const postStr = kstStr(c.posted_at);
-                for (let i = ROSTER2_NAVER_DATES.length - 1; i >= 0; i--) {
-                  const certStr = fk(ROSTER2_NAVER_DATES[i]);
-                  if (postStr >= certStr) {
-                    if (!sessionMap[i].cert) {
-                      sessionMap[i].cert = c;
-                      sessionMap[i].isLate = isLateByDeadline(c.posted_at, ROSTER2_NAVER_DATES[i]);
-                    }
-                    break;
+                certSessionNums(c).forEach(n => {
+                  const idx = n - 1;
+                  if (idx < 0 || idx >= ROSTER2_NAVER_DATES.length) return;
+                  if (!sessionMap[idx].cert) {
+                    sessionMap[idx].cert = c;
+                    sessionMap[idx].isLate = isLateByDeadline(c.posted_at, ROSTER2_NAVER_DATES[idx]);
                   }
-                }
+                });
               });
 
               const cols = isMobile ? 3 : 5;
