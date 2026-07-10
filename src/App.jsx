@@ -2137,9 +2137,11 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
   // myAttSet: 출석 인정 (카운트 대상) / myAttUnderSet: 참석은 했으나 시간 미달 / myAttMinutes: 분 표시용
   const myAttSet      = new Set();
   const myAttUnderSet = new Set();
+  const myAttPreSet   = new Set(); // 사전결석 신청(결석이지만 신청 기록) — Phase1은 출석 카운트 제외
   const myAttMinutes  = new Map();
   myAttLogs.forEach(l => {
     const key = `${l.session_type}-${l.session_date}`;
+    if (l.pre_absence) { myAttPreSet.add(key); return; }
     myAttMinutes.set(key, l.participation_minutes ?? null);
     if (isValidAttendance(l.session_type, l.participation_minutes, l.session_date)) myAttSet.add(key);
     else myAttUnderSet.add(key);
@@ -3084,6 +3086,11 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
   const [certScoreModal, setCertScoreModal] = useState(null); // {id, postTitle, submit, mission, fidelity}
   const [certScoreSaving, setCertScoreSaving] = useState(false);
   const [certSessionSaving, setCertSessionSaving] = useState(false);
+  // 전체현황 그리드 셀 수동 편집 모달
+  const [gridCertModal, setGridCertModal] = useState(null);  // {certId, studentId, studentName, sessionNum, sessionLabel, postedAt, submit, mission, fidelity}
+  const [gridCertSaving, setGridCertSaving] = useState(false);
+  const [attEditModal, setAttEditModal] = useState(null);    // {studentId, studentName, sessionDate, sessionType, sessionLabel, present, preAbsence}
+  const [attEditSaving, setAttEditSaving] = useState(false);
   const [lastCrawledAt, setLastCrawledAt] = useState(null);
   const [certRecordsPage, setCertRecordsPage] = useState(1);
   const CERT_RECORDS_PAGE_SIZE = 30;
@@ -3156,45 +3163,48 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
     const certTo = new Date(ROSTER2_NAVER_DATES[ROSTER2_NAVER_DATES.length-1]); certTo.setHours(23,59,59,999);
     loadAttendanceCerts(certFrom, certTo);
     // 모닝/나잇 출석 로그 로드 → 전체 활동 기간(5/17~)
-    {
-      const allDates = [...ROSTER2_MORNING_DATES, ...ROSTER2_NIGHT_DATES];
-      const minMs = Math.min(...allDates.map(d=>d.getTime()));
-      const maxMs = Math.max(...allDates.map(d=>d.getTime()));
-      const f = new Date(minMs); const t = new Date(maxMs);
-      const fromStr = `${f.getFullYear()}-${String(f.getMonth()+1).padStart(2,'0')}-${String(f.getDate()).padStart(2,'0')}`;
-      const toStr   = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
-      // ⚠️ PostgREST는 한 번에 최대 1000행만 반환(나머지는 조용히 잘림). 출석이 1000건을
-      //    넘으면 최신 회차가 화면에서 사라진다. → 1000건씩 페이지네이션으로 전부 로드.
-      //    (RPC에 ORDER BY 추가되어 페이지 경계가 안정적임)
-      (async () => {
-        const PAGE = 1000;
-        const all = [];
-        for (let from = 0; ; from += PAGE) {
-          const { data, error } = await supabase
-            .rpc("get_attendance_logs", { p_from: fromStr, p_to: toStr })
-            .range(from, from + PAGE - 1);
-          if (error) break;
-          const batch = data || [];
-          all.push(...batch);
-          if (batch.length < PAGE) break;
-        }
-        const map = {};
-        all.forEach(r => {
-          const idx = ROSTER2.findIndex(s => s.name === r.student_name);
-          if(idx >= 0){
-            // session_type: "M" 또는 "N"(나잇) → roster2 키는 "M" 또는 "나"
-            const rosterType = r.session_type === "N" ? "나" : "M";
-            const valid = isValidAttendance(r.session_type, r.participation_minutes, r.session_date);
-            map[`${idx}-${rosterType}-${r.session_date}`] = {
-              valid,
-              minutes: r.participation_minutes,
-            };
-          }
-        });
-        setAttendance2(map);
-      })();
-    }
+    loadAttendance2();
   },[adminTab]);
+
+  // 모닝/나잇 출석을 attendance2 맵으로 로드 (저장 후 갱신에도 재사용)
+  const loadAttendance2 = async () => {
+    const allDates = [...ROSTER2_MORNING_DATES, ...ROSTER2_NIGHT_DATES];
+    const minMs = Math.min(...allDates.map(d=>d.getTime()));
+    const maxMs = Math.max(...allDates.map(d=>d.getTime()));
+    const f = new Date(minMs); const t = new Date(maxMs);
+    const fromStr = `${f.getFullYear()}-${String(f.getMonth()+1).padStart(2,'0')}-${String(f.getDate()).padStart(2,'0')}`;
+    const toStr   = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    // ⚠️ PostgREST는 한 번에 최대 1000행만 반환(나머지는 조용히 잘림). 출석이 1000건을
+    //    넘으면 최신 회차가 화면에서 사라진다. → 1000건씩 페이지네이션으로 전부 로드.
+    const PAGE = 1000;
+    const all = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .rpc("get_attendance_logs", { p_from: fromStr, p_to: toStr })
+        .range(from, from + PAGE - 1);
+      if (error) break;
+      const batch = data || [];
+      all.push(...batch);
+      if (batch.length < PAGE) break;
+    }
+    const map = {};
+    all.forEach(r => {
+      const idx = ROSTER2.findIndex(s => s.name === r.student_name);
+      if(idx >= 0){
+        // session_type: "M" 또는 "N"(나잇) → roster2 키는 "M" 또는 "나"
+        const rosterType = r.session_type === "N" ? "나" : "M";
+        // 사전결석 행은 출석 카운트 제외(Phase1). 표시용으로 preAbs 보관.
+        const valid = !r.pre_absence && isValidAttendance(r.session_type, r.participation_minutes, r.session_date);
+        map[`${idx}-${rosterType}-${r.session_date}`] = {
+          valid,
+          minutes: r.participation_minutes,
+          preAbs: !!r.pre_absence,
+          preAbsAt: r.pre_absence_at || null,
+        };
+      }
+    });
+    setAttendance2(map);
+  };
 
   const saveNickname = async (profileId, nickname) => {
     await supabase.rpc("update_naver_nickname", {p_profile_id: profileId, p_nickname: nickname.trim()||null});
@@ -3260,6 +3270,56 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
     };
     setCertRecords(prev => prev.map(r => r.id===certId ? {...r, ...patch} : r));
     setAttendanceCerts(prev => prev.map(c => c.id===certId ? {...c, ...patch} : c));
+  };
+
+  // ── 전체현황 그리드 셀 수동 편집 저장 ──
+  // 출석 셀: 출석/결석/사전결석
+  const saveGridAttendance = async () => {
+    if (!attEditModal || attEditSaving) return;
+    setAttEditSaving(true);
+    try {
+      await supabase.rpc("admin_set_attendance", {
+        p_student_id: attEditModal.studentId,
+        p_session_date: attEditModal.sessionDate,
+        p_session_type: attEditModal.sessionType,       // 'M' | 'N'
+        p_present: attEditModal.present,
+        p_pre_absence: !attEditModal.present && !!attEditModal.preAbsence,
+        p_pre_absence_at: null,                         // 관리자 수동 = 유효 간주(전날규칙 미검증)
+      });
+      await loadAttendance2();
+      setAttEditModal(null);
+    } finally {
+      setAttEditSaving(false);
+    }
+  };
+  // 카페 인증 셀: 기존 인증 점수 수정 or 없으면 수동 인증 생성
+  const saveGridCert = async () => {
+    if (!gridCertModal || gridCertSaving) return;
+    const toNum = v => v==="" || v==null ? null : Number(v);
+    const submit = toNum(gridCertModal.submit), mission = toNum(gridCertModal.mission), fidelity = toNum(gridCertModal.fidelity);
+    setGridCertSaving(true);
+    try {
+      if (gridCertModal.certId) {
+        await updateCertScore(gridCertModal.certId, {
+          submit: gridCertModal.submit, mission: gridCertModal.mission, fidelity: gridCertModal.fidelity,
+        });
+      } else {
+        await supabase.rpc("admin_create_manual_cert", {
+          p_student_id: gridCertModal.studentId,
+          p_session_num: gridCertModal.sessionNum,
+          p_posted_at: gridCertModal.postedAt,
+          p_submit: submit, p_mission: mission, p_fidelity: fidelity,
+        });
+      }
+      // 그리드 + 채점표 갱신
+      const certFrom = new Date(ROSTER2_NAVER_DATES[0]); certFrom.setHours(0,0,0,0);
+      const certTo = new Date(ROSTER2_NAVER_DATES[ROSTER2_NAVER_DATES.length-1]); certTo.setHours(23,59,59,999);
+      await loadAttendanceCerts(certFrom, certTo);
+      loadCertRecords(certStatusFilter);
+      setGridCertModal(null);
+    } finally {
+      setGridCertSaving(false);
+    }
   };
 
   // 체크한 글들을 한 번에 만점(제출50/미션30/충실도20 = 종합 100점) 처리
@@ -4903,34 +4963,68 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                               const isLate = hasNaverCert && naverMatch.isLate;
                               // M/나 출석: {valid, minutes}. 미달은 valid=false, minutes는 표시용
                               const att = sec.type !== "N" ? getAtt(s.idx, sec.type, key) : null;
+                              const preAbs = sec.type !== "N" && !!(att && att.preAbs);
                               const checked = sec.type === "N" ? hasNaverCert : !!(att && att.valid);
-                              const underMin = sec.type !== "N" && att && !att.valid;
+                              const underMin = sec.type !== "N" && att && !att.valid && !preAbs;
                               const minThr = sec.type === "나" ? MIN_ATTENDANCE_MINUTES.N : sec.type === "M" ? MIN_ATTENDANCE_MINUTES.M : null;
                               const status = sec.type === "N"
                                 ? (hasNaverCert ? (isLate ? "지각 인정" : "정시 인증") : "미인증")
-                                : (checked ? "완료" : underMin ? "참여시간미달" : "미참여");
+                                : (checked ? "완료" : preAbs ? "사전결석(신청)" : underMin ? "참여시간미달" : "미참여");
                               const tipLines = [
                                 { label: `${s.name} · ${dt.getMonth()+1}/${dt.getDate()} · ${sec.label}`, color: sec.color },
-                                { label: `상태: ${status}`, color: checked ? "#16A34A" : underMin ? "#9A3412" : (sec.type==="N" && isLate) ? "#B45309" : T.muted },
+                                { label: `상태: ${status}`, color: checked ? "#16A34A" : preAbs ? "#2563EB" : underMin ? "#9A3412" : (sec.type==="N" && isLate) ? "#B45309" : T.muted },
                                 ...(att && att.minutes != null ? [{ label: `참여 시간: ${att.minutes}분`, color: T.navy }] : []),
                                 ...(underMin && minThr ? [{ label: `(인정 기준 ${minThr}분 미만)`, color: "#9A3412" }] : []),
+                                { label: "클릭해서 수정", color: T.muted },
                               ];
                               const showTip = (e) => setGridTip({ x: e.clientX, y: e.clientY, lines: tipLines });
                               const moveTip = (e) => setGridTip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
                               const hideTip = () => setGridTip(null);
+                              // 셀 클릭 → 편집 모달
+                              const onCellClick = () => {
+                                if (sec.type === "N") {
+                                  const cert = naverMatch?.cert || null;
+                                  const pd = naverDates[di];
+                                  setGridCertModal({
+                                    certId: cert?.id || null,
+                                    studentId: certStudentByName[s.name] ?? null,
+                                    studentName: s.name,
+                                    sessionNum: di + 1,
+                                    sessionLabel: `${di+1}회 · ${fmt(dt)}(${DAY_KO[dt.getDay()]}) 카페 인증`,
+                                    postedAt: new Date(pd.getFullYear(), pd.getMonth(), pd.getDate(), 12, 0, 0).toISOString(),
+                                    submit:   cert && cert.submit_score   != null ? String(cert.submit_score)   : "50",
+                                    mission:  cert && cert.mission_score  != null ? String(cert.mission_score)  : "30",
+                                    fidelity: cert && cert.fidelity_score != null ? String(cert.fidelity_score) : "20",
+                                  });
+                                } else {
+                                  setAttEditModal({
+                                    studentId: certStudentByName[s.name] ?? null,
+                                    studentName: s.name,
+                                    sessionDate: key,
+                                    sessionType: sec.type === "나" ? "N" : "M",
+                                    sessionLabel: `${fmt(dt)}(${DAY_KO[dt.getDay()]}) ${sec.label}`,
+                                    present: !!(att && att.valid),
+                                    preAbsence: preAbs,
+                                  });
+                                }
+                                setGridTip(null);
+                              };
                               return (
                                 <td key={`${si}-${di}`}
                                   onMouseEnter={showTip} onMouseMove={moveTip} onMouseLeave={hideTip}
+                                  onClick={onCellClick}
                                   style={{
                                     width: CELL_W, minWidth: CELL_W,
                                     height: CELL_H,
                                     textAlign:"center", verticalAlign:"middle",
-                                    cursor:"default",
+                                    cursor:"pointer",
                                     fontSize: 12,
-                                    fontWeight: (checked||underMin) ? 800 : 400,
+                                    fontWeight: (checked||underMin||preAbs) ? 800 : 400,
                                     color: checked ? (sec.type==="N" && isLate ? "#B45309" : sec.color)
+                                                   : preAbs ? "#2563EB"
                                                    : underMin ? "#9A3412" : "transparent",
                                     background: checked ? (sec.type==="N" && isLate ? "#FEF3C7" : sec.bg)
+                                                       : preAbs ? "#DBEAFE"
                                                        : underMin ? "#FED7AA" : "transparent",
                                     borderBottom:`1px solid ${T.border}`,
                                     borderLeft: di===0 ? `2px solid ${sec.color}` : `1px solid ${T.border}`,
@@ -4939,7 +5033,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                                   }}>
                                   {sec.type === "N"
                                     ? (hasNaverCert ? (isLate ? "△" : "O") : "")
-                                    : (checked ? "✓" : underMin ? "△" : "")}
+                                    : (checked ? "✓" : preAbs ? "신" : underMin ? "△" : "")}
                                 </td>
                               );
                             })
@@ -4995,6 +5089,105 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
         </div>
         );
       })()}
+
+      {/* 전체현황 그리드 — 카페 인증 셀 편집 모달 (점수 수정 or 수동 인증 생성) */}
+      {gridCertModal && (() => {
+        const clamp = (v,max) => { if(v===""||v==null) return ""; const n=Math.max(0,Math.min(max,Number(v))); return Number.isFinite(n)?String(n):""; };
+        const toNum = v => v==="" || v==null ? 0 : Number(v);
+        const total = toNum(gridCertModal.submit) + toNum(gridCertModal.mission) + toNum(gridCertModal.fidelity);
+        const rowStyle = {display:"grid",gridTemplateColumns:"1fr 110px",alignItems:"center",gap:10,marginBottom:10};
+        const inputStyle = {...css.input,width:"100%",padding:"8px 12px",fontSize:14,boxSizing:"border-box"};
+        const labelStyle = {fontSize:12,fontWeight:700,color:T.navy};
+        const hintStyle  = {fontSize:10,color:T.muted,fontWeight:400,marginLeft:4};
+        return (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}
+          onClick={()=>setGridCertModal(null)}>
+          <div style={{background:T.white,borderRadius:16,padding:24,maxWidth:460,width:"90%",boxShadow:"0 8px 32px rgba(0,0,0,0.18)"}}
+            onClick={e=>e.stopPropagation()}
+            onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); saveGridCert(); } if(e.key==="Escape") setGridCertModal(null); }}>
+            <div style={{fontWeight:800,fontSize:15,color:T.navy,marginBottom:6}}>카페 인증 점수</div>
+            <div style={{fontSize:12,color:T.muted,marginBottom:6,lineHeight:1.4}}>
+              <b style={{color:T.navy}}>{gridCertModal.studentName}</b> · {gridCertModal.sessionLabel}
+            </div>
+            <div style={{fontSize:11,marginBottom:16,fontWeight:700,color:gridCertModal.certId?"#16A34A":"#2563EB"}}>
+              {gridCertModal.certId ? "기존 인증 점수 수정" : "이 회차 수동 인증 생성"}
+            </div>
+            <div style={rowStyle}>
+              <div style={labelStyle}>① 제출<span style={hintStyle}>0~50</span></div>
+              <input type="number" min="0" max="50" autoFocus value={gridCertModal.submit}
+                onChange={e=>setGridCertModal(p=>({...p,submit:clamp(e.target.value,50)}))} style={inputStyle} placeholder="0~50" />
+            </div>
+            <div style={rowStyle}>
+              <div style={labelStyle}>② 필수 미션<span style={hintStyle}>0~30</span></div>
+              <input type="number" min="0" max="30" value={gridCertModal.mission}
+                onChange={e=>setGridCertModal(p=>({...p,mission:clamp(e.target.value,30)}))} style={inputStyle} placeholder="0~30" />
+            </div>
+            <div style={rowStyle}>
+              <div style={labelStyle}>③ 내용 충실도<span style={hintStyle}>0~20</span></div>
+              <input type="number" min="0" max="20" value={gridCertModal.fidelity}
+                onChange={e=>setGridCertModal(p=>({...p,fidelity:clamp(e.target.value,20)}))} style={inputStyle} placeholder="0~20" />
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:14,marginBottom:14,padding:"10px 14px",background:"#F0FDF4",borderRadius:8,border:"1px solid #BBF7D0"}}>
+              <div style={{fontSize:13,fontWeight:700,color:T.navy}}>종합</div>
+              <div style={{fontSize:18,fontWeight:800,color:"#16A34A"}}>{total}<span style={{fontSize:12,fontWeight:600,marginLeft:2}}>/ 100점</span></div>
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button onClick={()=>setGridCertModal(null)} style={{...css.btnOutline,padding:"7px 18px",fontSize:13}}>취소</button>
+              <button onClick={saveGridCert} disabled={gridCertSaving || gridCertModal.studentId==null}
+                style={{...css.btnOrange,padding:"7px 18px",fontSize:13,opacity:(gridCertSaving||gridCertModal.studentId==null)?0.6:1}}>
+                {gridCertSaving?"저장 중...":"저장"}
+              </button>
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* 전체현황 그리드 — 출석 셀 편집 모달 (출석/결석 + 사전결석) */}
+      {attEditModal && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}
+          onClick={()=>setAttEditModal(null)}>
+          <div style={{background:T.white,borderRadius:16,padding:24,maxWidth:420,width:"90%",boxShadow:"0 8px 32px rgba(0,0,0,0.18)"}}
+            onClick={e=>e.stopPropagation()}
+            onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); saveGridAttendance(); } if(e.key==="Escape") setAttEditModal(null); }}>
+            <div style={{fontWeight:800,fontSize:15,color:T.navy,marginBottom:6}}>출석 처리</div>
+            <div style={{fontSize:12,color:T.muted,marginBottom:16,lineHeight:1.4}}>
+              <b style={{color:T.navy}}>{attEditModal.studentName}</b> · {attEditModal.sessionLabel}
+            </div>
+            {/* 출석 / 결석 선택 */}
+            <div style={{display:"flex",gap:8,marginBottom:14}}>
+              {[{v:true,label:"출석",bg:"#16A34A"},{v:false,label:"결석",bg:"#DC2626"}].map(o=>(
+                <button key={String(o.v)}
+                  onClick={()=>setAttEditModal(p=>({...p,present:o.v, ...(o.v?{preAbsence:false}:{})}))}
+                  style={{flex:1,padding:"10px 0",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",
+                    border:`2px solid ${attEditModal.present===o.v?o.bg:T.border}`,
+                    background:attEditModal.present===o.v?o.bg:T.white,
+                    color:attEditModal.present===o.v?T.white:T.muted}}>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            {/* 사전결석 신청 (결석일 때만 의미) */}
+            <label style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",borderRadius:10,cursor:attEditModal.present?"not-allowed":"pointer",
+              background:attEditModal.present?"#F8FAFC":"#EFF6FF",border:`1px solid ${attEditModal.present?T.border:"#BFDBFE"}`,opacity:attEditModal.present?0.5:1}}>
+              <input type="checkbox" disabled={attEditModal.present} checked={!!attEditModal.preAbsence}
+                onChange={e=>setAttEditModal(p=>({...p,preAbsence:e.target.checked}))}
+                style={{width:16,height:16,accentColor:"#2563EB"}} />
+              <span style={{fontSize:13,fontWeight:700,color:attEditModal.present?T.muted:"#1D4ED8"}}>사전결석 신청</span>
+            </label>
+            <div style={{fontSize:10,color:T.muted,margin:"10px 2px 16px"}}>
+              ※ 참여시간과 무관하게 처리됩니다. 사전결석은 기록만 되며, 출석 인정 한도(모닝 3·나잇 5)는 카운트 시 적용됩니다.
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button onClick={()=>setAttEditModal(null)} style={{...css.btnOutline,padding:"7px 18px",fontSize:13}}>취소</button>
+              <button onClick={saveGridAttendance} disabled={attEditSaving || attEditModal.studentId==null}
+                style={{...css.btnOrange,padding:"7px 18px",fontSize:13,opacity:(attEditSaving||attEditModal.studentId==null)?0.6:1}}>
+                {attEditSaving?"저장 중...":"저장"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 관리자 전체현황 그리드 출석 셀 hover tooltip */}
       {gridTip && (
