@@ -2137,14 +2137,23 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
   // myAttSet: 출석 인정 (카운트 대상) / myAttUnderSet: 참석은 했으나 시간 미달 / myAttMinutes: 분 표시용
   const myAttSet      = new Set();
   const myAttUnderSet = new Set();
-  const myAttPreSet   = new Set(); // 사전결석 신청(결석이지만 신청 기록) — Phase1은 출석 카운트 제외
+  const myAttPreSet   = new Set(); // 사전결석 신청(결석이지만 신청 기록)
+  const myAttPreExcessSet = new Set(); // 사전결석 한도 초과 → 미인정
   const myAttMinutes  = new Map();
+  const myPreByType   = { M: [], N: [] };
   myAttLogs.forEach(l => {
     const key = `${l.session_type}-${l.session_date}`;
-    if (l.pre_absence) { myAttPreSet.add(key); myAttSet.add(key); return; } // 사전결석 = 출석 인정
+    if (l.pre_absence) { myAttPreSet.add(key); if (myPreByType[l.session_type]) myPreByType[l.session_type].push(l.session_date); return; }
     myAttMinutes.set(key, l.participation_minutes ?? null);
     if (isValidAttendance(l.session_type, l.participation_minutes, l.session_date)) myAttSet.add(key);
     else myAttUnderSet.add(key);
+  });
+  // 사전결석 한도(모닝 3·나잇 5): 회차 빠른 순 N개만 출석 인정, 초과분 미인정
+  const MY_PRE_CAP = { M: 3, N: 5 };
+  Object.keys(myPreByType).forEach(t => {
+    const cap = MY_PRE_CAP[t] ?? 0;
+    myPreByType[t].sort();
+    myPreByType[t].forEach((d, i) => { if (i < cap) myAttSet.add(`${t}-${d}`); else myAttPreExcessSet.add(`${t}-${d}`); });
   });
 
   // 시간 기준 — allStats / mentor / mastery 모두 공통 사용 (TDZ 회피 위해 위로 이동)
@@ -3202,6 +3211,25 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
           preAbsAt: r.pre_absence_at || null,
         };
       }
+    });
+    // 사전결석 한도(모닝 3·나잇 5): 학생·타입별 회차 빠른 순 N개만 출석 인정, 초과분은
+    // 기록은 유지하되 카운트에서 제외(valid=false, preAbsExcess 표시). — 사장님 방침
+    const PRE_CAP = { "M": 3, "나": 5 };
+    const preGroups = {};
+    Object.keys(map).forEach(k => {
+      if (!map[k].preAbs) return;
+      const parts = k.split("-");                 // [idx, type, YYYY, MM, DD]
+      const g = `${parts[0]}-${parts[1]}`;
+      const date = parts.slice(2).join("-");
+      (preGroups[g] = preGroups[g] || []).push({ date, key: k });
+    });
+    Object.entries(preGroups).forEach(([g, arr]) => {
+      const type = g.split("-")[1];
+      const cap = PRE_CAP[type] ?? 0;
+      arr.sort((a, b) => a.date.localeCompare(b.date));
+      arr.forEach((it, i) => {
+        if (i >= cap) { map[it.key].valid = false; map[it.key].preAbsExcess = true; }
+      });
     });
     setAttendance2(map);
   };
@@ -4964,15 +4992,16 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                               // M/나 출석: {valid, minutes}. 미달은 valid=false, minutes는 표시용
                               const att = sec.type !== "N" ? getAtt(s.idx, sec.type, key) : null;
                               const preAbs = sec.type !== "N" && !!(att && att.preAbs);
+                              const preAbsExcess = preAbs && !!att.preAbsExcess; // 한도 초과 → 미인정
                               const checked = sec.type === "N" ? hasNaverCert : !!(att && att.valid);
                               const underMin = sec.type !== "N" && att && !att.valid && !preAbs;
                               const minThr = sec.type === "나" ? MIN_ATTENDANCE_MINUTES.N : sec.type === "M" ? MIN_ATTENDANCE_MINUTES.M : null;
                               const status = sec.type === "N"
                                 ? (hasNaverCert ? (isLate ? "지각 인정" : "정시 인증") : "미인증")
-                                : (preAbs ? "사전결석(출석 인정)" : checked ? "완료" : underMin ? "참여시간미달" : "미참여");
+                                : (preAbsExcess ? "사전결석(한도초과·미인정)" : preAbs ? "사전결석(출석 인정)" : checked ? "완료" : underMin ? "참여시간미달" : "미참여");
                               const tipLines = [
                                 { label: `${s.name} · ${dt.getMonth()+1}/${dt.getDate()} · ${sec.label}`, color: sec.color },
-                                { label: `상태: ${status}`, color: preAbs ? "#2563EB" : checked ? "#16A34A" : underMin ? "#9A3412" : (sec.type==="N" && isLate) ? "#B45309" : T.muted },
+                                { label: `상태: ${status}`, color: preAbsExcess ? "#64748B" : preAbs ? "#2563EB" : checked ? "#16A34A" : underMin ? "#9A3412" : (sec.type==="N" && isLate) ? "#B45309" : T.muted },
                                 ...(att && att.minutes != null ? [{ label: `참여 시간: ${att.minutes}분`, color: T.navy }] : []),
                                 ...(underMin && minThr ? [{ label: `(인정 기준 ${minThr}분 미만)`, color: "#9A3412" }] : []),
                                 { label: "클릭해서 수정", color: T.muted },
@@ -5020,10 +5049,12 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                                     cursor:"pointer",
                                     fontSize: 12,
                                     fontWeight: (checked||underMin||preAbs) ? 800 : 400,
-                                    color: preAbs ? "#2563EB"
+                                    color: preAbsExcess ? "#94A3B8"
+                                                   : preAbs ? "#2563EB"
                                                    : checked ? (sec.type==="N" && isLate ? "#B45309" : sec.color)
                                                    : underMin ? "#9A3412" : "transparent",
-                                    background: preAbs ? "#DBEAFE"
+                                    background: preAbsExcess ? "#F1F5F9"
+                                                       : preAbs ? "#DBEAFE"
                                                        : checked ? (sec.type==="N" && isLate ? "#FEF3C7" : sec.bg)
                                                        : underMin ? "#FED7AA" : "transparent",
                                     borderBottom:`1px solid ${T.border}`,
@@ -5033,7 +5064,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                                   }}>
                                   {sec.type === "N"
                                     ? (hasNaverCert ? (isLate ? "△" : "O") : "")
-                                    : (preAbs ? "신" : checked ? "✓" : underMin ? "△" : "")}
+                                    : (preAbs ? <span style={{fontSize:9,fontWeight:800}}>사전</span> : checked ? "✓" : underMin ? "△" : "")}
                                 </td>
                               );
                             })
