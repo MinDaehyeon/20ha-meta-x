@@ -159,7 +159,8 @@ $$;
 GRANT EXECUTE ON FUNCTION public.get_attendance_logs(date, date) TO authenticated;
 
 -- ─────────────────────────────────────────────────────────
--- (5) 클래스 출석 통계: 사전결석 행은 카운트 제외 (Phase1)
+-- (5) 클래스 출석 통계: 사전결석 행도 출석으로 카운트(인정).
+--     한도(모닝3·나잇5) 초과분 제외는 Phase2에서 적용.
 -- ─────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.get_class_attendance_stats()
 RETURNS TABLE(student_name text, morning_count integer, night_count integer)
@@ -168,8 +169,7 @@ LANGUAGE sql SECURITY DEFINER AS $$
     COALESCE(SUM(CASE WHEN a.session_type='M' THEN 1 ELSE 0 END), 0)::int,
     COALESCE(SUM(CASE WHEN a.session_type='N' THEN 1 ELSE 0 END), 0)::int
   FROM public.cert_students s
-  LEFT JOIN public.attendance_logs a
-    ON a.student_id = s.id AND a.pre_absence = false
+  LEFT JOIN public.attendance_logs a ON a.student_id = s.id
   WHERE s.sort_order < 43
   GROUP BY s.name
   ORDER BY s.name;

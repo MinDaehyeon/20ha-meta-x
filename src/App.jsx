@@ -2141,7 +2141,7 @@ const StudentCertView = ({profile, viewerMode="self"}) => {
   const myAttMinutes  = new Map();
   myAttLogs.forEach(l => {
     const key = `${l.session_type}-${l.session_date}`;
-    if (l.pre_absence) { myAttPreSet.add(key); return; }
+    if (l.pre_absence) { myAttPreSet.add(key); myAttSet.add(key); return; } // 사전결석 = 출석 인정
     myAttMinutes.set(key, l.participation_minutes ?? null);
     if (isValidAttendance(l.session_type, l.participation_minutes, l.session_date)) myAttSet.add(key);
     else myAttUnderSet.add(key);
@@ -3193,8 +3193,8 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
       if(idx >= 0){
         // session_type: "M" 또는 "N"(나잇) → roster2 키는 "M" 또는 "나"
         const rosterType = r.session_type === "N" ? "나" : "M";
-        // 사전결석 행은 출석 카운트 제외(Phase1). 표시용으로 preAbs 보관.
-        const valid = !r.pre_absence && isValidAttendance(r.session_type, r.participation_minutes, r.session_date);
+        // 사전결석 신청 = 출석 인정(카운트 O). 한도(모닝3·나잇5) 초과분 제외는 Phase2.
+        const valid = r.pre_absence ? true : isValidAttendance(r.session_type, r.participation_minutes, r.session_date);
         map[`${idx}-${rosterType}-${r.session_date}`] = {
           valid,
           minutes: r.participation_minutes,
@@ -4969,10 +4969,10 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                               const minThr = sec.type === "나" ? MIN_ATTENDANCE_MINUTES.N : sec.type === "M" ? MIN_ATTENDANCE_MINUTES.M : null;
                               const status = sec.type === "N"
                                 ? (hasNaverCert ? (isLate ? "지각 인정" : "정시 인증") : "미인증")
-                                : (checked ? "완료" : preAbs ? "사전결석(신청)" : underMin ? "참여시간미달" : "미참여");
+                                : (preAbs ? "사전결석(출석 인정)" : checked ? "완료" : underMin ? "참여시간미달" : "미참여");
                               const tipLines = [
                                 { label: `${s.name} · ${dt.getMonth()+1}/${dt.getDate()} · ${sec.label}`, color: sec.color },
-                                { label: `상태: ${status}`, color: checked ? "#16A34A" : preAbs ? "#2563EB" : underMin ? "#9A3412" : (sec.type==="N" && isLate) ? "#B45309" : T.muted },
+                                { label: `상태: ${status}`, color: preAbs ? "#2563EB" : checked ? "#16A34A" : underMin ? "#9A3412" : (sec.type==="N" && isLate) ? "#B45309" : T.muted },
                                 ...(att && att.minutes != null ? [{ label: `참여 시간: ${att.minutes}분`, color: T.navy }] : []),
                                 ...(underMin && minThr ? [{ label: `(인정 기준 ${minThr}분 미만)`, color: "#9A3412" }] : []),
                                 { label: "클릭해서 수정", color: T.muted },
@@ -5003,7 +5003,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                                     sessionDate: key,
                                     sessionType: sec.type === "나" ? "N" : "M",
                                     sessionLabel: `${fmt(dt)}(${DAY_KO[dt.getDay()]}) ${sec.label}`,
-                                    present: !!(att && att.valid),
+                                    present: !!(att && att.valid && !att.preAbs),
                                     preAbsence: preAbs,
                                   });
                                 }
@@ -5020,11 +5020,11 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                                     cursor:"pointer",
                                     fontSize: 12,
                                     fontWeight: (checked||underMin||preAbs) ? 800 : 400,
-                                    color: checked ? (sec.type==="N" && isLate ? "#B45309" : sec.color)
-                                                   : preAbs ? "#2563EB"
+                                    color: preAbs ? "#2563EB"
+                                                   : checked ? (sec.type==="N" && isLate ? "#B45309" : sec.color)
                                                    : underMin ? "#9A3412" : "transparent",
-                                    background: checked ? (sec.type==="N" && isLate ? "#FEF3C7" : sec.bg)
-                                                       : preAbs ? "#DBEAFE"
+                                    background: preAbs ? "#DBEAFE"
+                                                       : checked ? (sec.type==="N" && isLate ? "#FEF3C7" : sec.bg)
                                                        : underMin ? "#FED7AA" : "transparent",
                                     borderBottom:`1px solid ${T.border}`,
                                     borderLeft: di===0 ? `2px solid ${sec.color}` : `1px solid ${T.border}`,
@@ -5033,7 +5033,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
                                   }}>
                                   {sec.type === "N"
                                     ? (hasNaverCert ? (isLate ? "△" : "O") : "")
-                                    : (checked ? "✓" : preAbs ? "신" : underMin ? "△" : "")}
+                                    : (preAbs ? "신" : checked ? "✓" : underMin ? "△" : "")}
                                 </td>
                               );
                             })
@@ -5176,7 +5176,7 @@ const AdminDashboard = ({allLogs, allProfiles, onRefresh, defaultTab="users", de
               <span style={{fontSize:13,fontWeight:700,color:attEditModal.present?T.muted:"#1D4ED8"}}>사전결석 신청</span>
             </label>
             <div style={{fontSize:10,color:T.muted,margin:"10px 2px 16px"}}>
-              ※ 참여시간과 무관하게 처리됩니다. 사전결석은 기록만 되며, 출석 인정 한도(모닝 3·나잇 5)는 카운트 시 적용됩니다.
+              ※ 참여시간과 무관하게 처리됩니다. 사전결석은 출석으로 인정되며, 한도(모닝 3·나잇 5) 초과분은 카운트에서 제외됩니다.
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
               <button onClick={()=>setAttEditModal(null)} style={{...css.btnOutline,padding:"7px 18px",fontSize:13}}>취소</button>
